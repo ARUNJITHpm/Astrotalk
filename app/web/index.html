@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="ml">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tara — താര</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Noto+Sans+Malayalam:wght@400;500;600&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,400&display=swap"
+    rel="stylesheet"
+  />
+</head>
+<body>
+  <div class="app">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="brand">
+        <span class="brand-star">✦</span>
+        <span class="brand-name">Tara</span>
+      </div>
+      <button id="new-chat" class="new-chat">+ പുതിയ സംഭാഷണം</button>
+      <nav id="history" class="history"></nav>
+      <div class="sidebar-foot">
+        <span class="dot"></span> AI ജ്യോതിഷ കൂട്ടുകാരി
+      </div>
+    </aside>
+
+    <!-- Main chat -->
+    <main class="chat">
+      <header class="chat-head">
+        <div class="chat-title">താര</div>
+        <div class="chat-sub">മാർഗനിർദേശം, ഭയമല്ല</div>
+      </header>
+
+      <div id="messages" class="messages">
+        <div class="welcome">
+          <div class="welcome-star">✦</div>
+          <h1>നമസ്കാരം 🙏</h1>
+          <p>ഞാൻ <strong>താര</strong> — നിങ്ങളുടെ Malayalam AI ജ്യോതിഷ കൂട്ടുകാരി.<br />
+             ഇന്ന് നിങ്ങളുടെ മനസ്സിൽ എന്താണ്?</p>
+          <div class="suggestions">
+            <button class="chip">എന്റെ ഇന്നത്തെ നക്ഷത്രഫലം</button>
+            <button class="chip">ജോലിയെക്കുറിച്ച് ഉത്കണ്ഠയുണ്ട്</button>
+            <button class="chip">പൊരുത്തം നോക്കാമോ?</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="composer">
+        <form id="composer-form" class="composer-form">
+          <textarea
+            id="input"
+            class="input"
+            rows="1"
+            placeholder="താരയോട് ചോദിക്കൂ…"
+            autofocus
+          ></textarea>
+          <button id="send" class="send" type="submit" aria-label="Send">↑</button>
+        </form>
+        <div class="disclaimer">Tara ഒരു AI ആണ് · മാർഗനിർദേശത്തിന് മാത്രം · അടിയന്തരം: Tele-MANAS 14416</div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

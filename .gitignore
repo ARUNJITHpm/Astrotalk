@@ -1,0 +1,53 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Type / lint / test caches
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+coverage/
+htmlcov/
+
+# Secrets — NEVER commit (AGENTS.md hard guardrail)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# ChromaDB local data (embedded mode)
+chroma_data/
+
+# Generated files
+tara_project_overview.pdf
+
+# Local / scratch directories
+vinimon/
+
+# Logs
+logs/
+*.log
+
+# IDEs / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Node (Next.js / React Native)
+node_modules/
+.next/
+.expo/
