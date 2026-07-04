@@ -28,6 +28,21 @@ from app.platform.logging_config import get_logger
 
 logger = get_logger(__name__)
 
+# Topic → divisional chart (varga). Checked in order against the user's latest
+# message; the first hit picks which varga is grafted into the prompt alongside
+# the fixed D1 chart. Keywords cover Malayalam + English phrasings.
+_VARGA_TOPICS: list[tuple[str, tuple[str, ...]]] = [
+    ("D10", ("career", "job", "work", "business", "promotion", "profession",
+             "ജോലി", "തൊഴിൽ", "ബിസിനസ", "കരിയർ", "ഉദ്യോഗ", "പ്രമോഷൻ")),
+    ("D9", ("marriage", "relationship", "love", "spouse", "partner", "wedding",
+            "divorce", "പൊരുത്തം", "വിവാഹ", "കല്യാണ", "പ്രണയ", "ഭർത്താ", "ഭാര്യ",
+            "ദാമ്പത്യ", "വിവാഹമോചന")),
+    ("D7", ("child", "children", "baby", "pregnan", "കുട്ടി", "കുഞ്ഞ", "സന്താന",
+            "ഗർഭ")),
+    ("D12", ("parent", "mother", "father", "അമ്മ", "അച്ഛ", "മാതാപിതാ")),
+    ("D3", ("sibling", "brother", "sister", "സഹോദര")),
+]
+
 
 class ChatService:
     def __init__(
@@ -104,6 +119,26 @@ class ChatService:
         grounded_in.extend(f"knowledge:{chunk.id}" for chunk in retrieved)
         _mark("rag_retrieve", s, tool="knowledge.retrieve", k=3, hits=len(retrieved), query=query)
 
+        # --- Step 3a2: pick the topical divisional chart (varga) ---
+        # The D1 chart is fixed; vargas answer specific domains (D9 marriage,
+        # D10 career, …). Keep only the topical one in the prompt so it stays
+        # focused instead of dumping all five divisional charts.
+        varga_key = self._select_varga(latest)
+        chart_for_prompt = chart
+        varga_used = False
+        if isinstance(chart, dict) and "vargas" in chart:
+            vargas = chart["vargas"]
+            chart_for_prompt = {k: v for k, v in chart.items() if k != "vargas"}
+            if varga_key and varga_key in vargas:
+                chart_for_prompt["divisional_chart"] = {varga_key: vargas[varga_key]}
+                grounded_in.append(f"varga:{varga_key}")
+                varga_used = True
+        if debug:
+            steps.append({
+                "step": "select_varga", "ms": 0.0, "tool": "chat.service._select_varga",
+                "topic_varga": varga_key, "used": varga_used,
+            })
+
         # --- Step 3b: durable user memory (cross-session profile) ---
         s = time.perf_counter()
         memory = await self._load_memory(user_id)
@@ -114,7 +149,7 @@ class ChatService:
         # --- Step 4: persona system prompt with context ---
         s = time.perf_counter()
         system_prompt = self._tone_safety.build_system_prompt(
-            chart=chart,
+            chart=chart_for_prompt,
             transits=transits,
             retrieved=[c.text for c in retrieved],
             memory=memory,
@@ -204,6 +239,15 @@ class ChatService:
             logger.warning("chat: memory lookup unavailable (%s); continuing.", exc)
             return None
         return user_memory.format_for_prompt(profile)
+
+    @staticmethod
+    def _select_varga(question: str) -> str | None:
+        """Pick the divisional chart matching the question's topic, if any."""
+        lower = question.lower()
+        for varga, keywords in _VARGA_TOPICS:
+            if any(kw in lower for kw in keywords):
+                return varga
+        return None
 
     @staticmethod
     def _retrieval_query(question: str, transits: dict) -> str:

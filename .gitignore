@@ -30,6 +30,11 @@ htmlcov/
 
 # ChromaDB local data (embedded mode)
 chroma_data/
+knowledge_vectordb/
+
+# RAG reference stack from another project — kept locally as a pattern to copy,
+# never committed or imported by app code.
+db/
 
 # Generated files
 tara_project_overview.pdf

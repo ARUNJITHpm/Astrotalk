@@ -174,6 +174,75 @@ def _graha_positions(jd_ut: float, reference_rasi_index: int) -> dict[str, Plane
     return planets
 
 
+# --- Divisional charts (vargas) --------------------------------------------
+# Derived purely from the D1 sidereal longitudes with the classical Parashari
+# division rules — no extra ephemeris calls. Each varga answers a life domain,
+# so chat can pull the matching one in when the user asks about that topic.
+
+VARGA_INFO: dict[str, dict[str, str]] = {
+    "D9": {"varga": "navamsa", "signifies": "marriage, relationships, inner strength"},
+    "D10": {"varga": "dashamsa", "signifies": "career, profession, public life"},
+    "D7": {"varga": "saptamsa", "signifies": "children, progeny"},
+    "D3": {"varga": "drekkana", "signifies": "siblings, courage, effort"},
+    "D12": {"varga": "dwadasamsa", "signifies": "parents, lineage"},
+}
+
+
+def _varga_sign(varga: str, longitude: float) -> int:
+    """Rasi index (0–11) a longitude maps to in the given divisional chart.
+
+    Vedic "odd" signs are Aries, Gemini, … (1st, 3rd, …) — even 0-based index.
+    """
+    lon = longitude % 360.0
+    sign = int(lon // 30)
+    deg = lon % 30
+    if varga == "D9":
+        # Navamsa: 3°20′ parts; the classical movable/fixed/dual start rule is
+        # equivalent to counting 108 parts continuously from 0° Aries.
+        # (lon * 9 // 30, not lon // (10/3): the latter loses exact boundaries
+        # to floating point — e.g. 30.0 // 3.333… lands in the wrong part.)
+        return int(lon * 9 // 30) % 12
+    if varga == "D3":
+        # Drekkana: 10° parts → same sign, 5th, 9th.
+        return (sign + int(deg // 10) * 4) % 12
+    if varga == "D7":
+        # Saptamsa: 30/7° parts; odd signs count from itself, even from the 7th.
+        part = int(deg * 7 // 30)  # boundary-exact (see D9 note)
+        start = sign if sign % 2 == 0 else sign + 6
+        return (start + part) % 12
+    if varga == "D10":
+        # Dashamsa: 3° parts; odd signs count from itself, even from the 9th.
+        part = int(deg // 3)
+        start = sign if sign % 2 == 0 else sign + 8
+        return (start + part) % 12
+    if varga == "D12":
+        # Dwadasamsa: 2°30′ parts, counted from the sign itself.
+        return (sign + int(deg // 2.5)) % 12
+    raise ValueError(f"Unknown varga {varga!r}; expected one of {sorted(VARGA_INFO)}")
+
+
+def compute_vargas(
+    planet_longitudes: dict[str, float], lagna_longitude: float
+) -> dict[str, dict]:
+    """All supported divisional charts from D1 longitudes.
+
+    Houses inside each varga are whole-sign from that varga's own lagna.
+    """
+    out: dict[str, dict] = {}
+    for key, info in VARGA_INFO.items():
+        lagna_idx = _varga_sign(key, lagna_longitude)
+        planets = {}
+        for name, lon in planet_longitudes.items():
+            idx = _varga_sign(key, lon)
+            planets[name] = {
+                "rasi": RASIS[idx],
+                "rasi_index": idx,
+                "house": (idx - lagna_idx) % 12 + 1,
+            }
+        out[key] = {**info, "lagnam": RASIS[lagna_idx], "planets": planets}
+    return out
+
+
 def compute_natal_chart(
     dob: date,
     birth_time: time | None,
@@ -237,6 +306,11 @@ def compute_natal_chart(
         "lagnam": RASIS[lagna_rasi_index],
         "lagna_degree": round(lagna_lon % 30, 4),
         "dasha": dasha,
+        # Divisional charts, derived from the same longitudes. Chat surfaces the
+        # topical one (marriage → D9, career → D10, …) alongside the D1 chart.
+        "vargas": compute_vargas(
+            {name: p.longitude for name, p in planets.items()}, lagna_lon
+        ),
         "planets": {
             name: {
                 "rasi": p.rasi,

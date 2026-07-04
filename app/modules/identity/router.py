@@ -65,7 +65,11 @@ def _chart_is_stale(natal: dict[str, Any] | None) -> bool:
     """
     if natal is None:
         return True
-    return bool(natal.get("mock")) or natal.get("status") == "pending"
+    if bool(natal.get("mock")) or natal.get("status") == "pending":
+        return True
+    # Real charts stored before divisional charts existed lack "vargas" — they
+    # gain them on recompute.
+    return "vargas" not in natal
 
 
 async def _refresh_chart_if_stale(session: AsyncSession, user: User) -> None:
