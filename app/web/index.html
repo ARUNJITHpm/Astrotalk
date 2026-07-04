@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Tara — താര</title>
-  <link rel="stylesheet" href="/static/styles.css" />
+  <link rel="stylesheet" href="/static/styles.css?v=7" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link
     href="https://fonts.googleapis.com/css2?family=Noto+Sans+Malayalam:wght@400;500;600&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,400&display=swap"
@@ -20,17 +20,39 @@
         <span class="brand-name">Tara</span>
       </div>
       <button id="new-chat" class="new-chat">+ പുതിയ സംഭാഷണം</button>
-      <nav id="history" class="history"></nav>
+
+      <div class="side-section history-section">
+        <div class="side-section-title">സംഭാഷണങ്ങൾ</div>
+        <nav id="history" class="history"></nav>
+        <div id="history-empty" class="side-empty">ഇതുവരെ സംഭാഷണങ്ങളൊന്നുമില്ല</div>
+      </div>
+
+      <div id="memory-panel" class="side-section memory-section" hidden>
+        <button id="memory-toggle" class="side-section-title memory-title" type="button"
+                aria-expanded="false">
+          <span>✦ താര ഓർക്കുന്നത്</span>
+          <span id="memory-caret" class="memory-caret">▸</span>
+        </button>
+        <ul id="memory-facts" class="memory-facts" hidden></ul>
+      </div>
       <div class="sidebar-foot">
-        <span class="dot"></span> AI ജ്യോതിഷ കൂട്ടുകാരി
+        <button id="change-number" class="change-number" hidden></button>
+        <div class="foot-status"><span class="dot"></span> AI ജ്യോതിഷ കൂട്ടുകാരി</div>
       </div>
     </aside>
 
     <!-- Main chat -->
     <main class="chat">
       <header class="chat-head">
-        <div class="chat-title">താര</div>
-        <div class="chat-sub">മാർഗനിർദേശം, ഭയമല്ല</div>
+        <div class="chat-head-left">
+          <div class="chat-title">താര</div>
+          <div class="chat-sub">മാർഗനിർദേശം, ഭയമല്ല</div>
+        </div>
+        <div class="chat-head-right">
+          <button id="debug-toggle" class="debug-toggle" type="button" title="Developer debug: show how each reply is built">🐞 Debug</button>
+          <button id="user-badge" class="user-badge" type="button" title="പ്രൊഫൈൽ കാണുക" hidden></button>
+          <button id="logout-btn" class="logout-btn" type="button">ലോഗ്ഔട്ട്</button>
+        </div>
       </header>
 
       <div id="messages" class="messages">
@@ -63,6 +85,32 @@
     </main>
   </div>
 
-  <script src="/static/app.js"></script>
+  <!-- Developer debug: right-side drawer, shown only while Debug is on -->
+  <aside id="debug-drawer" class="debug-drawer" hidden>
+    <div class="debug-drawer-head">
+      <span>🐞 Developer trace</span>
+      <button id="debug-close" class="debug-drawer-close" type="button" aria-label="Close">×</button>
+    </div>
+    <div id="debug-body" class="debug-drawer-body"></div>
+  </aside>
+
+  <!-- Profile: the logged-in user's details -->
+  <div id="profile-modal" class="modal" hidden>
+    <div class="modal-card">
+      <button id="profile-close" class="modal-close" type="button" aria-label="Close">×</button>
+      <div class="profile-avatar" id="pf-avatar">👤</div>
+      <div class="profile-name" id="pf-name"></div>
+      <div class="profile-sub">നിങ്ങളുടെ വിവരങ്ങൾ</div>
+      <dl class="profile-list">
+        <div class="profile-row"><dt>മൊബൈൽ നമ്പർ</dt><dd id="pf-phone">—</dd></div>
+        <div class="profile-row"><dt>ജനന തീയതി</dt><dd id="pf-dob">—</dd></div>
+        <div class="profile-row"><dt>ജനന സമയം</dt><dd id="pf-time">—</dd></div>
+        <div class="profile-row"><dt>ജനന സ്ഥലം</dt><dd id="pf-place">—</dd></div>
+      </dl>
+      <button id="profile-logout" class="modal-logout" type="button">ലോഗ്ഔട്ട്</button>
+    </div>
+  </div>
+
+  <script src="/static/app.js?v=7"></script>
 </body>
 </html>

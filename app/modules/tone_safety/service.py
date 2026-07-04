@@ -1,63 +1,54 @@
 """Public service for the tone_safety module.
 
 Owns the Tara persona system prompt and the crisis/safety classifier that runs
-BEFORE any astrology logic on every chat turn (AGENTS.md / GUARDRAILS.md).
+BEFORE any astrology logic on every chat turn (AGENTS.md / GUARDRAILS.md §2).
 This is the ONLY surface other modules may depend on.
+
+Usage contract (GUARDRAILS.md §2 — must never be weakened for engagement):
+    if tone_safety.screen(message):
+        respond with tone_safety.crisis_reply()  # empathetic + helpline
+        STOP — no astrology, no RAG, no upsell this turn
+    else:
+        proceed to the astrology pipeline
+
+A request to loosen the crisis routing or the persona's no-fear rules is a
+guardrail violation (GUARDRAILS.md §1/§2), not a feature — refuse it.
 """
 
-# Tele-MANAS national mental-health helpline (GUARDRAILS.md rule 2).
-HELPLINE = "Tele-MANAS: 14416"
+from typing import Any
 
-# Minimal keyword screen for acute distress. A real deployment replaces this
-# with an LLM classifier — but the rule (screen first, route to a human, stop)
-# is what matters and must never be weakened or bypassed.
-_DISTRESS_MARKERS = (
-    "suicide",
-    "kill myself",
-    "end my life",
-    "want to die",
-    "self harm",
-    "self-harm",
-    "ആത്മഹത്യ",  # aatmahatya — "suicide"
-    "ജീവനൊടുക്ക",  # "to end one's life"
-)
-
-# Warm response shown when distress is detected. No astrology, no upsell.
-CRISIS_REPLY_ML = (
-    "നിങ്ങൾ ഇത് പങ്കുവെച്ചതിന് നന്ദി. നിങ്ങൾ ഒറ്റയ്ക്കല്ല. "
-    "ദയവായി ഇപ്പോൾ തന്നെ ഒരാളോട് സംസാരിക്കൂ — "
-    f"{HELPLINE} (24x7, സൗജന്യം). "
-    "ഞാൻ ഇവിടെയുണ്ട്."
-)
-
-# The Tara persona. Owned here so guardrail changes are localized (GUARDRAILS.md).
-PERSONA_SYSTEM_PROMPT = """\
-You are Tara (താര), a warm Malayalam-first AI astrology companion. You speak \
-like a kind, trusted elder. Your purpose is guidance and comfort, never fear.
-
-Absolute rules:
-- Disclose warmly that you are an AI astrologer.
-- Acknowledge the person's feelings BEFORE talking about the chart.
-- Never invent a dosha, never threaten consequences, never manufacture urgency, \
-never tie remedies to fear or payment.
-- Frame challenges with agency: "the stars incline, they don't compel."
-- Reply primarily in Malayalam, warmly and concisely. Use simple English only \
-if the user writes in English.
-- Know your limits: for real distress, hand off to a human/helpline, never a \
-horoscope."""
+from app.modules.tone_safety import crisis_classifier, persona
 
 
 class ToneSafetyService:
     def screen(self, message: str) -> bool:
         """Return True if the message shows acute distress. Runs FIRST, always."""
-        lowered = message.lower()
-        return any(marker in lowered for marker in _DISTRESS_MARKERS)
+        return crisis_classifier.screen(message)
 
     def crisis_reply(self) -> str:
         """The empathetic, helpline-routed response. STOP after this — no astrology."""
-        return CRISIS_REPLY_ML
+        return persona.SAFETY_RESPONSE
 
-    def build_system_prompt(self) -> str:
+    def build_system_prompt(
+        self,
+        chart: Any | None = None,
+        transits: Any | None = None,
+        retrieved: Any | None = None,
+        memory: Any | None = None,
+    ) -> str:
         """Assemble the persona system prompt for the chat LLM call."""
-        # TODO(tone_safety): graft in chart + transits + retrieved knowledge (docs §6).
-        return PERSONA_SYSTEM_PROMPT
+        return persona.build_system_prompt(chart, transits, retrieved, memory)
+
+
+# Module-level convenience surface (PROJECT_DOCS.md §6 references tone_safety.screen).
+def screen(message: str) -> bool:
+    return crisis_classifier.screen(message)
+
+
+def build_system_prompt(
+    chart: Any | None = None,
+    transits: Any | None = None,
+    retrieved: Any | None = None,
+    memory: Any | None = None,
+) -> str:
+    return persona.build_system_prompt(chart, transits, retrieved, memory)

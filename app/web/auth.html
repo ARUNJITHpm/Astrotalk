@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="ml">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tara — പ്രവേശനം</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Noto+Sans+Malayalam:wght@400;500;600&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,400&display=swap"
+    rel="stylesheet"
+  />
+  <style>
+    :root {
+      --bg: #f4f1ea;
+      --surface: #fbfaf7;
+      --ink: #2b2722;
+      --muted: #8a8178;
+      --accent: #c45a3b;
+      --accent-hover: #b04e31;
+      --accent-soft: #f0d9cf;
+      --border: #e4ddd0;
+      --field: #fdfcf9;
+      --font-ml: "Noto Sans Malayalam", system-ui, sans-serif;
+      --font-display: "Fraunces", Georgia, serif;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      font-family: var(--font-ml);
+      background: var(--bg);
+      color: var(--ink);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .auth-wrap { display: flex; min-height: 100vh; }
+
+    /* ---------- Left: celestial hero ---------- */
+    .hero {
+      flex: 1.05;
+      position: relative;
+      overflow: hidden;
+      background:
+        radial-gradient(120% 90% at 20% 10%, #4a3b52 0%, #322833 45%, #241e21 100%);
+      color: #efe7dc;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 44px 48px;
+    }
+    .hero::after {
+      /* soft warm glow rising from the horizon */
+      content: "";
+      position: absolute;
+      inset: auto -20% -35% -20%;
+      height: 70%;
+      background: radial-gradient(60% 100% at 50% 100%, rgba(196,90,59,0.42), transparent 70%);
+      pointer-events: none;
+    }
+    .stars { position: absolute; inset: 0; pointer-events: none; }
+    .stars i {
+      position: absolute;
+      width: 2px; height: 2px;
+      background: #fff;
+      border-radius: 50%;
+      opacity: 0.7;
+      animation: twinkle 3.6s ease-in-out infinite;
+    }
+    .stars i:nth-child(1) { top: 14%; left: 22%; }
+    .stars i:nth-child(2) { top: 26%; left: 68%; width: 3px; height: 3px; animation-delay: .4s; }
+    .stars i:nth-child(3) { top: 40%; left: 12%; animation-delay: .9s; }
+    .stars i:nth-child(4) { top: 58%; left: 78%; animation-delay: 1.4s; }
+    .stars i:nth-child(5) { top: 70%; left: 30%; width: 3px; height: 3px; animation-delay: .2s; }
+    .stars i:nth-child(6) { top: 18%; left: 48%; animation-delay: 2.1s; }
+    .stars i:nth-child(7) { top: 82%; left: 60%; animation-delay: 1.1s; }
+    .stars i:nth-child(8) { top: 48%; left: 40%; animation-delay: 2.6s; }
+    @keyframes twinkle { 0%, 100% { opacity: .25; } 50% { opacity: .9; } }
+
+    .hero-brand {
+      display: flex; align-items: center; gap: 11px;
+      font-family: var(--font-display);
+      font-size: 24px; font-weight: 600;
+      position: relative; z-index: 1;
+    }
+    .hero-brand .star { color: var(--accent); font-size: 22px; }
+
+    .hero-copy { position: relative; z-index: 1; margin-bottom: 8px; }
+    .hero-copy .glyph { font-size: 40px; color: var(--accent); display: block; margin-bottom: 18px; }
+    .hero-copy h1 {
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 38px;
+      line-height: 1.2;
+      margin: 0 0 14px;
+      letter-spacing: 0.2px;
+    }
+    .hero-copy p {
+      font-size: 16px;
+      line-height: 1.7;
+      color: #cbbfb2;
+      max-width: 30ch;
+      margin: 0;
+    }
+    .hero-foot {
+      position: relative; z-index: 1;
+      font-size: 12.5px;
+      color: #9d9284;
+    }
+
+    /* ---------- Right: auth card ---------- */
+    .panel {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 24px;
+    }
+    .card {
+      width: 100%;
+      max-width: 400px;
+    }
+    .card-head { text-align: center; margin-bottom: 22px; }
+    .card-head .mini-star { display: none; }
+    .card-head h2 {
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 26px;
+      margin: 0 0 6px;
+    }
+    .card-head p { color: var(--muted); font-size: 14px; margin: 0; }
+
+    .tabs {
+      display: flex; gap: 4px;
+      background: #ece5d8;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 4px;
+      margin-bottom: 22px;
+    }
+    .tab {
+      flex: 1;
+      padding: 10px;
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      font-family: var(--font-ml);
+      font-size: 14.5px;
+      border-radius: 9px;
+      cursor: pointer;
+      transition: background .18s, color .18s, box-shadow .18s;
+    }
+    .tab.active {
+      background: var(--surface);
+      color: var(--accent);
+      font-weight: 500;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+
+    form { display: flex; flex-direction: column; gap: 15px; }
+    form[hidden] { display: none; }
+    label {
+      display: flex; flex-direction: column; gap: 6px;
+      font-size: 13px; color: var(--muted);
+    }
+    label .opt { color: #b3a99c; font-size: 12px; }
+    input {
+      font-family: var(--font-ml);
+      font-size: 15px; color: var(--ink);
+      background: var(--field);
+      border: 1px solid var(--border);
+      border-radius: 11px;
+      padding: 12px 13px;
+      outline: none;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    input::placeholder { color: #c3b9ac; }
+    input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-soft);
+    }
+
+    .submit {
+      margin-top: 4px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 12px;
+      padding: 13px 16px;
+      font-family: var(--font-ml);
+      font-size: 15.5px;
+      cursor: pointer;
+      transition: background .15s, transform .1s;
+    }
+    .submit:hover { background: var(--accent-hover); }
+    .submit:active { transform: scale(0.985); }
+    .submit:disabled { opacity: .6; cursor: default; }
+
+    .error {
+      color: var(--accent);
+      font-size: 13px;
+      background: var(--accent-soft);
+      border-radius: 9px;
+      padding: 9px 11px;
+      margin: 2px 0 -2px;
+    }
+    .error[hidden] { display: none; }
+
+    .fine {
+      text-align: center;
+      color: #a89e91;
+      font-size: 12px;
+      margin-top: 22px;
+      line-height: 1.6;
+    }
+
+    /* ---------- Responsive ---------- */
+    @media (max-width: 860px) {
+      .hero { display: none; }
+      .card-head .mini-star { display: block; font-size: 30px; color: var(--accent); margin-bottom: 8px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="auth-wrap">
+    <!-- Hero -->
+    <section class="hero">
+      <div class="stars"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      <div class="hero-brand"><span class="star">✦</span> Tara</div>
+      <div class="hero-copy">
+        <span class="glyph">✦</span>
+        <h1>നിങ്ങളുടെ<br />ജ്യോതിഷ കൂട്ടുകാരി</h1>
+        <p>മലയാളത്തിൽ സംസാരിക്കുന്ന, സത്യസന്ധമായ AI മാർഗനിർദേശം — ഭയമല്ല.</p>
+      </div>
+      <div class="hero-foot">✦ മാർഗനിർദേശത്തിന് മാത്രം · അടിയന്തരം: Tele-MANAS 14416</div>
+    </section>
+
+    <!-- Auth panel -->
+    <main class="panel">
+      <div class="card">
+        <div class="card-head">
+          <div class="mini-star">✦</div>
+          <h2>നമസ്കാരം 🙏</h2>
+          <p id="sub">താരയിലേക്ക് പ്രവേശിക്കൂ</p>
+        </div>
+
+        <div class="tabs">
+          <button type="button" id="tab-login" class="tab active">പ്രവേശനം</button>
+          <button type="button" id="tab-register" class="tab">പുതിയ അക്കൗണ്ട്</button>
+        </div>
+
+        <!-- Login -->
+        <form id="login-form">
+          <label>മൊബൈൽ നമ്പർ
+            <input id="login-phone" type="tel" autocomplete="username" placeholder="+91 98765 43210" />
+          </label>
+          <label>പാസ്‌വേഡ്
+            <input id="login-password" type="password" autocomplete="current-password" placeholder="പാസ്‌വേഡ്" />
+          </label>
+          <div id="login-error" class="error" hidden></div>
+          <button type="submit" class="submit">പ്രവേശിക്കൂ →</button>
+        </form>
+
+        <!-- Register -->
+        <form id="register-form" hidden>
+          <label>മൊബൈൽ നമ്പർ
+            <input id="reg-phone" type="tel" autocomplete="username" placeholder="+91 98765 43210" />
+          </label>
+          <label>പാസ്‌വേഡ്
+            <input id="reg-password" type="password" autocomplete="new-password" placeholder="കുറഞ്ഞത് 4 അക്ഷരം" />
+          </label>
+          <label>പേര്
+            <input id="reg-name" type="text" placeholder="നിങ്ങളുടെ പേര്" />
+          </label>
+          <label>ജനന തീയതി
+            <input id="reg-dob" type="date" />
+          </label>
+          <label>ജനന സമയം <span class="opt">(അറിയാമെങ്കിൽ)</span>
+            <input id="reg-time" type="time" />
+          </label>
+          <label>ജനന സ്ഥലം
+            <input id="reg-place" type="text" placeholder="ഉദാ. തൃശൂർ, കേരളം" />
+          </label>
+          <div id="reg-error" class="error" hidden></div>
+          <button type="submit" class="submit">തുടങ്ങൂ →</button>
+        </form>
+
+        <p class="fine">Tara ഒരു AI ആണ് · നിങ്ങളുടെ വിവരങ്ങൾ സ്വകാര്യമായി സൂക്ഷിക്കുന്നു</p>
+      </div>
+    </main>
+  </div>
+
+  <script src="/static/auth.js?v=3"></script>
+</body>
+</html>

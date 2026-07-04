@@ -1,10 +1,8 @@
-"""App logging setup.
+"""Backwards-compatible shim — logging now lives in ``logging_config``.
 
 HARD RULE (AGENTS.md): never log raw birth data or secrets.
 """
 
-import logging
+from app.platform.logging_config import configure_logging, get_logger
 
-
-def get_logger(name: str) -> logging.Logger:
-    return logging.getLogger(name)
+__all__ = ["configure_logging", "get_logger"]

@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="ml">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tara · WhatsApp</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Noto+Sans+Malayalam:wght@400;500;600&display=swap"
+    rel="stylesheet"
+  />
+  <style>
+    /* WhatsApp-style skin for the SAME chatbot backend (/chat/message).
+       Self-contained so it stays isolated from the main web UI's styles.css. */
+    :root {
+      --wa-green: #075e54;      /* header */
+      --wa-teal: #128c7e;
+      --wa-light-green: #25d366;
+      --wa-out: #d9fdd3;        /* outgoing bubble (you) */
+      --wa-out-dark: #dcf8c6;
+      --wa-in: #ffffff;         /* incoming bubble (Tara) */
+      --wa-bg: #efeae2;         /* chat wallpaper base */
+      --wa-ink: #111b21;
+      --wa-muted: #667781;
+      --wa-tick: #53bdeb;
+      --font-ml: "Noto Sans Malayalam", system-ui, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      font-family: var(--font-ml);
+      background: #d1d7db;
+      color: var(--wa-ink);
+      -webkit-font-smoothing: antialiased;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    /* Phone frame — centers the chat on desktop, full-screen on mobile. */
+    .phone {
+      width: 100%; max-width: 460px; height: 100vh; max-height: 900px;
+      display: flex; flex-direction: column;
+      background: var(--wa-bg);
+      box-shadow: 0 6px 40px rgba(0,0,0,0.18);
+      overflow: hidden;
+      position: relative;
+    }
+    @media (max-width: 480px) { .phone { max-height: none; } }
+
+    /* ---------- Header ---------- */
+    .wa-head {
+      background: var(--wa-green);
+      color: #fff;
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 14px;
+      flex-shrink: 0;
+    }
+    .wa-back { font-size: 22px; opacity: 0.9; }
+    .wa-avatar {
+      width: 40px; height: 40px; border-radius: 50%;
+      background: var(--wa-light-green); color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; flex-shrink: 0;
+    }
+    .wa-meta { flex: 1; min-width: 0; line-height: 1.3; }
+    .wa-name { font-size: 16px; font-weight: 600; }
+    .wa-status { font-size: 12px; color: #cfe9e2; }
+    .wa-icons { display: flex; gap: 20px; font-size: 18px; opacity: 0.9; }
+
+    /* ---------- Chat area ---------- */
+    .wa-chat {
+      flex: 1; overflow-y: auto;
+      padding: 14px 8px 8px;
+      display: flex; flex-direction: column; gap: 3px;
+      /* subtle WhatsApp doodle vibe via layered gradients (no external asset) */
+      background-color: var(--wa-bg);
+      background-image:
+        radial-gradient(circle at 20% 30%, rgba(0,0,0,0.015) 0 2px, transparent 2px),
+        radial-gradient(circle at 70% 60%, rgba(0,0,0,0.015) 0 2px, transparent 2px),
+        radial-gradient(circle at 40% 80%, rgba(0,0,0,0.015) 0 2px, transparent 2px);
+      background-size: 90px 90px, 120px 120px, 70px 70px;
+    }
+    .wa-day {
+      align-self: center; background: #ffffff; color: var(--wa-muted);
+      font-size: 12px; padding: 5px 12px; border-radius: 8px;
+      box-shadow: 0 1px 0 rgba(0,0,0,0.05); margin: 4px 0 8px;
+    }
+    .wa-note {
+      align-self: center; background: #ffeecd; color: #7a6a3a;
+      font-size: 12px; text-align: center; line-height: 1.5;
+      padding: 8px 14px; border-radius: 8px; max-width: 90%;
+      box-shadow: 0 1px 0 rgba(0,0,0,0.05); margin: 2px 0 10px;
+    }
+
+    .bubble {
+      max-width: 82%;
+      padding: 6px 9px 8px;
+      border-radius: 8px;
+      font-size: 14.5px; line-height: 1.5;
+      position: relative;
+      white-space: pre-wrap; word-wrap: break-word;
+      box-shadow: 0 1px 0.5px rgba(0,0,0,0.13);
+      margin-bottom: 2px;
+    }
+    .bubble .txt { display: inline; }
+    .bubble .stamp {
+      float: right; margin: 6px 0 -2px 8px;
+      font-size: 10.5px; color: var(--wa-muted);
+      display: inline-flex; align-items: center; gap: 3px;
+    }
+    .bubble .tick { color: var(--wa-tick); font-size: 13px; line-height: 1; }
+
+    .bubble.in {
+      align-self: flex-start; background: var(--wa-in);
+      border-top-left-radius: 2px;
+    }
+    .bubble.out {
+      align-self: flex-end; background: var(--wa-out-dark);
+      border-top-right-radius: 2px;
+    }
+
+    /* typing indicator */
+    .typing { display: inline-flex; gap: 4px; padding: 3px 2px; }
+    .typing span {
+      width: 7px; height: 7px; border-radius: 50%; background: #9aa6ac;
+      animation: bounce 1.2s infinite ease-in-out;
+    }
+    .typing span:nth-child(2) { animation-delay: 0.15s; }
+    .typing span:nth-child(3) { animation-delay: 0.3s; }
+    @keyframes bounce { 0%, 60%, 100% { transform: translateY(0); opacity: 0.5; } 30% { transform: translateY(-4px); opacity: 1; } }
+
+    /* ---------- Composer ---------- */
+    .wa-composer {
+      flex-shrink: 0; padding: 8px 10px;
+      display: flex; align-items: flex-end; gap: 8px;
+      background: transparent;
+    }
+    .wa-input-wrap {
+      flex: 1; display: flex; align-items: center; gap: 8px;
+      background: #fff; border-radius: 24px;
+      padding: 8px 14px;
+      box-shadow: 0 1px 1px rgba(0,0,0,0.06);
+    }
+    .wa-input {
+      flex: 1; border: none; outline: none; resize: none;
+      font-family: var(--font-ml); font-size: 15px; color: var(--wa-ink);
+      max-height: 120px; line-height: 1.4; background: transparent;
+    }
+    .wa-send {
+      width: 46px; height: 46px; flex-shrink: 0;
+      border: none; border-radius: 50%;
+      background: var(--wa-teal); color: #fff;
+      font-size: 20px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: transform 0.1s, background 0.15s;
+    }
+    .wa-send:hover { background: var(--wa-green); }
+    .wa-send:active { transform: scale(0.92); }
+    .wa-send:disabled { opacity: 0.5; cursor: default; }
+
+    /* ---------- Number gate ---------- */
+    .gate {
+      position: absolute; inset: 0; z-index: 20;
+      background: rgba(6, 40, 36, 0.92);
+      display: flex; align-items: center; justify-content: center; padding: 24px;
+    }
+    .gate[hidden] { display: none; }
+    .gate-card {
+      background: #fff; border-radius: 14px; padding: 26px 22px;
+      width: 100%; max-width: 340px; text-align: center;
+    }
+    .gate-card h2 { margin: 6px 0 4px; font-size: 20px; }
+    .gate-card p { margin: 0 0 18px; color: var(--wa-muted); font-size: 13.5px; line-height: 1.5; }
+    .gate-card input {
+      width: 100%; font-family: var(--font-ml); font-size: 16px;
+      padding: 11px 12px; border: 1px solid #d5dbdc; border-radius: 10px;
+      outline: none; margin-bottom: 12px;
+    }
+    .gate-card input:focus { border-color: var(--wa-teal); }
+    .gate-card button {
+      width: 100%; background: var(--wa-light-green); color: #fff;
+      border: none; border-radius: 10px; padding: 12px; font-size: 15px;
+      font-family: var(--font-ml); cursor: pointer;
+    }
+    .gate-err { color: #d33; font-size: 13px; min-height: 18px; margin-bottom: 6px; }
+  </style>
+</head>
+<body>
+  <div class="phone">
+    <header class="wa-head">
+      <span class="wa-back">‹</span>
+      <div class="wa-avatar">✦</div>
+      <div class="wa-meta">
+        <div class="wa-name">Tara · താര</div>
+        <div class="wa-status" id="wa-status">online</div>
+      </div>
+      <div class="wa-icons"><span>📹</span><span>📞</span><span>⋮</span></div>
+    </header>
+
+    <div class="wa-chat" id="wa-chat">
+      <div class="wa-day">ഇന്ന്</div>
+      <div class="wa-note">
+        🔒 ഇത് WhatsApp ശൈലിയിലുള്ള ഒരു ഡെമോ ആണ്. താരയുടെ അതേ AI ആണ് ഇവിടെയും മറുപടി നൽകുന്നത്.<br />
+        Tara ഒരു AI ആണ് · മാർഗനിർദേശത്തിന് മാത്രം · അടിയന്തരം: Tele-MANAS 14416
+      </div>
+    </div>
+
+    <div class="wa-composer">
+      <div class="wa-input-wrap">
+        <textarea id="wa-input" class="wa-input" rows="1" placeholder="Message"></textarea>
+      </div>
+      <button id="wa-send" class="wa-send" aria-label="Send">➤</button>
+    </div>
+
+    <!-- Number gate: WhatsApp identity IS the mobile number. -->
+    <div class="gate" id="gate" hidden>
+      <div class="gate-card">
+        <div style="font-size:30px;color:var(--wa-light-green)">✦</div>
+        <h2>നമസ്കാരം 🙏</h2>
+        <p>WhatsApp-ൽ താരയുമായി ചാറ്റ് ചെയ്യാൻ നിങ്ങളുടെ മൊബൈൽ നമ്പർ നൽകൂ.</p>
+        <div class="gate-err" id="gate-err"></div>
+        <input id="gate-phone" type="tel" placeholder="+91 98765 43210" />
+        <button id="gate-go">തുടങ്ങൂ</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      const chat = document.getElementById("wa-chat");
+      const input = document.getElementById("wa-input");
+      const sendBtn = document.getElementById("wa-send");
+      const statusEl = document.getElementById("wa-status");
+      const gate = document.getElementById("gate");
+      const gatePhone = document.getElementById("gate-phone");
+      const gateGo = document.getElementById("gate-go");
+      const gateErr = document.getElementById("gate-err");
+
+      // Conversation state — sent in full each request (the API is stateless),
+      // exactly like the main web UI. Same [{role, content}] shape.
+      let messages = [];
+      let busy = false;
+      // Shared identity with the website: the mobile number IS the user_id, and
+      // it maps to the same SQL chart + Mongo history/memory. On WhatsApp the
+      // number is intrinsic; here we ask once and reuse localStorage["tara_phone"].
+      let userId = localStorage.getItem("tara_phone") || null;
+
+      // Mirror identity.service.normalize_phone (leading + kept, digits only).
+      const normalizePhone = (raw) => {
+        const s = raw.trim();
+        const digits = s.replace(/\D/g, "");
+        return s.startsWith("+") ? "+" + digits : digits;
+      };
+
+      const nowStamp = () => {
+        const d = new Date();
+        return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      };
+
+      const scrollDown = () => { chat.scrollTop = chat.scrollHeight; };
+
+      function addBubble(side, text) {
+        const b = document.createElement("div");
+        b.className = `bubble ${side}`;
+        const txt = document.createElement("span");
+        txt.className = "txt";
+        txt.textContent = text;
+        const stamp = document.createElement("span");
+        stamp.className = "stamp";
+        stamp.textContent = nowStamp();
+        if (side === "out") {
+          const tick = document.createElement("span");
+          tick.className = "tick";
+          tick.textContent = "✓✓";
+          stamp.appendChild(tick);
+        }
+        b.appendChild(txt);
+        b.appendChild(stamp);
+        chat.appendChild(b);
+        scrollDown();
+        return b;
+      }
+
+      function showTyping() {
+        const b = document.createElement("div");
+        b.className = "bubble in";
+        b.id = "typing-bubble";
+        b.innerHTML = '<div class="typing"><span></span><span></span><span></span></div>';
+        chat.appendChild(b);
+        statusEl.textContent = "typing…";
+        scrollDown();
+        return b;
+      }
+
+      async function send(text) {
+        messages.push({ role: "user", content: text });
+        addBubble("out", text);
+        busy = true; sendBtn.disabled = true;
+
+        const typing = showTyping();
+        let reply = "";
+        try {
+          const res = await fetch("/chat/message", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ user_id: userId, messages }),
+          });
+          if (!res.ok) throw new Error("network");
+          const data = await res.json();          // ChatResponse: {reply, ...}
+          reply = data.reply || "…";
+        } catch (err) {
+          reply = "ക്ഷമിക്കണം, ഒരു പിശക് സംഭവിച്ചു. വീണ്ടും ശ്രമിക്കൂ.";
+        } finally {
+          typing.remove();
+          statusEl.textContent = "online";
+          addBubble("in", reply);
+          messages.push({ role: "assistant", content: reply });
+          busy = false; sendBtn.disabled = false;
+          input.focus();
+        }
+      }
+
+      function trySend() {
+        if (busy) return;
+        if (!userId) { gate.hidden = false; gatePhone.focus(); return; }
+        const text = input.value.trim();
+        if (!text) return;
+        input.value = "";
+        input.style.height = "auto";
+        send(text);
+      }
+
+      sendBtn.addEventListener("click", trySend);
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); trySend(); }
+      });
+      input.addEventListener("input", () => {
+        input.style.height = "auto";
+        input.style.height = Math.min(input.scrollHeight, 120) + "px";
+      });
+
+      // --- Number gate ---
+      function acceptNumber() {
+        const phone = normalizePhone(gatePhone.value);
+        if (!phone || phone.replace(/\D/g, "").length < 8) {
+          gateErr.textContent = "സാധുവായ നമ്പർ നൽകൂ.";
+          return;
+        }
+        userId = phone;
+        localStorage.setItem("tara_phone", phone);
+        gate.hidden = true;
+        statusEl.textContent = "online";
+        input.focus();
+      }
+      gateGo.addEventListener("click", acceptNumber);
+      gatePhone.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") { e.preventDefault(); acceptNumber(); }
+      });
+
+      // Gate the chat behind a number if we don't have one yet.
+      if (!userId) gate.hidden = false;
+    })();
+  </script>
+</body>
+</html>
