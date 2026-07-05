@@ -56,3 +56,10 @@ Thumbs.db
 node_modules/
 .next/
 .expo/
+
+# Local SQLite database - user accounts + birth data, never commit
+tara.db
+*.sqlite3
+
+# Eval outputs (contain full LLM replies)
+evals/results/

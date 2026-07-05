@@ -87,6 +87,7 @@ class ChatService:
         session: AsyncSession | None = None,
         debug: bool = False,
         prashnam: PrashnamPick | None = None,
+        provider: str | None = None,
     ) -> ChatResponse:
         """Run the §6 orchestrator. When ``debug`` is set, attach a per-turn trace
         (params, tools invoked, timings, LLM config) to the response so a
@@ -233,8 +234,34 @@ class ChatService:
 
         # --- Step 5: LLM ---
         s = time.perf_counter()
-        reply = await self._llm.complete(system_prompt, messages)
+        reply = await self._llm.complete(system_prompt, messages, provider=provider)
         _mark("llm_complete", s, tool="llm_client.complete", **self._llm.debug_meta())
+
+        # --- Step 5b: output guardrail screen (GUARDRAILS.md §1, enforced) ---
+        # The persona asks for no fear / no paid remedies / no urgency; this
+        # verifies the model complied. One corrective retry, then a safe
+        # fallback — a violation must never reach the user.
+        s = time.perf_counter()
+        violations = self._tone_safety.screen_reply(reply)
+        if violations:
+            logger.warning(
+                "chat: reply guardrail violation %s; retrying once.", violations
+            )
+            reply = await self._llm.complete(
+                system_prompt + "\n\n" + self._tone_safety.corrective_note(),
+                messages,
+                provider=provider,
+            )
+            still = self._tone_safety.screen_reply(reply)
+            if still:
+                logger.warning(
+                    "chat: retry still violates %s; serving safe fallback.", still
+                )
+                reply = self._tone_safety.safe_reply()
+        _mark(
+            "reply_screen", s, tool="tone_safety.screen_reply",
+            violations=violations or None,
+        )
 
         # --- Step 6: reply (router schedules memory extraction) ---
         return ChatResponse(

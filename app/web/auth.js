@@ -8,8 +8,9 @@
   const regError = document.getElementById("reg-error");
   const sub = document.getElementById("sub");
 
-  // Already signed in? Skip straight to the chat.
-  if (localStorage.getItem("tara_phone")) {
+  // Already signed in (number AND a live session token)? Skip to the chat.
+  // Old sessions that predate tokens fall through to login again.
+  if (localStorage.getItem("tara_phone") && localStorage.getItem("tara_token")) {
     window.location.replace("/");
     return;
   }
@@ -27,8 +28,10 @@
     el.hidden = false;
   }
 
-  function enter(phone, user) {
+  function enter(phone, user, token) {
     localStorage.setItem("tara_phone", phone);
+    // Bearer session token (47h TTL) — sent on every user-scoped API call.
+    if (token) localStorage.setItem("tara_token", token);
     // Remember the display name so the chat can greet the user by name.
     if (user && user.name) localStorage.setItem("tara_name", user.name);
     else localStorage.removeItem("tara_name");
@@ -92,8 +95,8 @@
         return;
       }
       if (!res.ok) throw new Error("login failed");
-      const user = await res.json(); // UserOut — full profile
-      enter(phone, user);
+      const data = await res.json(); // AuthResponse — {user, token, expires_at}
+      enter(phone, data.user, data.token);
     } catch (err) {
       showError(loginError, "ക്ഷമിക്കണം, എന്തോ പിശക്. വീണ്ടും ശ്രമിക്കൂ.");
     } finally {
@@ -138,8 +141,8 @@
         return;
       }
       if (!res.ok) throw new Error("register failed");
-      const user = await res.json(); // UserOut — full profile
-      enter(phone, user);
+      const data = await res.json(); // AuthResponse — {user, token, expires_at}
+      enter(phone, data.user, data.token);
     } catch (err) {
       showError(regError, "ക്ഷമിക്കണം, എന്തോ പിശക്. വീണ്ടും ശ്രമിക്കൂ.");
     } finally {

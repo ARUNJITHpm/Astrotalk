@@ -244,10 +244,13 @@
       const conversationId =
         (crypto.randomUUID && crypto.randomUUID()) ||
         "wa-" + Date.now() + "-" + Math.random().toString(16).slice(2);
-      // Shared identity with the website: the mobile number IS the user_id, and
-      // it maps to the same SQL chart + Mongo history/memory. On WhatsApp the
-      // number is intrinsic; here we ask once and reuse localStorage["tara_phone"].
+      // Shared identity with the website: same account, same bearer session
+      // token from the /auth login page. The server derives the user from the
+      // token — typing an arbitrary number no longer works (by design).
       let userId = localStorage.getItem("tara_phone") || null;
+      const authToken = localStorage.getItem("tara_token") || null;
+      const authHeaders = (extra = {}) =>
+        authToken ? { ...extra, Authorization: `Bearer ${authToken}` } : extra;
 
       // Mirror identity.service.normalize_phone (leading + kept, digits only).
       const normalizePhone = (raw) => {
@@ -306,9 +309,10 @@
         try {
           const res = await fetch("/chat/message", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: authHeaders({ "Content-Type": "application/json" }),
             body: JSON.stringify({ user_id: userId, conversation_id: conversationId, messages }),
           });
+          if (res.status === 401) { window.location.href = "/auth"; return; }
           if (!res.ok) throw new Error("network");
           const data = await res.json();          // ChatResponse: {reply, ...}
           reply = data.reply || "…";
@@ -326,7 +330,9 @@
 
       function trySend() {
         if (busy) return;
-        if (!userId) { gate.hidden = false; gatePhone.focus(); return; }
+        // No login session → the real /auth page (the old number-only gate
+        // can't authenticate against the token-protected API).
+        if (!userId || !authToken) { window.location.href = "/auth"; return; }
         const text = input.value.trim();
         if (!text) return;
         input.value = "";

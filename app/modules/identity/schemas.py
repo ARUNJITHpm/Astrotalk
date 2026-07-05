@@ -59,6 +59,18 @@ class UserOut(BaseModel):
     created_at: datetime
 
 
+class AuthResponse(BaseModel):
+    """Login/registration result: the profile plus the bearer session token.
+
+    The client sends ``Authorization: Bearer <token>`` on every user-scoped
+    call until ``expires_at`` (47h by default), then logs in again.
+    """
+
+    user: UserOut
+    token: str
+    expires_at: datetime
+
+
 class ChartOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

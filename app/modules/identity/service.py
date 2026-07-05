@@ -13,12 +13,14 @@ import hashlib
 import hmac
 import os
 import re
+import secrets
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.identity.models import Chart, User
+from app.modules.identity.models import Chart, Session, User
 from app.modules.identity.schemas import UserCreate
 from app.platform.config import get_settings
 from app.platform.logging_config import get_logger
@@ -30,10 +32,10 @@ logger = get_logger(__name__)
 # so the rounds/salt travel with the hash and can be tuned without a migration).
 _PBKDF2_ROUNDS = 200_000
 
-# ⚠️ TESTING STAGE ONLY: when True, login accepts ANY password for a registered
-# mobile number (see IdentityService.authenticate). Set back to False to enforce
-# real password checks before shipping.
-_TESTING_SKIP_PASSWORD = True
+# When True, login accepts ANY password for a registered mobile number — a
+# testing-stage convenience only. OFF since 2026-07-05 (week-1 security):
+# login now verifies the stored PBKDF2 hash.
+_TESTING_SKIP_PASSWORD = False
 
 
 def hash_password(password: str) -> str:
@@ -264,21 +266,59 @@ class IdentityService:
     async def authenticate(
         self, session: AsyncSession, phone: str, password: str
     ) -> User | None:
-        """Return the user for a registered mobile number, if it exists.
+        """Return the user when the mobile number AND password both match.
 
-        ⚠️ TESTING STAGE: the password is NOT checked — any password is accepted
-        as long as the mobile number is already registered. To restore real
-        password verification, drop `_TESTING_SKIP_PASSWORD` and re-enable the
-        `verify_password` check below.
+        Constant-time hash comparison; None on unknown number, wrong password,
+        or an account with no stored hash (pre-auth rows must reset first).
         """
         user = await self.get_user_by_phone(session, phone)
         if user is None:
             return None
-        if _TESTING_SKIP_PASSWORD:
+        if _TESTING_SKIP_PASSWORD:  # pragma: no cover - testing escape hatch, off
             return user
         if not verify_password(password, user.password_hash):
             return None
         return user
+
+    # ---- login sessions (bearer tokens) ----
+
+    async def create_session(self, session: AsyncSession, user: User) -> Session:
+        """Mint a login session: an opaque bearer token valid for
+        ``settings.session_ttl_hours`` (47h by default)."""
+        login = Session(
+            token=secrets.token_urlsafe(32),
+            user_id=user.id,
+            expires_at=datetime.now(UTC) + timedelta(
+                hours=get_settings().session_ttl_hours
+            ),
+        )
+        session.add(login)
+        await session.flush()
+        await session.refresh(login)
+        return login
+
+    async def get_session_user(
+        self, session: AsyncSession, token: str
+    ) -> User | None:
+        """The user a live (unexpired) session token belongs to, else None."""
+        if not token:
+            return None
+        result = await session.execute(select(Session).where(Session.token == token))
+        login = result.scalars().first()
+        if login is None:
+            return None
+        # SQLite hands datetimes back naive; treat stored values as UTC.
+        expires = login.expires_at
+        if expires.tzinfo is None:
+            expires = expires.replace(tzinfo=UTC)
+        if expires < datetime.now(UTC):
+            await session.execute(delete(Session).where(Session.id == login.id))
+            return None
+        return await session.get(User, login.user_id)
+
+    async def revoke_session(self, session: AsyncSession, token: str) -> None:
+        """Delete a session token (logout) — immediate revocation, idempotent."""
+        await session.execute(delete(Session).where(Session.token == token))
 
     async def regeocode_user(self, session: AsyncSession, user: User) -> User:
         """Re-resolve the user's birth place and store fresh lat/lng/tz.

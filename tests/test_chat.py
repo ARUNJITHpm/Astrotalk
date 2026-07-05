@@ -28,6 +28,38 @@ def _no_mongo(monkeypatch):
     """
     monkeypatch.setattr("app.modules.chat.history.get_db", lambda: None)
     monkeypatch.setattr("app.modules.chat.user_memory.get_db", lambda: None)
+    # Pin the LLM to the mock regardless of the local .env (which points at
+    # real providers) — pytest must never spend API money; evals/ is the only
+    # place real LLM calls belong.
+    monkeypatch.setenv("MOCK_LLM", "1")
+
+
+class _FakeUser:
+    """Stand-in for the authenticated identity.User require_user resolves."""
+
+    def __init__(self, phone: str):
+        self.phone = phone
+        self.id = 0
+
+
+def _login_as(phone: str) -> None:
+    """Override the auth dependency: requests act as this logged-in user.
+
+    Chat derives the user from the session token, so tests inject the identity
+    here instead of registering + logging in for every case.
+    """
+    from app.modules.identity.auth import require_user
+
+    app.dependency_overrides[require_user] = lambda: _FakeUser(phone)
+
+
+@pytest.fixture(autouse=True)
+def _as_demo_user():
+    _login_as("demo")
+    yield
+    from app.modules.identity.auth import require_user
+
+    app.dependency_overrides.pop(require_user, None)
 
 
 @pytest.fixture
@@ -126,6 +158,7 @@ async def test_temple_question_grounds_reply_in_a_temple(client):
     # Explicit temple ask ("ക്ഷേത്രത്തിൽ" → remedy intent) with a career concern
     # ("ജോലി") and a district ("തിരുവനന്തപുരം"): step 3c must graft a suggestion
     # and tag it in grounded_in as "temple:<id>".
+    _login_as("demo1")  # digits → the chart/location DB path runs (and degrades)
     async with client:
         resp = await client.post(
             "/chat/message",
@@ -272,3 +305,90 @@ async def test_memory_endpoint_404_when_no_profile(client):
     async with client:
         resp = await client.get("/chat/memory/demo")
     assert resp.status_code == 404, resp.text
+
+
+def test_reply_screen_lexicons():
+    # Output guardrail: normal astrology talk (doshas discussed with agency)
+    # is clean; fear, payment-linked remedies, and urgency are flagged.
+    from app.modules.tone_safety.service import ToneSafetyService
+
+    svc = ToneSafetyService()
+    clean = (
+        "നിങ്ങളുടെ ജാതകത്തിൽ ചൊവ്വാ ദോഷം ഉണ്ട്, പക്ഷേ ഭയപ്പെടേണ്ടതില്ല — "
+        "ഏഴര ശനിയുടെ കാലം ക്ഷമയോടെ കടന്നുപോകാം. ക്ഷേത്രദർശനം നിങ്ങൾക്ക് "
+        "തിരഞ്ഞെടുക്കാവുന്ന ഒരു ഭക്തിമാർഗം മാത്രമാണ്. കൂടുതൽ അറിയണോ?"
+    )
+    assert svc.screen_reply(clean) == []
+
+    assert svc.screen_reply("സൂക്ഷിക്കണം, നിങ്ങൾക്ക് വലിയ ആപത്ത് വരും!") == ["fear"]
+    assert svc.screen_reply("You are cursed and doomed.") == ["fear"]
+    assert svc.screen_reply(
+        "ഈ പൂജ ചെയ്യാൻ ₹5000 അടയ്ക്കണം, എങ്കിലേ ദോഷം മാറൂ."
+    ) == ["payment_remedy"]
+    assert svc.screen_reply("You must pay a fee for this homam.") == ["payment_remedy"]
+    assert svc.screen_reply(
+        "ഉടനെ വഴിപാട് ചെയ്തില്ലെങ്കിൽ വലിയ നഷ്ടം ഉണ്ടാകും."
+    ) == ["payment_remedy", "urgency"]
+    assert svc.screen_reply("") == []
+
+
+async def test_reply_guardrail_retries_once_then_falls_back():
+    # A violating reply must NEVER reach the user: one corrective retry, and if
+    # that also violates, the on-persona safe fallback is served.
+    from app.modules.chat.service import ChatService
+    from app.modules.tone_safety.reply_screen import SAFE_FALLBACK_REPLY
+
+    class _BadThenGood:
+        def __init__(self):
+            self.calls = 0
+
+        async def complete(self, system_prompt, messages, provider=None):
+            self.calls += 1
+            if self.calls == 1:
+                return "സൂക്ഷിക്കണം! നിങ്ങൾക്ക് വലിയ ആപത്ത് വരും!"
+            # The retry must have received the corrective instruction.
+            assert "IMPORTANT CORRECTION" in system_prompt
+            return "എല്ലാം ശാന്തമായി നോക്കാം. ക്ഷമ വിജയം തരും. കൂടുതൽ ചോദിക്കണോ?"
+
+        def debug_meta(self):
+            return {}
+
+    llm = _BadThenGood()
+    svc = ChatService(llm=llm)
+    resp = await svc.handle_message("demo", [{"role": "user", "content": "എന്റെ ഭാവി?"}])
+    assert llm.calls == 2
+    assert "ആപത്ത്" not in resp.reply
+
+    class _AlwaysBad:
+        async def complete(self, system_prompt, messages, provider=None):
+            return "ശാപം! ഉടനെ ചെയ്തില്ലെങ്കിൽ വലിയ ആപത്ത് വരും!"
+
+        def debug_meta(self):
+            return {}
+
+    svc2 = ChatService(llm=_AlwaysBad())
+    resp2 = await svc2.handle_message("demo", [{"role": "user", "content": "ഭാവി?"}])
+    assert resp2.reply == SAFE_FALLBACK_REPLY
+
+
+async def test_chat_requires_login(client):
+    # Without a session token the chat API refuses — identity comes from the
+    # token, never from the payload (week-1 security).
+    from app.modules.identity.auth import require_user
+
+    app.dependency_overrides.pop(require_user, None)  # drop the test login
+    async with client:
+        resp = await client.post(
+            "/chat/message",
+            json={"user_id": "demo", "messages": [{"role": "user", "content": "hi"}]},
+        )
+        assert resp.status_code == 401, resp.text
+        history = await client.get("/chat/history/demo")
+        assert history.status_code == 401, history.text
+
+
+async def test_history_of_another_user_is_forbidden(client):
+    # Logged in as "demo" but asking for someone else's transcript → 403.
+    async with client:
+        resp = await client.get("/chat/history/9999999999")
+    assert resp.status_code == 403, resp.text

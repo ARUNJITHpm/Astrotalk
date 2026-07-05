@@ -552,3 +552,16 @@ details.debug-sec[open] > summary { margin-bottom: 7px; }
 }
 .chip-followup:hover { background: var(--accent-soft); border-color: var(--accent); }
 .chip-prashnam { border-color: var(--accent); color: var(--accent); }
+
+/* LLM model selector in the chat header */
+.model-select {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-family: var(--font-ml);
+  font-size: 13px;
+  color: var(--ink);
+  cursor: pointer;
+}
+.model-select:hover { border-color: var(--accent); }

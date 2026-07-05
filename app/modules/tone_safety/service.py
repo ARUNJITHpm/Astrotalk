@@ -17,7 +17,7 @@ guardrail violation (GUARDRAILS.md §1/§2), not a feature — refuse it.
 
 from typing import Any
 
-from app.modules.tone_safety import crisis_classifier, persona
+from app.modules.tone_safety import crisis_classifier, persona, reply_screen
 
 
 class ToneSafetyService:
@@ -28,6 +28,23 @@ class ToneSafetyService:
     def crisis_reply(self) -> str:
         """The empathetic, helpline-routed response. STOP after this — no astrology."""
         return persona.SAFETY_RESPONSE
+
+    def screen_reply(self, reply: str) -> list[str]:
+        """Violation categories in a GENERATED reply ([] = clean).
+
+        The output-side guardrail (GUARDRAILS.md §1): fear-mongering,
+        payment-linked remedies, manufactured urgency. Chat retries once with
+        ``corrective_note()`` and falls back to ``safe_reply()`` if needed.
+        """
+        return reply_screen.screen_reply(reply)
+
+    def corrective_note(self) -> str:
+        """System-prompt addendum for the one corrective retry."""
+        return reply_screen.CORRECTIVE_NOTE
+
+    def safe_reply(self) -> str:
+        """On-persona fallback when the retry still violates."""
+        return reply_screen.SAFE_FALLBACK_REPLY
 
     def build_system_prompt(
         self,

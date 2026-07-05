@@ -45,6 +45,9 @@ class ChatRequest(BaseModel):
     conversation_id: str | None = None
     # Set when this turn is a prashnam interaction (the "പ്രശ്നം ചോദിക്കൂ" flow).
     prashnam: PrashnamPick | None = None
+    # Optional per-message LLM provider pick (the UI's model selector).
+    # None = the configured default (sarvam). Keyless providers fall back.
+    provider: Literal["sarvam", "sarvam-fast", "openai"] | None = None
     # Developer flag: when true (and not in production), the response carries a
     # `debug` trace of the whole orchestration. Off by default.
     debug: bool = False

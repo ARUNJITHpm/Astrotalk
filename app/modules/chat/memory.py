@@ -54,7 +54,9 @@ def _use_llm() -> bool:
     if env is not None:
         return env.strip().lower() not in {"1", "true", "yes", "on"}
     settings = get_settings()
-    return not settings.mock_openai and bool(settings.openai_api_key)
+    return not settings.mock_openai and bool(
+        settings.openai_api_key or settings.sarvam_api_key
+    )
 
 
 def _parse_facts(reply: str) -> list[dict] | None:

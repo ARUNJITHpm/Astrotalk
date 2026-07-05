@@ -18,6 +18,10 @@ class Settings(BaseSettings):
     # ---- App ----
     app_env: str = "development"
     port: int = 3000
+    # Login session lifetime (bearer token TTL).
+    session_ttl_hours: int = 47
+    # Per-user ceiling on /chat/message calls (LLM cost / abuse protection).
+    chat_rate_limit_per_hour: int = 30
 
     # ---- Database (PostgreSQL in prod; SQLite default in dev, see platform/db.py) ----
     # Empty = fall back to the local SQLite file so the app boots with no Postgres.
@@ -35,9 +39,20 @@ class Settings(BaseSettings):
     # ---- Cache / queue (Redis + Celery) ----
     redis_url: str = "redis://localhost:6379/0"
 
-    # ---- LLM (OpenAI) ----
+    # ---- LLM providers (chat replies) ----
+    # Active default: "sarvam" (Malayalam-first) or "openai". A per-request
+    # override may pick the other; a provider without a key falls back to the
+    # other, then to the mock.
+    chat_provider: str = "sarvam"
+    # OpenAI
     openai_api_key: str = ""
     chat_model: str = "gpt-4o-mini"
+    # Sarvam AI — OpenAI-compatible API, Indic/Malayalam-first models.
+    # sarvam-105b: strongest AND cheapest per token; sarvam-30b: lower latency.
+    sarvam_api_key: str = ""
+    sarvam_model: str = "sarvam-105b"
+    sarvam_fast_model: str = "sarvam-30b"
+    sarvam_base_url: str = "https://api.sarvam.ai/v1"
     # Embedding model for the knowledge RAG dense (vector) retriever.
     embedding_model: str = "text-embedding-ada-002"
 

@@ -67,18 +67,41 @@ async def test_create_user_assigns_id_and_placeholder_geocode(session):
     assert user.password_hash and user.password_hash != "secret123"
 
 
-async def test_authenticate_registered_number(session):
+async def test_authenticate_checks_the_password(session):
     service = IdentityService()
     await service.create_user(session, _SAMPLE)
 
-    # TESTING STAGE: any password logs in a registered number; equivalent phone
-    # formats resolve to the same user.
+    # Correct password logs in; equivalent phone formats resolve to one user.
     ok = await service.authenticate(session, "+91-98765-43210", "secret123")
     assert ok is not None and ok.phone == "+919876543210"
-    assert await service.authenticate(session, "+919876543210", "wrong") is not None
 
-    # An UNregistered number still fails regardless of password.
+    # Wrong password fails, and an unregistered number fails regardless.
+    assert await service.authenticate(session, "+919876543210", "wrong") is None
     assert await service.authenticate(session, "+910000000000", "secret123") is None
+
+
+async def test_session_tokens_expire_and_revoke(session, monkeypatch):
+    service = IdentityService()
+    user = await service.create_user(session, _SAMPLE)
+
+    login = await service.create_session(session, user)
+    assert login.token and len(login.token) > 30
+    found = await service.get_session_user(session, login.token)
+    assert found is not None and found.id == user.id
+
+    # Unknown/empty tokens resolve to no one.
+    assert await service.get_session_user(session, "not-a-token") is None
+    assert await service.get_session_user(session, "") is None
+
+    # Logout revokes immediately (and is idempotent).
+    await service.revoke_session(session, login.token)
+    assert await service.get_session_user(session, login.token) is None
+    await service.revoke_session(session, login.token)
+
+    # An expired session is dead even though the row existed.
+    monkeypatch.setattr(get_settings(), "session_ttl_hours", -1)
+    stale = await service.create_session(session, user)
+    assert await service.get_session_user(session, stale.token) is None
 
 
 async def test_lookup_and_chart_by_phone(session):
@@ -224,24 +247,32 @@ async def test_onboard_flow_via_api():
             }
             resp = await client.post("/identity/users", json=body)
             assert resp.status_code == 201, resp.text
-            user_id = resp.json()["id"]
-            assert resp.json()["phone"] == "+919876543210"
-            assert resp.json()["tz"] == "Asia/Kolkata"
+            auth = resp.json()  # AuthResponse: {user, token, expires_at}
+            user_id = auth["user"]["id"]
+            token = auth["token"]
+            assert token and auth["expires_at"]
+            assert auth["user"]["phone"] == "+919876543210"
+            assert auth["user"]["tz"] == "Asia/Kolkata"
             # Password hash is never exposed in the API response.
-            assert "password" not in resp.json()
-            assert "password_hash" not in resp.json()
+            assert "password" not in auth["user"]
+            assert "password_hash" not in auth["user"]
 
             # Same mobile again → 409, not a duplicate user.
             dup = await client.post("/identity/users", json=body)
             assert dup.status_code == 409, dup.text
 
-            # Login (TESTING STAGE): any password works for a registered number.
-            ok = await client.post(
+            # Login needs the REAL password now.
+            wrong = await client.post(
                 "/identity/login",
                 json={"phone": "+91 98765 43210", "password": "anything"},
             )
+            assert wrong.status_code == 401, wrong.text
+            ok = await client.post(
+                "/identity/login",
+                json={"phone": "+91 98765 43210", "password": "secret123"},
+            )
             assert ok.status_code == 200, ok.text
-            assert ok.json()["id"] == user_id
+            assert ok.json()["user"]["id"] == user_id
 
             # An unregistered number still gets 401.
             bad = await client.post(
@@ -250,7 +281,14 @@ async def test_onboard_flow_via_api():
             )
             assert bad.status_code == 401, bad.text
 
-            chart = await client.get(f"/identity/users/{user_id}/chart")
+            # The chart is private: no token → 401; another user's id → 403.
+            headers = {"Authorization": f"Bearer {token}"}
+            assert (await client.get(f"/identity/users/{user_id}/chart")).status_code == 401
+            assert (
+                await client.get(f"/identity/users/{user_id + 1}/chart", headers=headers)
+            ).status_code == 403
+
+            chart = await client.get(f"/identity/users/{user_id}/chart", headers=headers)
             assert chart.status_code == 200, chart.text
             # astrology_engine now computes a (mock) natal chart at onboarding.
             natal = chart.json()["natal_json"]
@@ -299,25 +337,23 @@ async def test_recompute_chart_and_login_self_heal(monkeypatch):
             }
             resp = await client.post("/identity/users", json=body)
             assert resp.status_code == 201, resp.text
-            user_id = resp.json()["id"]
+            auth = resp.json()
+            user_id = auth["user"]["id"]
+            headers = {"Authorization": f"Bearer {auth['token']}"}
 
             # Onboarded under the pinned mock → chart is a mock.
-            first = await client.get(f"/identity/users/{user_id}/chart")
+            first = await client.get(f"/identity/users/{user_id}/chart", headers=headers)
             assert first.json()["natal_json"]["mock"] is True
 
-            # Unknown number → 404, no chart leak.
-            missing = await client.post(
-                "/identity/recompute-chart", json={"phone": "+910000000000"}
-            )
-            assert missing.status_code == 404, missing.text
+            # Recompute is for the logged-in account only: no token → 401.
+            anon = await client.post("/identity/recompute-chart")
+            assert anon.status_code == 401, anon.text
 
             # Turn the real engine on (overrides the autouse mock pin).
             monkeypatch.setattr(get_settings(), "mock_ephemeris", False)
 
             # Manual recompute → a real Swiss Ephemeris chart is stored.
-            redo = await client.post(
-                "/identity/recompute-chart", json={"phone": "+91 98765 43210"}
-            )
+            redo = await client.post("/identity/recompute-chart", headers=headers)
             assert redo.status_code == 200, redo.text
             natal = redo.json()["natal_json"]
             assert natal["mock"] is False
@@ -325,14 +361,14 @@ async def test_recompute_chart_and_login_self_heal(monkeypatch):
             assert natal["dasha"]["system"] == "vimshottari"
 
             # The newest chart is now the real one.
-            newest = await client.get(f"/identity/users/{user_id}/chart")
+            newest = await client.get(f"/identity/users/{user_id}/chart", headers=headers)
             assert newest.json()["natal_json"]["mock"] is False
 
             # Login self-heal: with a real chart already stored it's a no-op,
             # and login still succeeds normally.
             ok = await client.post(
                 "/identity/login",
-                json={"phone": "+919876543210", "password": "anything"},
+                json={"phone": "+919876543210", "password": "secret123"},
             )
             assert ok.status_code == 200, ok.text
     finally:
@@ -378,19 +414,21 @@ async def test_login_self_heals_mock_chart(monkeypatch):
             }
             resp = await client.post("/identity/users", json=body)
             assert resp.status_code == 201, resp.text
-            user_id = resp.json()["id"]
-            before = await client.get(f"/identity/users/{user_id}/chart")
+            auth = resp.json()
+            user_id = auth["user"]["id"]
+            headers = {"Authorization": f"Bearer {auth['token']}"}
+            before = await client.get(f"/identity/users/{user_id}/chart", headers=headers)
             assert before.json()["natal_json"]["mock"] is True
 
             # Real engine on → the next login recomputes the stale chart.
             monkeypatch.setattr(get_settings(), "mock_ephemeris", False)
             ok = await client.post(
                 "/identity/login",
-                json={"phone": "+918888877777", "password": "anything"},
+                json={"phone": "+918888877777", "password": "secret123"},
             )
             assert ok.status_code == 200, ok.text
 
-            after = await client.get(f"/identity/users/{user_id}/chart")
+            after = await client.get(f"/identity/users/{user_id}/chart", headers=headers)
             natal = after.json()["natal_json"]
             assert natal["mock"] is False
             assert natal["source"] == "swiss-ephemeris"

@@ -8,14 +8,16 @@ import inspect
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.astrology_engine.service import AstrologyEngineService
+from app.modules.identity.auth import CurrentUser
 from app.modules.identity.models import User
 from app.modules.identity.schemas import (
+    AuthResponse,
     ChartOut,
     LoginRequest,
-    PhoneLookup,
     ProfileOut,
     UserCreate,
     UserOut,
@@ -88,8 +90,22 @@ async def _refresh_chart_if_stale(session: AsyncSession, user: User) -> None:
     await session.commit()
 
 
-@router.post("/users", response_model=UserOut, status_code=status.HTTP_201_CREATED)
-async def onboard_user(data: UserCreate, session: SessionDep) -> User:
+async def _auth_response(session: AsyncSession, user: User) -> AuthResponse:
+    """Mint a login session for ``user`` and shape the auth payload."""
+    login = await _service.create_session(session, user)
+    return AuthResponse(
+        user=UserOut.model_validate(user),
+        token=login.token,
+        expires_at=login.expires_at,
+    )
+
+
+@router.post(
+    "/users", response_model=AuthResponse, status_code=status.HTTP_201_CREATED
+)
+async def onboard_user(data: UserCreate, session: SessionDep) -> AuthResponse:
+    """Register, compute the first chart, and log the new account in (one
+    round-trip: the response carries the bearer session token)."""
     if await _service.get_user_by_phone(session, data.phone) is not None:
         raise HTTPException(
             status.HTTP_409_CONFLICT, detail="A user with this mobile already exists"
@@ -97,14 +113,14 @@ async def onboard_user(data: UserCreate, session: SessionDep) -> User:
     user = await _service.create_user(session, data)
     natal_json = await _compute_natal_chart(user)
     await _service.save_chart(session, user.id, natal_json)
+    result = await _auth_response(session, user)
     await session.commit()
-    await session.refresh(user)
-    return user
+    return result
 
 
-@router.post("/login", response_model=UserOut)
-async def login(data: LoginRequest, session: SessionDep) -> User:
-    """Authenticate an existing account by mobile number + password.
+@router.post("/login", response_model=AuthResponse)
+async def login(data: LoginRequest, session: SessionDep) -> AuthResponse:
+    """Authenticate by mobile number + password and mint a session token.
 
     Returns 401 on any failure (unknown number or wrong password), without
     revealing which — so the number space can't be probed for registrations.
@@ -118,22 +134,41 @@ async def login(data: LoginRequest, session: SessionDep) -> User:
     # Self-heal: charts stored while the ephemeris was mocked get recomputed with
     # the real engine on the user's next login.
     await _refresh_chart_if_stale(session, user)
+    result = await _auth_response(session, user)
+    await session.commit()
+    return result
+
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+async def logout(
+    credentials: Annotated[
+        HTTPAuthorizationCredentials | None, Depends(HTTPBearer(auto_error=False))
+    ],
+    session: SessionDep,
+) -> None:
+    """Revoke the presented session token. Idempotent — a missing or already
+    revoked token still returns 204 (nothing to enumerate)."""
+    if credentials:
+        await _service.revoke_session(session, credentials.credentials)
+        await session.commit()
+
+
+@router.get("/me", response_model=ProfileOut)
+async def me(user: CurrentUser) -> User:
+    """The logged-in user's display profile (name only, no birth data)."""
     return user
 
 
 @router.post("/recompute-chart", response_model=ChartOut)
-async def recompute_chart(data: PhoneLookup, session: SessionDep):
-    """Recompute and store a fresh natal chart for a registered mobile number.
+async def recompute_chart(user: CurrentUser, session: SessionDep):
+    """Recompute and store a fresh natal chart for the LOGGED-IN user.
 
     Unconditional (unlike the login self-heal): use after birth details change or
     to force an upgrade from a mock chart. Re-geocodes the birth place first, so
     accounts onboarded with the placeholder location gain real coordinates (and
-    a correct lagna) here. Phone travels in the body, never the URL
-    (GUARDRAILS.md §4).
+    a correct lagna) here. The account is taken from the session token — one
+    user can never recompute (or probe) another's chart.
     """
-    user = await _service.get_user_by_phone(session, data.phone)
-    if user is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="User not found")
     user = await _service.regeocode_user(session, user)
     natal_json = await _compute_natal_chart(user)
     chart = await _service.save_chart(session, user.id, natal_json)
@@ -142,27 +177,19 @@ async def recompute_chart(data: PhoneLookup, session: SessionDep):
     return chart
 
 
-@router.post("/profile", response_model=ProfileOut)
-async def get_profile(data: PhoneLookup, session: SessionDep) -> User:
-    """Return the display name for a registered mobile number (name only, no
-    birth data). Lets the web UI greet a returning user whose name wasn't cached
-    locally. 404 if the number isn't registered."""
-    user = await _service.get_user_by_phone(session, data.phone)
-    if user is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="User not found")
-    return user
-
-
 @router.get("/users/{user_id}", response_model=UserOut)
-async def get_user(user_id: int, session: SessionDep) -> User:
-    user = await _service.get_user(session, user_id)
-    if user is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="User not found")
+async def get_user(user_id: int, user: CurrentUser, session: SessionDep) -> User:
+    """Full profile (incl. birth data) — only for the account itself."""
+    if user.id != user_id:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Not your account")
     return user
 
 
 @router.get("/users/{user_id}/chart", response_model=ChartOut)
-async def get_user_chart(user_id: int, session: SessionDep):
+async def get_user_chart(user_id: int, user: CurrentUser, session: SessionDep):
+    """The newest natal chart — only for the account itself."""
+    if user.id != user_id:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Not your account")
     chart = await _service.get_chart(session, user_id)
     if chart is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Chart not found")

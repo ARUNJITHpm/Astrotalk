@@ -28,6 +28,15 @@
   // Developer debug: a dev tool, so it always starts hidden on load — click the
   // header toggle to open the right-side trace drawer for this session only.
   let debugMode = false;
+  // LLM provider pick (header selector). Sarvam (Malayalam-first) is the
+  // default; the server falls back automatically if a provider has no key.
+  const modelSelect = document.getElementById("model-select");
+  let modelProvider = localStorage.getItem("tara_model") || "sarvam";
+  modelSelect.value = modelProvider;
+  modelSelect.addEventListener("change", () => {
+    modelProvider = modelSelect.value;
+    localStorage.setItem("tara_model", modelProvider);
+  });
 
   // Groups all turns of the current chat under one history entry. A fresh id is
   // minted per "new chat" and set when reopening a past conversation.
@@ -38,8 +47,20 @@
   // The user's mobile number is the identity key (matches the SQL users.phone).
   // Persisted locally so returning visitors skip onboarding.
   let userId = localStorage.getItem("tara_phone") || null;
+  // Bearer session token (47h TTL). Every user-scoped call carries it; a 401
+  // means it expired or was revoked → back to the login page.
+  let authToken = localStorage.getItem("tara_token") || null;
   // Display name captured at login/register — used to greet the user by name.
   let userName = localStorage.getItem("tara_name") || null;
+
+  const authHeaders = (extra = {}) =>
+    authToken ? { ...extra, Authorization: `Bearer ${authToken}` } : extra;
+
+  function sessionExpired() {
+    // Keep the profile cache; drop only the credentials and re-login.
+    localStorage.removeItem("tara_token");
+    window.location.href = "/auth";
+  }
   // Full profile (mobile, birth details) cached at login — for the profile card.
   let profile = null;
   try {
@@ -217,7 +238,10 @@
   async function loadHistory() {
     if (!userId) return;
     try {
-      const res = await fetch(`/chat/history/${encodeURIComponent(userId)}?limit=100`);
+      const res = await fetch(`/chat/history/${encodeURIComponent(userId)}?limit=100`, {
+        headers: authHeaders(),
+      });
+      if (res.status === 401) return sessionExpired();
       if (!res.ok) return;
       const entries = await res.json();
       if (!Array.isArray(entries)) return;
@@ -275,7 +299,10 @@
   async function loadMemory() {
     if (!userId) return;
     try {
-      const res = await fetch(`/chat/memory/${encodeURIComponent(userId)}`);
+      const res = await fetch(`/chat/memory/${encodeURIComponent(userId)}`, {
+        headers: authHeaders(),
+      });
+      if (res.status === 401) return sessionExpired();
       if (!res.ok) {
         memoryPanel.hidden = true; // 404 = no profile yet / Mongo off
         return;
@@ -377,15 +404,22 @@
     try {
       const res = await fetch("/chat/message", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({
           user_id: userId,
           conversation_id: conversationId,
           messages,
           prashnam,
+          provider: modelProvider,
           debug: debugMode,
         }),
       });
+      if (res.status === 401) return sessionExpired();
+      if (res.status === 429) {
+        reply = "അല്പനേരം കഴിഞ്ഞ് വീണ്ടും ശ്രമിക്കൂ — ഈ മണിക്കൂറിലെ സന്ദേശപരിധി കഴിഞ്ഞു. 🙏";
+        bubble.textContent = reply;
+        return;
+      }
       if (!res.ok) throw new Error("network");
 
       // /chat/message returns JSON (ChatResponse), not a token stream. Parse the
@@ -582,7 +616,14 @@
 
   function logout() {
     if (streaming) return;
-    // Forget the current user and return to the login / register page.
+    // Revoke the session server-side (fire-and-forget), then forget the user
+    // locally and return to the login / register page.
+    if (authToken) {
+      fetch("/identity/logout", { method: "POST", headers: authHeaders() }).catch(
+        () => {}
+      );
+    }
+    localStorage.removeItem("tara_token");
     localStorage.removeItem("tara_phone");
     localStorage.removeItem("tara_name");
     localStorage.removeItem("tara_profile");
@@ -743,11 +784,8 @@
   async function ensureUserName() {
     if (userName || !userId) return;
     try {
-      const res = await fetch("/identity/profile", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: userId }),
-      });
+      const res = await fetch("/identity/me", { headers: authHeaders() });
+      if (res.status === 401) return sessionExpired();
       if (!res.ok) return;
       const profile = await res.json();
       if (profile.name) {
@@ -762,9 +800,10 @@
     }
   }
 
-  // Gate the chat behind the auth page: no account → redirect to login/register.
-  // Otherwise greet the returning user by name and load history + durable memory.
-  if (userId) {
+  // Gate the chat behind the auth page: no account or no live session token →
+  // redirect to login/register. Otherwise greet the returning user by name and
+  // load history + durable memory.
+  if (userId && authToken) {
     updateAccountControl();
     renderWelcome(); // show the personalized greeting first
     ensureUserName();
