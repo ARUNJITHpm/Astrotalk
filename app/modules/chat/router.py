@@ -37,7 +37,7 @@ async def send_message(
     # production, even if a client asks for it.
     debug = payload.debug and get_settings().app_env != "production"
     result = await _service.handle_message(
-        payload.user_id, messages, session, debug=debug
+        payload.user_id, messages, session, debug=debug, prashnam=payload.prashnam
     )
 
     # Persist history + schedule durable-memory extraction only on the normal

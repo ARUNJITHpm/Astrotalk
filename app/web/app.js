@@ -81,9 +81,14 @@
     }
   });
 
-  // Suggestion chips
+  // Suggestion chips (welcome + per-reply follow-ups). A chip either types its
+  // text into the composer, or opens the prashnam modal (data-action).
   messagesEl.addEventListener("click", (e) => {
     if (e.target.classList.contains("chip")) {
+      if (e.target.dataset.action === "prashnam") {
+        openPrashnam();
+        return;
+      }
       input.value = e.target.textContent;
       autoGrow();
       form.requestSubmit();
@@ -103,7 +108,24 @@
     input.focus();
   });
 
+  // Welcome chip pool — a random 4 show per load (plus the prashnam chip), so
+  // returning users keep discovering what they can ask.
+  const WELCOME_CHIPS = [
+    "എന്റെ ഇന്നത്തെ നക്ഷത്രഫലം",
+    "ജോലിയെക്കുറിച്ച് ഉത്കണ്ഠയുണ്ട്",
+    "പൊരുത്തം നോക്കാമോ?",
+    "എന്റെ ദശാകാലം എങ്ങനെ പോകുന്നു?",
+    "വിവാഹം എപ്പോൾ നടക്കും?",
+    "ഏഴര ശനി എന്നെ ബാധിക്കുമോ?",
+    "നല്ലൊരു മുഹൂർത്തം നോക്കാമോ?",
+    "ഏത് ക്ഷേത്രത്തിൽ വഴിപാട് ചെയ്യണം?",
+  ];
+
   function renderWelcome() {
+    const picks = [...WELCOME_CHIPS].sort(() => Math.random() - 0.5).slice(0, 4);
+    const chips = picks
+      .map((t) => `<button class="chip">${escapeHtml(t)}</button>`)
+      .join("");
     messagesEl.innerHTML = `
       <div class="welcome">
         <div class="welcome-star">✦</div>
@@ -111,9 +133,8 @@
         <p>ഞാൻ <strong>താര</strong> — നിങ്ങളുടെ Malayalam AI ജ്യോതിഷ കൂട്ടുകാരി.<br/>
            ഇന്ന് നിങ്ങളുടെ മനസ്സിൽ എന്താണ്?</p>
         <div class="suggestions">
-          <button class="chip">എന്റെ ഇന്നത്തെ നക്ഷത്രഫലം</button>
-          <button class="chip">ജോലിയെക്കുറിച്ച് ഉത്കണ്ഠയുണ്ട്</button>
-          <button class="chip">പൊരുത്തം നോക്കാമോ?</button>
+          ${chips}
+          <button class="chip chip-prashnam" data-action="prashnam">🪷 പ്രശ്നം ചോദിക്കൂ</button>
         </div>
       </div>`;
   }
@@ -156,9 +177,10 @@
 
   function groupIntoConversations(entries) {
     const byId = new Map();
-    entries.forEach((entry, i) => {
-      // Legacy turns saved before conversation_id existed each stand alone.
-      const cid = entry.conversation_id || `legacy-${i}`;
+    entries.forEach((entry) => {
+      // Turns saved before conversation_id existed (or by old clients) all fold
+      // into ONE bucket — one turn per sidebar row flooded it with duplicates.
+      const cid = entry.conversation_id || "legacy";
       if (!byId.has(cid)) byId.set(cid, { id: cid, turns: [], at: entry.created_at });
       byId.get(cid).turns.push(entry);
     });
@@ -166,11 +188,31 @@
     // title it by the opening question.
     return [...byId.values()].map((c) => {
       c.turns.reverse();
-      c.title = firstUserText(c.turns[0] && c.turns[0].messages) || "സംഭാഷണം";
+      c.title =
+        c.id === "legacy"
+          ? "മുൻ സംഭാഷണങ്ങൾ"
+          : firstUserText(c.turns[0] && c.turns[0].messages) || "സംഭാഷണം";
       c.at = c.turns[c.turns.length - 1].created_at;
       return c;
     });
   }
+
+  // "ഇന്ന് · 6:01 PM", "ഇന്നലെ · 11:58 AM", else "4 Jul · 10:48 AM".
+  function formatWhen(iso) {
+    const d = new Date(iso);
+    if (isNaN(d)) return "";
+    const now = new Date();
+    const time = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    const startOfDay = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+    const days = Math.round((startOfDay(now) - startOfDay(d)) / 86400000);
+    if (days === 0) return `ഇന്ന് · ${time}`;
+    if (days === 1) return `ഇന്നലെ · ${time}`;
+    return d.toLocaleDateString("en-IN", { day: "numeric", month: "short" }) + ` · ${time}`;
+  }
+
+  // Rebuilding the sidebar every turn made items flicker/re-animate; skip the
+  // DOM work when nothing actually changed.
+  let historySig = null;
 
   async function loadHistory() {
     if (!userId) return;
@@ -180,6 +222,12 @@
       const entries = await res.json();
       if (!Array.isArray(entries)) return;
       conversations = groupIntoConversations(entries); // already newest-first
+      const sig =
+        conversations.map((c) => `${c.id}|${c.at}|${c.turns.length}`).join(";") +
+        "@" +
+        conversationId;
+      if (sig === historySig) return;
+      historySig = sig;
       historyEl.innerHTML = "";
       historyEmpty.hidden = conversations.length > 0;
       conversations.forEach((c) => {
@@ -187,12 +235,11 @@
         item.className = "history-item";
         if (c.id === conversationId) item.classList.add("active");
         const title = document.createElement("div");
+        title.className = "hist-title";
         title.textContent = c.title;
-        title.style.overflow = "hidden";
-        title.style.textOverflow = "ellipsis";
         const time = document.createElement("span");
         time.className = "hist-time";
-        time.textContent = new Date(c.at).toLocaleString();
+        time.textContent = formatWhen(c.at);
         item.appendChild(title);
         item.appendChild(time);
         item.addEventListener("click", () => openConversation(c.id));
@@ -274,7 +321,47 @@
     });
   }
 
-  async function send(text) {
+  // --- Follow-up chips: deterministic next steps from what grounded the reply.
+  // No extra LLM cost — grounded_in already says which knowledge was used.
+  function followUpsFor(groundedIn) {
+    const g = groundedIn || [];
+    const has = (p) => g.some((x) => x.startsWith(p));
+    const out = [];
+    if (has("temple:")) out.push({ text: "ഈ ക്ഷേത്രത്തിലെ വഴിപാടുകൾ വിശദമാക്കാമോ?" });
+    if (has("knowledge:dosha-sade-sati"))
+      out.push({ text: "ഏഴര ശനിയിൽ ഞാൻ എന്ത് ശ്രദ്ധിക്കണം?" });
+    if (has("knowledge:dosha-chovva"))
+      out.push({ text: "ചൊവ്വാ ദോഷത്തിന് എന്ത് ചെയ്യാം?" });
+    if (has("knowledge:mahadasha") || has("varga:"))
+      out.push({ text: "എന്റെ ദശാകാലം കൂടുതൽ വിശദമാക്കൂ" });
+    if (has("prashnam:"))
+      out.push({ text: "🪷 മറ്റൊരു പ്രശ്നം ചോദിക്കൂ", action: "prashnam" });
+    // Gentle defaults so there is always a next step on screen.
+    out.push({ text: "എന്റെ ഇന്നത്തെ നക്ഷത്രഫലം പറയൂ" });
+    if (!out.some((c) => c.action))
+      out.push({ text: "🪷 പ്രശ്നം ചോദിക്കൂ", action: "prashnam" });
+    return out.slice(0, 3);
+  }
+
+  function renderFollowUps(bubble, groundedIn) {
+    const row = bubble.closest(".row");
+    if (!row) return;
+    const wrap = document.createElement("div");
+    wrap.className = "followups";
+    followUpsFor(groundedIn).forEach((c) => {
+      const btn = document.createElement("button");
+      btn.className = "chip chip-followup";
+      btn.textContent = c.text;
+      if (c.action) btn.dataset.action = c.action;
+      wrap.appendChild(btn);
+    });
+    row.querySelector(".content").appendChild(wrap);
+    scrollToBottom();
+  }
+
+  async function send(text, prashnam = null) {
+    // Retire the previous turn's follow-up chips — stale ones pile up fast.
+    document.querySelectorAll(".followups").forEach((el) => el.remove());
     messages.push({ role: "user", content: text });
     addRow("user", text);
 
@@ -295,6 +382,7 @@
           user_id: userId,
           conversation_id: conversationId,
           messages,
+          prashnam,
           debug: debugMode,
         }),
       });
@@ -305,6 +393,9 @@
       const data = await res.json();
       reply = data.reply || "…";
       await typeOut(bubble, cursor, reply);
+      // Engagement: offer tappable next steps tied to what grounded this reply
+      // (skipped on the crisis path — no astrology prompts there).
+      if (!data.is_safety_response) renderFollowUps(bubble, data.grounded_in);
       // Developer trace: show the orchestration details in the right-side drawer.
       if (debugMode && data.debug) {
         showDebug(data.debug, data.grounded_in || []);
@@ -523,6 +614,129 @@
 
   logoutBtn.addEventListener("click", logout);
   changeNumberBtn.addEventListener("click", logout);
+
+  // --- Prashnam (Kerala horary): thamboola count / swarna arudha pick ---
+  // The pick is sent as a structured `prashnam` field; the SERVER computes the
+  // question-moment chart and the rules — the client only collects the ritual
+  // interaction. The 12 squares are deliberately unlabeled (the querent should
+  // not know which rasi they touch).
+  const prashnamModal = document.getElementById("prashnam-modal");
+  const prashnamOpen = document.getElementById("prashnam-open");
+  const prashnamClose = document.getElementById("prashnam-close");
+  const prashnamQuestion = document.getElementById("prashnam-question");
+  const arudhaGrid = document.getElementById("arudha-grid");
+  const leafCount = document.getElementById("leaf-count");
+  const thamboolaSend = document.getElementById("thamboola-send");
+  const sankhyaNumber = document.getElementById("sankhya-number");
+  const sankhyaSend = document.getElementById("sankhya-send");
+  const prashnamPanes = {
+    swarna: document.getElementById("prashnam-swarna"),
+    thamboola: document.getElementById("prashnam-thamboola"),
+    sankhya: document.getElementById("prashnam-sankhya"),
+  };
+
+  for (let i = 0; i < 12; i++) {
+    const sq = document.createElement("button");
+    sq.type = "button";
+    sq.className = "arudha-square";
+    sq.dataset.index = String(i);
+    sq.textContent = "✦";
+    sq.setAttribute("aria-label", `കളം ${i + 1}`);
+    arudhaGrid.appendChild(sq);
+  }
+
+  function openPrashnam() {
+    if (streaming) return;
+    // Seed the question from the composer, if the user already typed one.
+    if (input.value.trim()) prashnamQuestion.value = input.value.trim();
+    prashnamModal.hidden = false;
+    prashnamQuestion.focus();
+  }
+  function closePrashnam() {
+    prashnamModal.hidden = true;
+  }
+
+  function prashnamQuestionText() {
+    const q = prashnamQuestion.value.trim();
+    if (!q) {
+      prashnamQuestion.focus();
+      prashnamQuestion.classList.add("needs-question");
+      setTimeout(() => prashnamQuestion.classList.remove("needs-question"), 900);
+      return null;
+    }
+    return q;
+  }
+
+  function submitPrashnam(prashnam, label) {
+    const q = prashnamQuestionText();
+    if (!q || streaming) return;
+    closePrashnam();
+    prashnamQuestion.value = "";
+    leafCount.value = "";
+    sankhyaNumber.value = "";
+    input.value = "";
+    autoGrow();
+    send(`🪷 [${label}] ${q}`, prashnam);
+  }
+
+  prashnamModal.querySelectorAll(".prashnam-mode").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      prashnamModal
+        .querySelectorAll(".prashnam-mode")
+        .forEach((b) => b.classList.toggle("active", b === btn));
+      const mode = btn.dataset.mode;
+      Object.entries(prashnamPanes).forEach(([m, pane]) => {
+        pane.hidden = m !== mode;
+      });
+      if (mode === "thamboola") leafCount.focus();
+      if (mode === "sankhya") sankhyaNumber.focus();
+    });
+  });
+
+  arudhaGrid.addEventListener("click", (e) => {
+    const sq = e.target.closest(".arudha-square");
+    if (!sq) return;
+    submitPrashnam(
+      { mode: "swarna", arudha_rasi_index: Number(sq.dataset.index) },
+      "സ്വർണ പ്രശ്നം"
+    );
+  });
+
+  thamboolaSend.addEventListener("click", () => {
+    const n = Number(leafCount.value);
+    if (!Number.isInteger(n) || n < 1 || n > 108) {
+      leafCount.focus();
+      return;
+    }
+    submitPrashnam({ mode: "thamboola", leaf_count: n }, "താംബൂല പ്രശ്നം");
+  });
+  leafCount.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      thamboolaSend.click();
+    }
+  });
+
+  sankhyaSend.addEventListener("click", () => {
+    const n = Number(sankhyaNumber.value);
+    if (!Number.isInteger(n) || n < 1 || n > 108) {
+      sankhyaNumber.focus();
+      return;
+    }
+    submitPrashnam({ mode: "sankhya", number: n }, "സംഖ്യാ പ്രശ്നം");
+  });
+  sankhyaNumber.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      sankhyaSend.click();
+    }
+  });
+
+  prashnamOpen.addEventListener("click", openPrashnam);
+  prashnamClose.addEventListener("click", closePrashnam);
+  prashnamModal.addEventListener("click", (e) => {
+    if (e.target === prashnamModal) closePrashnam();
+  });
 
   // Fill in the display name for sessions that logged in before the name was
   // cached locally, so the greeting/header still show it (no re-login needed).

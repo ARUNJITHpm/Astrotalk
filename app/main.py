@@ -41,6 +41,7 @@ from app.modules.content.router import router as content_router
 from app.modules.identity.router import router as identity_router
 from app.modules.knowledge.router import router as knowledge_router
 from app.modules.notifications.router import router as notifications_router
+from app.modules.temples.router import router as temples_router
 from app.modules.tone_safety.router import router as tone_safety_router
 from app.modules.whatsapp.router import router as whatsapp_router
 from app.platform.db import init_db
@@ -72,6 +73,7 @@ for router in (
     tone_safety_router,
     chat_router,
     content_router,
+    temples_router,
     whatsapp_router,
     community_router,
     commerce_router,

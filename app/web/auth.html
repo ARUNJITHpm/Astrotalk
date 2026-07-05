@@ -288,6 +288,104 @@
     </main>
   </div>
 
+  <script src="/static/vendor/gsap.min.js"></script>
   <script src="/static/auth.js?v=3"></script>
+  <script>
+    // GSAP motion layer for the auth page. Purely decorative — the page works
+    // identically without it (reduced-motion users, GSAP load failure).
+    (() => {
+      if (!window.gsap) return;
+      if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+      // auth.js redirects logged-in users to "/"; skip animating a dead page.
+      if (localStorage.getItem("tara_phone")) return;
+
+      const hero = document.querySelector(".hero");
+      const starsLayer = document.querySelector(".stars");
+
+      // Densify the starfield: GSAP-driven twinkle + drift on extra stars.
+      if (starsLayer) {
+        for (let i = 0; i < 22; i++) {
+          const s = document.createElement("i");
+          s.style.animation = "none"; // GSAP owns these, not the CSS keyframes
+          const size = gsap.utils.random(1.5, 3);
+          gsap.set(s, {
+            width: size,
+            height: size,
+            left: gsap.utils.random(0, 100) + "%",
+            top: gsap.utils.random(0, 100) + "%",
+            opacity: gsap.utils.random(0.1, 0.5),
+          });
+          starsLayer.appendChild(s);
+          gsap.to(s, {
+            opacity: gsap.utils.random(0.5, 0.95),
+            duration: gsap.utils.random(1.4, 3.6),
+            repeat: -1,
+            yoyo: true,
+            ease: "sine.inOut",
+            delay: gsap.utils.random(0, 2.5),
+          });
+          gsap.to(s, {
+            y: gsap.utils.random(-30, -90),
+            duration: gsap.utils.random(24, 60),
+            repeat: -1,
+            yoyo: true,
+            ease: "none",
+          });
+        }
+      }
+
+      // Entrance: hero copy cascades, then the auth card lifts in.
+      const tl = gsap.timeline({ defaults: { ease: "power3.out" } });
+      if (hero) {
+        tl.from(".hero-brand", { y: -16, autoAlpha: 0, duration: 0.5 });
+        const glyph = document.querySelector(".hero-copy .glyph");
+        if (glyph) {
+          gsap.set(glyph, { display: "inline-block", transformOrigin: "50% 50%" });
+          tl.from(
+            glyph,
+            { scale: 0, rotation: -180, autoAlpha: 0, duration: 0.9, ease: "elastic.out(1, 0.55)" },
+            "-=0.25"
+          );
+          gsap.to(glyph, { y: -6, duration: 2.4, repeat: -1, yoyo: true, ease: "sine.inOut", delay: 1.2 });
+        }
+        tl.from(".hero-copy h1", { y: 30, autoAlpha: 0, duration: 0.6 }, "-=0.55");
+        tl.from(".hero-copy p", { y: 20, autoAlpha: 0, duration: 0.5 }, "-=0.4");
+        tl.from(".hero-foot", { autoAlpha: 0, duration: 0.6 }, "-=0.25");
+      }
+      tl.from(".card-head", { y: 22, autoAlpha: 0, duration: 0.5 }, hero ? "-=0.7" : 0);
+      tl.from(".tabs", { y: 18, autoAlpha: 0, duration: 0.45 }, "-=0.35");
+      tl.from(
+        "#login-form > *",
+        { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.07, clearProps: "all" },
+        "-=0.3"
+      );
+      tl.from(".fine", { autoAlpha: 0, duration: 0.5 }, "-=0.2");
+
+      // Tab switch: the newly revealed form's fields cascade in.
+      const animateFormIn = (form) => {
+        if (form.hidden) return;
+        gsap.fromTo(
+          form.querySelectorAll(":scope > *"),
+          { y: 14, autoAlpha: 0 },
+          { y: 0, autoAlpha: 1, duration: 0.35, stagger: 0.05, ease: "power2.out", clearProps: "all" }
+        );
+      };
+      ["login-form", "register-form"].forEach((id) => {
+        const form = document.getElementById(id);
+        if (!form) return;
+        new MutationObserver(() => animateFormIn(form)).observe(form, {
+          attributes: true,
+          attributeFilter: ["hidden"],
+        });
+      });
+
+      // Submit buttons get a springy press.
+      document.querySelectorAll(".submit").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          gsap.fromTo(btn, { scale: 0.94 }, { scale: 1, duration: 0.5, ease: "elastic.out(1, 0.5)" });
+        });
+      });
+    })();
+  </script>
 </body>
 </html>

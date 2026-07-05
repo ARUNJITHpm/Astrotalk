@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Tara — താര</title>
-  <link rel="stylesheet" href="/static/styles.css?v=7" />
+  <link rel="stylesheet" href="/static/styles.css?v=10" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link
     href="https://fonts.googleapis.com/css2?family=Noto+Sans+Malayalam:wght@400;500;600&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,400&display=swap"
@@ -71,6 +71,8 @@
 
       <div class="composer">
         <form id="composer-form" class="composer-form">
+          <button id="prashnam-open" class="prashnam-open" type="button"
+                  title="പ്രശ്നം ചോദിക്കൂ — ചോദ്യനിമിഷത്തിന്റെ ചാർട്ട്">🪷</button>
           <textarea
             id="input"
             class="input"
@@ -111,6 +113,58 @@
     </div>
   </div>
 
-  <script src="/static/app.js?v=7"></script>
+  <!-- Prashnam (Kerala horary): question-moment reading via thamboola / swarna -->
+  <div id="prashnam-modal" class="modal" hidden>
+    <div class="modal-card prashnam-card">
+      <button id="prashnam-close" class="modal-close" type="button" aria-label="Close">×</button>
+      <div class="prashnam-title">🪷 പ്രശ്നം ചോദിക്കൂ</div>
+      <p class="prashnam-sub">
+        ചോദ്യം ചോദിക്കുന്ന നിമിഷത്തിന്റെ ചാർട്ട് നോക്കി, പരമ്പരാഗത ശൈലിയിലുള്ള
+        മാർഗനിർദേശം. നേരിട്ടുള്ള അഷ്ടമംഗല പ്രശ്നത്തിന് പകരമല്ല.
+      </p>
+
+      <textarea id="prashnam-question" class="prashnam-question" rows="2"
+                placeholder="നിങ്ങളുടെ ചോദ്യം… (ഉദാ: പുതിയ ജോലി ശരിയാകുമോ?)"></textarea>
+
+      <div class="prashnam-modes">
+        <button class="prashnam-mode active" type="button" data-mode="swarna">
+          സ്വർണ പ്രശ്നം<small>ഒരു കളം തൊടുക</small>
+        </button>
+        <button class="prashnam-mode" type="button" data-mode="thamboola">
+          താംബൂല പ്രശ്നം<small>വെറ്റിലയുടെ എണ്ണം</small>
+        </button>
+        <button class="prashnam-mode" type="button" data-mode="sankhya">
+          സംഖ്യാ പ്രശ്നം<small>1–108 ഒരു സംഖ്യ</small>
+        </button>
+      </div>
+
+      <div id="prashnam-swarna" class="prashnam-pane">
+        <div class="prashnam-hint">ചോദ്യം മനസ്സിൽ ധ്യാനിച്ച്, ഈ 12 കളങ്ങളിൽ ഒന്ന് തൊടുക — അതാണ് ആരൂഢം:</div>
+        <div id="arudha-grid" class="arudha-grid"></div>
+      </div>
+
+      <div id="prashnam-thamboola" class="prashnam-pane" hidden>
+        <div class="prashnam-hint">കയ്യിലെടുത്ത വെറ്റിലകളുടെ എണ്ണം (1–108):</div>
+        <div class="thamboola-row">
+          <input id="leaf-count" class="leaf-count" type="number" min="1" max="108"
+                 inputmode="numeric" placeholder="ഉദാ: 21" />
+          <button id="thamboola-send" class="thamboola-send" type="button">ചോദിക്കൂ</button>
+        </div>
+      </div>
+
+      <div id="prashnam-sankhya" class="prashnam-pane" hidden>
+        <div class="prashnam-hint">മനസ്സിൽ വരുന്ന ഒരു സംഖ്യ പറയൂ (1–108):</div>
+        <div class="thamboola-row">
+          <input id="sankhya-number" class="leaf-count" type="number" min="1" max="108"
+                 inputmode="numeric" placeholder="ഉദാ: 54" />
+          <button id="sankhya-send" class="thamboola-send" type="button">ചോദിക്കൂ</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/vendor/gsap.min.js"></script>
+  <script src="/static/app.js?v=9"></script>
+  <script src="/static/motion.js?v=2"></script>
 </body>
 </html>

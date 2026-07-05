@@ -18,10 +18,20 @@ import os
 
 from app.modules.chat import user_memory
 from app.modules.chat.llm_client import LLMClient
+from app.modules.temples.service import TemplesService
 from app.platform.config import get_settings
 from app.platform.logging_config import get_logger
 
 logger = get_logger(__name__)
+
+# First-person residence cues: a district name alone isn't enough ("എന്റെ അമ്മ
+# കോഴിക്കോട് ആണ്" is about the mother), but combined with one of these the
+# message is very likely about where the USER is. Detection is deterministic —
+# no LLM — so the stored district is always a real Kerala district key.
+_RESIDENCE_CUES = (
+    "ഞാൻ", "താമസ", "എന്റെ വീട്", "ഇപ്പോൾ",
+    "i live", "i am in", "i'm in", "i stay", "based in", "my home",
+)
 
 _DISTILL_SYSTEM = (
     "You extract durable facts about the user from a chat, to help a companion "
@@ -74,13 +84,30 @@ async def _distill(messages: list[dict[str, str]]) -> list[dict]:
     return [{"text": latest, "kind": "note"}]
 
 
+def _detect_current_district(text: str) -> str | None:
+    """The user's current Kerala district, when the message states it.
+
+    Requires BOTH a district name (temples' public detector, en/ml variants)
+    and a first-person residence cue, to avoid storing places that belong to
+    someone else in the conversation.
+    """
+    district = TemplesService.detect_district(text)
+    if district is None:
+        return None
+    lower = text.lower()  # no-op for Malayalam, folds the English cues
+    if any(cue in lower for cue in _RESIDENCE_CUES):
+        return district
+    return None
+
+
 async def extract_memory(user_id: str, messages: list[dict[str, str]]) -> None:
     """Distil durable facts from a conversation and merge into the user's profile.
 
     No-op storage when Mongo is disabled/unavailable (upsert_facts handles that).
     """
     facts = await _distill(messages)
-    await user_memory.upsert_facts(user_id, facts)
+    district = _detect_current_district(_latest_user_text(messages))
+    await user_memory.upsert_facts(user_id, facts, district=district)
     logger.info(
         "chat.memory: extraction ran for user=%s (%d fact(s)).", user_id, len(facts)
     )

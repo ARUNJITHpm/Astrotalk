@@ -4,7 +4,8 @@ Implements the request flow in PROJECT_DOCS.md §6, in this exact order:
   1. tone_safety.screen() FIRST — if crisis, return the safety response and STOP
      (no chart, no transits, no RAG, no LLM, no memory). GUARDRAILS.md §2.
   2. identity.get_chart() + astrology_engine.get_transits()
-  3. knowledge.retrieve() grounded in the transits + the user's question
+  3. knowledge.retrieve() grounded in the computed chart facts + the question
+     (3c: temples.suggest() when remedies are asked for or traditional)
   4. tone_safety.build_system_prompt() with chart/transit/RAG context
   5. llm_client.complete()
   6. return the reply; the router schedules memory extraction as a BackgroundTask
@@ -20,9 +21,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.astrology_engine.service import AstrologyEngineService
 from app.modules.chat import user_memory
 from app.modules.chat.llm_client import LLMClient
-from app.modules.chat.schemas import ChatResponse
+from app.modules.chat.schemas import ChatResponse, PrashnamPick
 from app.modules.identity.service import IdentityService
 from app.modules.knowledge.service import KnowledgeService
+from app.modules.temples.service import TemplesService
 from app.modules.tone_safety.service import ToneSafetyService
 from app.platform.logging_config import get_logger
 
@@ -43,6 +45,23 @@ _VARGA_TOPICS: list[tuple[str, tuple[str, ...]]] = [
     ("D3", ("sibling", "brother", "sister", "സഹോദര")),
 ]
 
+# Explicit remedy/temple intent — the user is ASKING for devotional guidance.
+# (Careful with short Malayalam stems: "തൊഴ" would also match "തൊഴിൽ"/job.)
+_REMEDY_INTENT = (
+    "temple", "remedy", "remedies", "pariharam", "pooja", "puja", "vazhipadu",
+    "prayer", "pray", "worship", "mantra", "offering", "darshan",
+    "ക്ഷേത്ര", "അമ്പല", "വഴിപാട", "പരിഹാര", "പ്രാർത്ഥ", "പൂജ", "മന്ത്ര",
+    "ദർശന", "തൊഴണ", "തൊഴാൻ",
+)
+
+# Concern+dosha pairs where a temple suggestion is traditional even without the
+# user explicitly asking (e.g. chovva dosha in a marriage question). Kept narrow
+# so suggestions don't spam every chat; anything else needs explicit intent.
+_AUTO_SUGGEST_PAIRS = {
+    ("marriage", "chovva_dosha"),
+    ("children", "kala_sarpa_dosha"),
+}
+
 
 class ChatService:
     def __init__(
@@ -52,12 +71,14 @@ class ChatService:
         astrology: AstrologyEngineService | None = None,
         knowledge: KnowledgeService | None = None,
         llm: LLMClient | None = None,
+        temples: TemplesService | None = None,
     ) -> None:
         self._tone_safety = tone_safety or ToneSafetyService()
         self._identity = identity or IdentityService()
         self._astrology = astrology or AstrologyEngineService()
         self._knowledge = knowledge or KnowledgeService()
         self._llm = llm or LLMClient()
+        self._temples = temples or TemplesService()
 
     async def handle_message(
         self,
@@ -65,6 +86,7 @@ class ChatService:
         messages: list[dict[str, str]],
         session: AsyncSession | None = None,
         debug: bool = False,
+        prashnam: PrashnamPick | None = None,
     ) -> ChatResponse:
         """Run the §6 orchestrator. When ``debug`` is set, attach a per-turn trace
         (params, tools invoked, timings, LLM config) to the response so a
@@ -112,12 +134,45 @@ class ChatService:
         grounded_in.append("transits")
         _mark("get_transits", s, tool="astrology_engine.get_transits")
 
-        # --- Step 3: RAG grounded in transits + question ---
+        # --- Step 2p: prashnam (horary) reading, when this turn carries a pick ---
+        # Deterministic end to end: the engine computes the question-moment
+        # chart and the thamboola/swarna rules; the LLM only narrates them.
+        prashnam_note: str | None = None
+        prashnam_cues: list[str] = []
+        if prashnam is not None:
+            s = time.perf_counter()
+            lat, lng = await self._load_user_location(session, user_id)
+            loc = {"lat": lat, "lng": lng} if lat is not None and lng is not None else {}
+            reading = await self._astrology.get_prashnam_reading(
+                prashnam.mode,
+                leaf_count=prashnam.leaf_count,
+                arudha_rasi_index=prashnam.arudha_rasi_index,
+                number=prashnam.number,
+                **loc,
+            )
+            prashnam_cues = reading["cues"]
+            prashnam_note = self._prashnam_note(reading)
+            grounded_in.append(f"prashnam:{prashnam.mode}")
+            _mark(
+                "prashnam_reading", s, tool="astrology_engine.get_prashnam_reading",
+                mode=prashnam.mode, cues=prashnam_cues,
+            )
+
+        # --- Step 3: RAG grounded in the question + computed facts ---
+        # The chart facts (mahadasha lord, janma nakshatram, doshas, sade sati)
+        # are computed by astrology_engine; feeding them into the query pulls the
+        # interpretation chunks that match THIS person's chart, not just the
+        # question's wording. A prashnam turn retrieves on the reading's cues
+        # instead — the prashna chart of the moment, not the natal chart, is
+        # what the answer hangs on.
         s = time.perf_counter()
-        query = self._retrieval_query(latest, transits)
-        retrieved = self._knowledge.retrieve(query, k=3)
+        if prashnam_cues:
+            query = " ".join([latest, *prashnam_cues]).strip()
+        else:
+            query = self._retrieval_query(latest, transits, chart)
+        retrieved = self._knowledge.retrieve(query, k=4)
         grounded_in.extend(f"knowledge:{chunk.id}" for chunk in retrieved)
-        _mark("rag_retrieve", s, tool="knowledge.retrieve", k=3, hits=len(retrieved), query=query)
+        _mark("rag_retrieve", s, tool="knowledge.retrieve", k=4, hits=len(retrieved), query=query)
 
         # --- Step 3a2: pick the topical divisional chart (varga) ---
         # The D1 chart is fixed; vargas answer specific domains (D9 marriage,
@@ -141,17 +196,37 @@ class ChatService:
 
         # --- Step 3b: durable user memory (cross-session profile) ---
         s = time.perf_counter()
-        memory = await self._load_memory(user_id)
+        memory, stored_district = await self._load_memory(user_id)
         if memory:
             grounded_in.append("memory")
         _mark("load_memory", s, used=bool(memory), tool="chat.user_memory.get_profile")
 
+        # --- Step 3c: temple guidance (optional devotional suggestion) ---
+        # Deterministic: temples.suggest picks deity+temple from the computed
+        # doshas/dasha and the message's concern; the LLM only narrates it.
+        # The profile's stored district ("where I live now") localizes the
+        # suggestion when the message itself names no place.
+        s = time.perf_counter()
+        temple_note, temple_ids = await self._temple_guidance(
+            latest, chart, transits, session, user_id, stored_district
+        )
+        grounded_in.extend(f"temple:{tid}" for tid in temple_ids)
+        _mark(
+            "temple_guidance", s, tool="temples.suggest",
+            suggested=temple_ids or None,
+        )
+
         # --- Step 4: persona system prompt with context ---
         s = time.perf_counter()
+        notes = [c.text for c in retrieved]
+        if prashnam_note:
+            notes.append(prashnam_note)
+        if temple_note:
+            notes.append(temple_note)
         system_prompt = self._tone_safety.build_system_prompt(
             chart=chart_for_prompt,
             transits=transits,
-            retrieved=[c.text for c in retrieved],
+            retrieved=notes,
             memory=memory,
         )
         _mark("build_prompt", s, tool="tone_safety.build_system_prompt", chars=len(system_prompt))
@@ -227,18 +302,163 @@ class ChatService:
             return None
         return chart.natal_json if chart is not None else None
 
-    async def _load_memory(self, user_id: str) -> str | None:
-        """Load the user's durable memory profile, formatted for the prompt.
+    async def _load_memory(self, user_id: str) -> tuple[str | None, str | None]:
+        """Load the user's durable memory profile: (prompt block, current district).
 
-        Degrades to None if Mongo is disabled/unavailable — chat still answers,
-        just without the personalization.
+        The district is where the user lives NOW (captured by memory extraction),
+        distinct from the birth place in identity. Degrades to (None, None) if
+        Mongo is disabled/unavailable — chat still answers, just without the
+        personalization.
         """
         try:
             profile = await user_memory.get_profile(user_id)
         except Exception as exc:  # pragma: no cover - depends on Mongo availability
             logger.warning("chat: memory lookup unavailable (%s); continuing.", exc)
-            return None
-        return user_memory.format_for_prompt(profile)
+            return None, None
+        district = (profile or {}).get("district")
+        return user_memory.format_for_prompt(profile), district
+
+    async def _temple_guidance(
+        self,
+        question: str,
+        chart: dict | None,
+        transits: dict,
+        session: AsyncSession | None,
+        user_id: str,
+        stored_district: str | None = None,
+    ) -> tuple[str | None, list[str]]:
+        """Suggest temples when the user asks for remedies — or when a classic
+        concern+dosha pairing makes it traditional (e.g. marriage + chovva).
+
+        Returns (prompt note, temple ids). The note carries its own framing so
+        the LLM presents the visit as an optional act of devotion — never a
+        demand, never fear, never payment (GUARDRAILS.md §1).
+        """
+        lower = question.lower()
+        concern = self._temples.detect_concern(question)
+
+        doshas: list[str] = []
+        if isinstance(chart, dict):
+            chart_doshas = chart.get("doshas") or {}
+            doshas = [
+                name for name, d in chart_doshas.items()
+                if isinstance(d, dict) and d.get("present")
+            ]
+        if transits.get("sade_sati", {}).get("active"):
+            doshas.append("sade_sati")
+
+        asked = any(kw in lower for kw in _REMEDY_INTENT)
+        traditional = any(
+            (concern, dosha) in _AUTO_SUGGEST_PAIRS for dosha in doshas
+        )
+        if not asked and not traditional:
+            return None, []
+
+        grahas: list[str] = []
+        if isinstance(chart, dict):
+            maha = ((chart.get("dasha") or {}).get("current") or {}).get("mahadasha") or {}
+            if maha.get("lord"):
+                grahas.append(maha["lord"])
+
+        # The message's own place mention wins; else where the user said they
+        # live (memory profile); the identity lat/lng (birth place) is last.
+        district = self._temples.detect_district(question) or stored_district
+        lat, lng = await self._load_user_location(session, user_id)
+
+        # k=1 on purpose: gpt-4o-mini narrates everything it is given, so the
+        # "at most one temple" guardrail is enforced here, not by instruction.
+        suggestions = self._temples.suggest(
+            concern=concern, doshas=doshas, grahas=grahas,
+            district=district, lat=lat, lng=lng, k=1,
+        )
+        if not suggestions:
+            return None, []
+
+        t = suggestions[0]
+        near = f", about {t.distance_km:g} km away" if t.distance_km is not None else ""
+        note = (
+            "Temple guidance (share only if it fits the conversation "
+            "naturally, as an optional act of devotion the person may choose "
+            "— never as a requirement, never out of fear, and never linked "
+            "to payment. Copy the temple name, town and district EXACTLY as "
+            "written below; do not substitute a different place):\n"
+            f"- {t.name} ({t.name_ml}), {t.town}, {t.district}{near}: "
+            f"{t.reason}. Known for {t.famous_for}. "
+            f"Vazhipadu: {', '.join(t.vazhipadu)}. Days: {t.days}. "
+            f"Mantra: {t.mantra}."
+        )
+        return note, [t.id]
+
+    @staticmethod
+    def _prashnam_note(reading: dict) -> str:
+        """Deterministic prompt note for a prashnam reading.
+
+        Carries the computed facts AND the honesty guardrail: Tara presents
+        this as a traditional-STYLE reading of the question moment, never as
+        equivalent to an in-person ashtamangala prashnam with a Daivajna.
+        """
+        chart = reading["prashna_chart"]
+        moon = chart["moon"]
+        facts = [
+            f"- Udaya lagnam (rising now): {chart['udaya_lagnam']}; "
+            f"Moon: {moon['rasi']} ({moon['nakshatram']}), house {moon['house']} "
+            f"from the lagna; tithi {chart['tithi']} ({chart['paksha']})."
+        ]
+        if reading["mode"] == "thamboola":
+            facts.append(
+                f"- Thamboola (താംബൂല പ്രശ്നം): {reading['leaf_count']} leaves — "
+                f"{reading['parity']} "
+                f"({'gati/movement' if reading['parity'] == 'odd' else 'sthiti/steadiness'}), "
+                f"remainder {reading['remainder']} of 8; Moon's house relation: "
+                f"{reading['moon_house_relation']}."
+            )
+        elif reading["mode"] == "sankhya":
+            facts.append(
+                f"- Sankhya (സംഖ്യാ പ്രശ്നം): number {reading['number']} of 108 — "
+                f"falls in {reading['number_rasi']} rasi and "
+                f"{reading['number_nakshatram']} nakshatra (pada "
+                f"{reading['number_pada']}), house "
+                f"{reading['number_house_from_lagna']} from the udaya lagna "
+                f"({reading['number_lagna_relation']})."
+            )
+        else:
+            facts.append(
+                f"- Swarna (സ്വർണ പ്രശ്നം): arudha (ആരൂഢം) {reading['arudha_rasi']}, "
+                f"house {reading['arudha_house_from_lagna']} from the udaya lagna "
+                f"({reading['arudha_lagna_relation']}); Moon is house "
+                f"{reading['moon_house_from_arudha']} from the arudha."
+            )
+        return (
+            "Prashnam reading of this question's moment (facts computed by the "
+            "engine — narrate them, do not add placements):\n"
+            + "\n".join(facts)
+            + "\nHONESTY RULE: present this as a traditional-style reading of "
+            "the question moment. NEVER claim or imply it equals an in-person "
+            "ashtamangala prashnam (അഷ്ടമംഗല പ്രശ്നം) conducted by a Daivajna; "
+            "if the matter is weighty, gently note that a full prashnam is done "
+            "in person. Frame as reflective guidance the person is free to "
+            "weigh — never as a decree, never with fear."
+        )
+
+    async def _load_user_location(
+        self, session: AsyncSession | None, user_id: str
+    ) -> tuple[float | None, float | None]:
+        """The user's stored place (lat/lng), for 'temples near you' ranking.
+
+        Uses identity's public service; degrades to (None, None) without a
+        session/registration. Coordinates stay in memory only — never logged,
+        never in URLs (GUARDRAILS.md §4).
+        """
+        if session is None or not any(ch.isdigit() for ch in user_id):
+            return None, None
+        try:
+            user = await self._identity.get_user_by_phone(session, user_id)
+        except Exception as exc:  # pragma: no cover - depends on DB availability
+            logger.warning("chat: user lookup unavailable (%s); continuing.", exc)
+            return None, None
+        if user is None:
+            return None, None
+        return user.lat, user.lng
 
     @staticmethod
     def _select_varga(question: str) -> str | None:
@@ -250,12 +470,40 @@ class ChatService:
         return None
 
     @staticmethod
-    def _retrieval_query(question: str, transits: dict) -> str:
-        """Build the RAG query from the question plus transit cues (retrograde, etc.)."""
-        cues = [
-            name
-            for name, body in transits.get("transits", {}).items()
-            if body.get("retrograde")
-        ]
-        retro = " ".join(f"{name} retrograde" for name in cues)
-        return f"{question} {retro}".strip()
+    def _retrieval_query(question: str, transits: dict, chart: dict | None = None) -> str:
+        """Build the RAG query from the question plus computed chart/transit facts.
+
+        Facts are computed (astrology_engine), knowledge is retrieved (this
+        query), language is generated (LLM). Every cue added here is a fact the
+        engine derived — the query never invents astrology.
+        """
+        cues: list[str] = []
+
+        # Transit cues: retrograde planets. Rahu/Ketu are excluded — the nodes
+        # are perpetually retrograde, so they carry no signal and would drag
+        # retrograde chunks into every single query.
+        for name, body in transits.get("transits", {}).items():
+            if body.get("retrograde") and name not in ("rahu", "ketu"):
+                cues.append(f"{name} retrograde")
+
+        # Transit cue: active Sade Sati (Saturn 12th/1st/2nd from janma rasi).
+        if transits.get("sade_sati", {}).get("active"):
+            cues.append("sade sati shani saturn")
+
+        # Chart cues: the person's own computed facts.
+        if isinstance(chart, dict):
+            if chart.get("nakshatram"):
+                cues.append(str(chart["nakshatram"]))
+            if chart.get("lagnam"):
+                cues.append(f"{chart['lagnam']} lagna")
+            current = (chart.get("dasha") or {}).get("current") or {}
+            maha = current.get("mahadasha") or {}
+            if maha.get("lord"):
+                cues.append(f"{maha['lord']} mahadasha dasha")
+            doshas = chart.get("doshas") or {}
+            if doshas.get("chovva_dosha", {}).get("present"):
+                cues.append("chovva dosha mangal")
+            if doshas.get("kala_sarpa_dosha", {}).get("present"):
+                cues.append("kala sarpa dosha")
+
+        return " ".join([question, *cues]).strip()

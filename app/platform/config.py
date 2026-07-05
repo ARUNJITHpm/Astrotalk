@@ -58,7 +58,11 @@ class Settings(BaseSettings):
     razorpay_key_id: str = ""
     razorpay_key_secret: str = ""
 
-    # ---- Geocoding / timezone (OpenCage / Google) ----
+    # ---- Geocoding / timezone ----
+    # Default provider is Open-Meteo's free geocoding API: no key required, and
+    # it returns the IANA timezone with the coordinates (one call resolves a
+    # birth place completely). The key field remains for a paid-provider swap.
+    geocoding_url: str = "https://geocoding-api.open-meteo.com/v1/search"
     geocoding_api_key: str = ""
 
     # ---- Mock switches: every external integration defaults to mocked ----

@@ -126,12 +126,15 @@ async def recompute_chart(data: PhoneLookup, session: SessionDep):
     """Recompute and store a fresh natal chart for a registered mobile number.
 
     Unconditional (unlike the login self-heal): use after birth details change or
-    to force an upgrade from a mock chart. Phone travels in the body, never the
-    URL (GUARDRAILS.md §4).
+    to force an upgrade from a mock chart. Re-geocodes the birth place first, so
+    accounts onboarded with the placeholder location gain real coordinates (and
+    a correct lagna) here. Phone travels in the body, never the URL
+    (GUARDRAILS.md §4).
     """
     user = await _service.get_user_by_phone(session, data.phone)
     if user is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="User not found")
+    user = await _service.regeocode_user(session, user)
     natal_json = await _compute_natal_chart(user)
     chart = await _service.save_chart(session, user.id, natal_json)
     await session.commit()

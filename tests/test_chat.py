@@ -88,6 +88,176 @@ def test_select_varga_maps_topics_to_divisional_charts():
     assert pick("hello, how are you?") is None                  # no topic → D1 only
 
 
+def test_retrieval_query_grounds_in_computed_chart_facts():
+    from app.modules.chat.service import ChatService
+
+    chart = {
+        "nakshatram": "ചോതി",
+        "lagnam": "തുലാം",
+        "dasha": {"current": {"mahadasha": {"lord": "shani"}}},
+        "doshas": {
+            "chovva_dosha": {"present": True},
+            "kala_sarpa_dosha": {"present": False},
+        },
+    }
+    transits = {
+        "transits": {"budhan": {"retrograde": True}},
+        "sade_sati": {"active": True, "phase": "peak"},
+    }
+    q = ChatService._retrieval_query("വിവാഹം എപ്പോൾ?", transits, chart)
+    # Every cue is a computed fact — the query pulls chunks for THIS chart.
+    assert "budhan retrograde" in q
+    assert "sade sati" in q
+    assert "ചോതി" in q
+    assert "തുലാം lagna" in q
+    assert "shani mahadasha" in q
+    assert "chovva dosha" in q
+    assert "kala sarpa" not in q  # absent dosha adds no cue
+
+
+def test_retrieval_query_degrades_without_chart():
+    from app.modules.chat.service import ChatService
+
+    q = ChatService._retrieval_query("hello", {"transits": {}}, None)
+    assert q == "hello"
+
+
+async def test_temple_question_grounds_reply_in_a_temple(client):
+    # Explicit temple ask ("ക്ഷേത്രത്തിൽ" → remedy intent) with a career concern
+    # ("ജോലി") and a district ("തിരുവനന്തപുരം"): step 3c must graft a suggestion
+    # and tag it in grounded_in as "temple:<id>".
+    async with client:
+        resp = await client.post(
+            "/chat/message",
+            json={
+                "user_id": "demo1",
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "ജോലി കിട്ടാൻ ഏത് ക്ഷേത്രത്തിൽ പോകണം? ഞാൻ തിരുവനന്തപുരം ആണ്.",
+                    }
+                ],
+            },
+        )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["is_safety_response"] is False
+    temple_refs = [g for g in body["grounded_in"] if g.startswith("temple:")]
+    assert temple_refs, f"expected a temple:<id> in grounded_in, got {body['grounded_in']}"
+
+
+async def test_plain_question_suggests_no_temple(client):
+    # No remedy intent and no classic concern+dosha pairing → step 3c stays
+    # silent; temple suggestions must not spam ordinary questions.
+    async with client:
+        resp = await client.post(
+            "/chat/message",
+            json={
+                "user_id": "demo",
+                "messages": [
+                    {"role": "user", "content": "ഇന്ന് എന്റെ ദിവസം എങ്ങനെ?"}
+                ],
+            },
+        )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    temple_refs = [g for g in body["grounded_in"] if g.startswith("temple:")]
+    assert temple_refs == [], f"unexpected temple suggestions: {temple_refs}"
+
+
+def test_detect_current_district_needs_first_person_residence_cue():
+    # Deterministic capture of "where I live now" for the memory profile:
+    # district name + first-person cue, so other people's places don't stick.
+    from app.modules.chat.memory import _detect_current_district
+
+    assert _detect_current_district("ഞാൻ തിരുവനന്തപുരം ആണ്") == "Thiruvananthapuram"
+    assert _detect_current_district("I live in Kochi now") == "Ernakulam"
+    # District present but it's the mother's place → not stored.
+    assert _detect_current_district("എന്റെ അമ്മ കോഴിക്കോട് ആണ്") is None
+    assert _detect_current_district("ഇന്ന് നല്ല ദിവസമാണോ?") is None
+
+
+async def test_temple_guidance_falls_back_to_stored_district():
+    # When the message names no place, the profile's stored district (current
+    # residence from memory extraction) localizes the temple suggestion.
+    from app.modules.chat.service import ChatService
+
+    class _SpyTemples:
+        def __init__(self):
+            self.kwargs = None
+
+        def detect_concern(self, text):
+            return "career"
+
+        def detect_district(self, text):
+            return None
+
+        def suggest(self, **kwargs):
+            self.kwargs = kwargs
+            return []
+
+    spy = _SpyTemples()
+    svc = ChatService(temples=spy)
+    await svc._temple_guidance(
+        "ഒരു വഴിപാട് പറയാമോ?", None, {}, None, "demo", stored_district="Kollam"
+    )
+    assert spy.kwargs["district"] == "Kollam"
+
+
+async def test_swarna_prashnam_turn_grounds_in_prashnam(client):
+    # A swarna pick rides the normal /chat/message flow: the engine computes
+    # the question-moment chart + arudha rules, grounded_in records it.
+    async with client:
+        resp = await client.post(
+            "/chat/message",
+            json={
+                "user_id": "demo",
+                "messages": [
+                    {"role": "user", "content": "എന്റെ പുതിയ സംരംഭം വിജയിക്കുമോ?"}
+                ],
+                "prashnam": {"mode": "swarna", "arudha_rasi_index": 4},
+            },
+        )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["is_safety_response"] is False
+    assert "prashnam:swarna" in body["grounded_in"]
+
+
+async def test_thamboola_prashnam_requires_leaf_count(client):
+    async with client:
+        resp = await client.post(
+            "/chat/message",
+            json={
+                "user_id": "demo",
+                "messages": [{"role": "user", "content": "വിജയിക്കുമോ?"}],
+                "prashnam": {"mode": "thamboola"},  # no leaf_count → 422
+            },
+        )
+    assert resp.status_code == 422, resp.text
+
+
+async def test_crisis_screen_still_wins_over_prashnam(client):
+    # GUARDRAILS §2: the crisis screen runs FIRST even on a prashnam turn —
+    # no chart, no reading, no astrology in the reply.
+    async with client:
+        resp = await client.post(
+            "/chat/message",
+            json={
+                "user_id": "demo",
+                "messages": [
+                    {"role": "user", "content": "എനിക്ക് ജീവിക്കാൻ വയ്യ, ആത്മഹത്യ ചെയ്യണം"}
+                ],
+                "prashnam": {"mode": "thamboola", "leaf_count": 21},
+            },
+        )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["is_safety_response"] is True
+    assert body["grounded_in"] == []
+    assert "പ്രശ്ന" not in body["reply"]
+
+
 async def test_history_endpoint_returns_empty_when_mongo_disabled(client):
     # Mongo forced off (see _no_mongo): history persists nowhere and reads empty
     # (endpoint must degrade to [] rather than error).

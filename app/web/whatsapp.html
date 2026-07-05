@@ -239,6 +239,11 @@
       // exactly like the main web UI. Same [{role, content}] shape.
       let messages = [];
       let busy = false;
+      // One /wa session = ONE conversation in the shared history. Without this
+      // every turn was saved standalone and flooded the website's sidebar.
+      const conversationId =
+        (crypto.randomUUID && crypto.randomUUID()) ||
+        "wa-" + Date.now() + "-" + Math.random().toString(16).slice(2);
       // Shared identity with the website: the mobile number IS the user_id, and
       // it maps to the same SQL chart + Mongo history/memory. On WhatsApp the
       // number is intrinsic; here we ask once and reuse localStorage["tara_phone"].
@@ -302,7 +307,7 @@
           const res = await fetch("/chat/message", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ user_id: userId, messages }),
+            body: JSON.stringify({ user_id: userId, conversation_id: conversationId, messages }),
           });
           if (!res.ok) throw new Error("network");
           const data = await res.json();          // ChatResponse: {reply, ...}

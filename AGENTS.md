@@ -22,6 +22,7 @@ FastAPI · PostgreSQL · ChromaDB (vectors) · Redis + Celery/arq (cache & sched
 | tone_safety | `app/modules/tone_safety/**` |
 | chat | `app/modules/chat/**` |
 | content | `app/modules/content/**` |
+| temples | `app/modules/temples/**` |
 | whatsapp | `app/modules/whatsapp/**` |
 | community | `app/modules/community/**` |
 | commerce | `app/modules/commerce/**` |

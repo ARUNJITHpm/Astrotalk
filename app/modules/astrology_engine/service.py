@@ -40,3 +40,61 @@ class AstrologyEngineService:
     async def get_panchangam(self, day: date | None = None) -> dict:
         """Panchangam for the day: nakshatram, nalla neram, tithi."""
         return await self._client.panchangam(day or date.today())
+
+    async def get_prashna_chart(
+        self,
+        when: datetime | None = None,
+        lat: float = 9.9312,
+        lng: float = 76.2673,
+    ) -> dict:
+        """Horary (prashna) chart for the moment a question is asked.
+
+        Defaults: now (tz-aware) at Kochi — pass the user's stored location
+        when known, since the udaya lagna is location-sensitive.
+        """
+        from datetime import timezone
+
+        return await self._client.prashna_chart(
+            when or datetime.now(timezone.utc), lat, lng
+        )
+
+    async def get_prashnam_reading(
+        self,
+        mode: str,
+        *,
+        leaf_count: int | None = None,
+        arudha_rasi_index: int | None = None,
+        number: int | None = None,
+        when: datetime | None = None,
+        lat: float = 9.9312,
+        lng: float = 76.2673,
+    ) -> dict:
+        """A full prashnam reading: prashna chart of the moment + mode rules.
+
+        ``mode`` is ``"thamboola"`` (requires ``leaf_count``), ``"swarna"``
+        (requires ``arudha_rasi_index`` 0–11), or ``"sankhya"`` (requires
+        ``number`` 1–108). Returns deterministic facts and retrieval cues —
+        the traditional meanings live in the knowledge corpus.
+        """
+        from app.modules.astrology_engine.prashnam import (
+            sankhya_prashnam,
+            swarna_prashnam,
+            thamboola_prashnam,
+        )
+
+        chart = await self.get_prashna_chart(when, lat, lng)
+        if mode == "thamboola":
+            if leaf_count is None:
+                raise ValueError("thamboola prashnam requires leaf_count")
+            reading = thamboola_prashnam(leaf_count, chart)
+        elif mode == "swarna":
+            if arudha_rasi_index is None:
+                raise ValueError("swarna prashnam requires arudha_rasi_index")
+            reading = swarna_prashnam(arudha_rasi_index, chart)
+        elif mode == "sankhya":
+            if number is None:
+                raise ValueError("sankhya prashnam requires number")
+            reading = sankhya_prashnam(number, chart)
+        else:
+            raise ValueError(f"Unknown prashnam mode {mode!r}")
+        return {**reading, "prashna_chart": chart}

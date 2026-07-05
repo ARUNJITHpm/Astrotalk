@@ -5,7 +5,11 @@ durable profile of the person — keyed by ``user_id``, shared across ALL sessio
 This is what lets Tara feel like she remembers someone.
 
 Stored in the MongoDB ``user_memory`` collection, one document per user:
-    { user_id, summary, facts: [{text, kind, created_at}], updated_at }
+    { user_id, summary, facts: [{text, kind, created_at}], district, updated_at }
+
+``district`` is the user's CURRENT Kerala district (where they live now — NOT
+the birth place, which lives in identity). Chat uses it to rank "temples near
+you" when a message doesn't name a place.
 
 Everything degrades to a safe no-op when Mongo is disabled/unavailable
 (get_db() -> None), so a down document store never breaks a chat reply.
@@ -36,9 +40,13 @@ async def get_profile(user_id: str) -> dict | None:
 
 
 async def upsert_facts(
-    user_id: str, facts: list[dict], summary: str | None = None
+    user_id: str,
+    facts: list[dict],
+    summary: str | None = None,
+    district: str | None = None,
 ) -> None:
-    """Merge new distilled ``facts`` (and optionally a ``summary``) into the profile.
+    """Merge new distilled ``facts`` (and optionally a ``summary`` and the
+    user's current ``district``) into the profile.
 
     Each fact is ``{"text": str, "kind": str}``; created_at is stamped here. Facts
     are capped at the most recent ``_MAX_FACTS``. No-op when Mongo is disabled or
@@ -64,12 +72,14 @@ async def upsert_facts(
             continue
         seen.add(key)
         stamped.append({"text": text, "kind": f.get("kind", "fact"), "created_at": now})
-    if not stamped and summary is None:
+    if not stamped and summary is None and district is None:
         return
 
     set_fields: dict = {"updated_at": now}
     if summary is not None:
         set_fields["summary"] = summary
+    if district is not None:
+        set_fields["district"] = district
     update: dict = {"$set": set_fields}
     if stamped:
         update["$push"] = {"facts": {"$each": stamped, "$slice": -_MAX_FACTS}}

@@ -88,6 +88,11 @@ class EphemerisClient:
             return self._mock_panchangam(day)
         return await self._real_panchangam(day)
 
+    async def prashna_chart(self, when: datetime, lat: float, lng: float) -> dict:
+        if self._mock:
+            return self._mock_prashna_chart(when, lat, lng)
+        return await self._real_prashna_chart(when, lat, lng)
+
     # ---- deterministic mocks ----
 
     def _mock_natal_chart(
@@ -148,6 +153,44 @@ class EphemerisClient:
             "source": "mock-ephemeris",
         }
 
+    def _mock_prashna_chart(self, when: datetime, lat: float, lng: float) -> dict:
+        # Minute-level seed: prashna is about the question MOMENT, so two
+        # questions a minute apart may differ (unlike the daily transit mock).
+        base = _seed(when.replace(second=0, microsecond=0).isoformat(),
+                     round(lat, 2), round(lng, 2))
+        lagna_index = base % 12
+        moon_index = (base + 4) % 12
+        planets = {
+            name: {
+                "rasi": _pick(_RASIS, base + i * 7),
+                "rasi_index": (base + i * 7) % 12,
+                "house": ((base + i * 7) % 12 - lagna_index) % 12 + 1,
+                "retrograde": ((base + i * 17) % 5) == 0,
+            }
+            for i, name in enumerate(_PLANETS)
+        }
+        return {
+            "system": "vedic",
+            "ayanamsa": "lahiri",
+            "as_of": when.isoformat(),
+            "udaya_lagnam": _RASIS[lagna_index],
+            "udaya_lagna_index": lagna_index,
+            "lagna_degree": float(base % 30),
+            "moon": {
+                "rasi": _RASIS[moon_index],
+                "rasi_index": moon_index,
+                "nakshatram": _pick(_NAKSHATRAS, base + 2),
+                "pada": base % 4 + 1,
+                "house": (moon_index - lagna_index) % 12 + 1,
+            },
+            "tithi": _pick(_TITHI_NAMES, base // 7),
+            "tithi_index": base % 30,
+            "paksha": "shukla" if base % 30 < 15 else "krishna",
+            "planets": planets,
+            "mock": True,
+            "source": "mock-ephemeris",
+        }
+
     # ---- real provider (fill these in to go live; nothing else changes) ----
 
     async def _real_natal_chart(
@@ -183,3 +226,10 @@ class EphemerisClient:
         from app.modules.astrology_engine.swiss_ephemeris import compute_panchangam
 
         return await to_thread(compute_panchangam, day, self._ayanamsa)
+
+    async def _real_prashna_chart(self, when: datetime, lat: float, lng: float) -> dict:
+        from asyncio import to_thread
+
+        from app.modules.astrology_engine.swiss_ephemeris import compute_prashna_chart
+
+        return await to_thread(compute_prashna_chart, when, lat, lng, self._ayanamsa)

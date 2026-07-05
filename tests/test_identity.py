@@ -20,9 +20,11 @@ from app.platform.db import Base
 
 @pytest.fixture(autouse=True)
 def _force_mock_ephemeris(monkeypatch):
-    # Onboarding computes a natal chart; pin the mock so the test is independent
-    # of the local .env (which now runs the real Swiss Ephemeris).
+    # Onboarding computes a natal chart AND geocodes the birth place; pin both
+    # mocks so tests are independent of the local .env (which runs the real
+    # Swiss Ephemeris + Open-Meteo geocoder) and never touch the network.
     monkeypatch.setattr(get_settings(), "mock_ephemeris", True)
+    monkeypatch.setattr(get_settings(), "mock_geocoding", True)
 
 _SAMPLE = UserCreate(
     phone="+91 98765 43210",
@@ -113,6 +115,73 @@ async def test_get_chart_none_when_user_has_no_chart(session):
     user = await service.create_user(session, _SAMPLE)
 
     assert await service.get_chart(session, user.id) is None
+
+
+async def test_geocode_real_mode_uses_fetched_result_and_caches(monkeypatch):
+    """With mock_geocoding off, _geocode returns the provider's result and
+    caches it — a later provider outage must not lose a known place."""
+    from app.modules.identity import service as identity_service
+
+    monkeypatch.setattr(get_settings(), "mock_geocoding", False)
+    monkeypatch.setattr(identity_service, "_GEOCODE_CACHE", {})
+
+    thrissur = (10.5276, 76.2144, "Asia/Kolkata")
+
+    async def fake_fetch(place):
+        return thrissur
+
+    monkeypatch.setattr(identity_service, "_fetch_geocode", fake_fetch)
+    assert await identity_service._geocode("Thrissur, Kerala") == thrissur
+
+    async def broken_fetch(place):
+        raise RuntimeError("provider down")
+
+    monkeypatch.setattr(identity_service, "_fetch_geocode", broken_fetch)
+    # Same place (any spacing/case) → served from cache, no network needed.
+    assert await identity_service._geocode("  thrissur,   kerala ") == thrissur
+
+
+async def test_geocode_degrades_to_placeholder(monkeypatch):
+    """Provider errors and no-match results both fall back to the placeholder —
+    onboarding never blocks on the geocoder."""
+    from app.modules.identity import service as identity_service
+
+    monkeypatch.setattr(get_settings(), "mock_geocoding", False)
+    monkeypatch.setattr(identity_service, "_GEOCODE_CACHE", {})
+
+    async def broken_fetch(place):
+        raise RuntimeError("provider down")
+
+    monkeypatch.setattr(identity_service, "_fetch_geocode", broken_fetch)
+    assert await identity_service._geocode("Thrissur") == _PLACEHOLDER_GEOCODE
+
+    async def no_match(place):
+        return None
+
+    monkeypatch.setattr(identity_service, "_fetch_geocode", no_match)
+    assert await identity_service._geocode("Atlantis") == _PLACEHOLDER_GEOCODE
+    # Failures are never cached — a later fixed lookup can still succeed.
+    assert identity_service._GEOCODE_CACHE == {}
+
+
+async def test_recompute_regeocodes_placeholder_account(monkeypatch, session):
+    """regeocode_user upgrades an account onboarded with the placeholder to the
+    real coordinates once geocoding is enabled."""
+    from app.modules.identity import service as identity_service
+
+    service = IdentityService()
+    user = await service.create_user(session, _SAMPLE)  # mocked → placeholder
+    assert (user.lat, user.lng) == _PLACEHOLDER_GEOCODE[:2]
+
+    monkeypatch.setattr(get_settings(), "mock_geocoding", False)
+    monkeypatch.setattr(identity_service, "_GEOCODE_CACHE", {})
+
+    async def fake_fetch(place):
+        return (10.5276, 76.2144, "Asia/Kolkata")
+
+    monkeypatch.setattr(identity_service, "_fetch_geocode", fake_fetch)
+    user = await service.regeocode_user(session, user)
+    assert (user.lat, user.lng, user.tz) == (10.5276, 76.2144, "Asia/Kolkata")
 
 
 async def test_onboard_flow_via_api():

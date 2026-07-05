@@ -293,6 +293,26 @@ def compute_natal_chart(
     from app.modules.astrology_engine.vimshottari import compute_vimshottari_dasha
 
     dasha = compute_vimshottari_dasha(moon.longitude, local_dt, antardasha=False)
+
+    planets_json = {
+        name: {
+            "rasi": p.rasi,
+            "rasi_index": p.rasi_index,
+            "longitude": p.longitude,
+            "degree": p.degree_in_rasi,
+            "nakshatra": p.nakshatra,
+            "pada": p.pada,
+            "house": p.house,
+            "retrograde": p.retrograde,
+        }
+        for name, p in planets.items()
+    }
+
+    # Doshas are deterministic facts derived from the positions above — detected
+    # here in Python (never by the LLM); how to *talk* about them is the
+    # knowledge corpus + persona's job.
+    from app.modules.astrology_engine.doshas import detect_natal_doshas
+
     return {
         "system": "vedic",
         "ayanamsa": key,
@@ -311,19 +331,8 @@ def compute_natal_chart(
         "vargas": compute_vargas(
             {name: p.longitude for name, p in planets.items()}, lagna_lon
         ),
-        "planets": {
-            name: {
-                "rasi": p.rasi,
-                "rasi_index": p.rasi_index,
-                "longitude": p.longitude,
-                "degree": p.degree_in_rasi,
-                "nakshatra": p.nakshatra,
-                "pada": p.pada,
-                "house": p.house,
-                "retrograde": p.retrograde,
-            }
-            for name, p in planets.items()
-        },
+        "doshas": detect_natal_doshas(planets_json),
+        "planets": planets_json,
         "mock": False,
         "source": "swiss-ephemeris",
     }
@@ -372,10 +381,93 @@ def compute_transits(
             entry["house_from_moon"] = p.house
         transits[name] = entry
 
-    return {
+    out = {
         "as_of": when.isoformat(),
         "gochara_from": "chandra" if has_chart else None,
         "transits": transits,
+        "mock": False,
+        "source": "swiss-ephemeris",
+    }
+    if has_chart:
+        # Sade Sati is a transit fact (Saturn 12th/1st/2nd from janma rasi) —
+        # detected here so chat can ground the reply in it, framed by the corpus.
+        from app.modules.astrology_engine.doshas import detect_sade_sati
+
+        out["sade_sati"] = detect_sade_sati(transits["shani"].get("house_from_moon"))
+    return out
+
+
+def _tithi_at(jd_ut: float) -> tuple[int, str, str]:
+    """(tithi_index 0–29, name, paksha) from the Moon–Sun elongation at jd_ut.
+
+    The ayanamsa cancels in the difference, so tropical longitudes are fine.
+    """
+    trop = swe.FLG_MOSEPH | swe.FLG_SPEED
+    sun_v, _s = swe.calc_ut(jd_ut, swe.SUN, trop)
+    moon_v, _m = swe.calc_ut(jd_ut, swe.MOON, trop)
+    elong = (moon_v[0] - sun_v[0]) % 360.0
+    tithi_index = int(elong // 12)  # 0–29
+    paksha = "shukla" if tithi_index < 15 else "krishna"
+    return tithi_index, TITHI_NAMES[tithi_index % 15], paksha
+
+
+def compute_prashna_chart(
+    when: datetime, lat: float, lng: float, ayanamsa: str = "lahiri"
+) -> dict:
+    """Horary (prashna) chart: the sky at the MOMENT a question is asked.
+
+    Kerala prashnam reads the chart of the question time at the querent's
+    place, not the birth chart — the udaya lagna (rasi rising right now) is the
+    anchor, with the Moon and the tithi as supporting angas. This is a thin
+    reuse of the natal machinery with ``when`` in place of the birth moment.
+    A naive ``when`` is treated as UTC; pass a tz-aware datetime.
+    """
+    key = ayanamsa.strip().lower()
+    if key not in _AYANAMSA_MODES:
+        raise ValueError(
+            f"Unknown ayanamsa {ayanamsa!r}; expected one of {sorted(_AYANAMSA_MODES)}"
+        )
+    swe.set_sid_mode(_AYANAMSA_MODES[key])
+
+    moment = when.astimezone(timezone.utc) if when.tzinfo else when
+    ut_hours = moment.hour + moment.minute / 60 + moment.second / 3600
+    jd_ut = swe.julday(moment.year, moment.month, moment.day, ut_hours)
+
+    # Udaya lagna — the ascendant of the question moment at the question place.
+    _cusps, ascmc = swe.houses_ex(jd_ut, lat, lng, b"W", swe.FLG_SIDEREAL)
+    lagna_lon = ascmc[0] % 360.0
+    lagna_rasi_index = int(lagna_lon // 30)
+
+    planets = _graha_positions(jd_ut, lagna_rasi_index)
+    moon = planets["chandra"]
+    tithi_index, tithi_name, paksha = _tithi_at(jd_ut)
+
+    return {
+        "system": "vedic",
+        "ayanamsa": key,
+        "as_of": when.isoformat(),
+        "udaya_lagnam": RASIS[lagna_rasi_index],
+        "udaya_lagna_index": lagna_rasi_index,
+        "lagna_degree": round(lagna_lon % 30, 4),
+        "moon": {
+            "rasi": moon.rasi,
+            "rasi_index": moon.rasi_index,
+            "nakshatram": moon.nakshatra,
+            "pada": moon.pada,
+            "house": moon.house,
+        },
+        "tithi": tithi_name,
+        "tithi_index": tithi_index,
+        "paksha": paksha,
+        "planets": {
+            name: {
+                "rasi": p.rasi,
+                "rasi_index": p.rasi_index,
+                "house": p.house,
+                "retrograde": p.retrograde,
+            }
+            for name, p in planets.items()
+        },
         "mock": False,
         "source": "swiss-ephemeris",
     }
@@ -408,20 +500,13 @@ def compute_panchangam(
         raise RuntimeError(f"swe.calc_ut failed for the Moon: {moon_sid}")
     nak_index = int((moon_sid[0] % 360.0) // _NAK_SPAN)
 
-    # Tithi from the Moon–Sun elongation. The ayanamsa cancels in the difference,
-    # so tropical longitudes are fine here.
-    trop = swe.FLG_MOSEPH | swe.FLG_SPEED
-    sun_v, _s = swe.calc_ut(jd_ut, swe.SUN, trop)
-    moon_v, _m = swe.calc_ut(jd_ut, swe.MOON, trop)
-    elong = (moon_v[0] - sun_v[0]) % 360.0
-    tithi_index = int(elong // 12)  # 0–29
-    paksha = "shukla" if tithi_index < 15 else "krishna"
+    tithi_index, tithi_name, paksha = _tithi_at(jd_ut)
 
     return {
         "date": day.isoformat(),
         "nakshatram": NAKSHATRAS[nak_index],
         "nakshatra_index": nak_index,
-        "tithi": TITHI_NAMES[tithi_index % 15],
+        "tithi": tithi_name,
         "tithi_index": tithi_index,
         "paksha": paksha,
         "nalla_neram": "11:48–12:36",

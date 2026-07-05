@@ -25,9 +25,11 @@ from app.platform.logging_config import get_logger
 
 logger = get_logger(__name__)
 
-# Unicode-aware tokenizer: keeps Malayalam word characters, not just ASCII, so
-# the sparse retriever works on Malayalam queries too.
-_WORD = re.compile(r"\w+", re.UNICODE)
+# Unicode-aware tokenizer. ``\w`` alone is NOT enough for Malayalam: Python's
+# ``re`` excludes combining marks (vowel signs ോ/ി, virama ്), which shreds
+# "ചോതി" into bare consonants. Including the whole Malayalam block (U+0D00–
+# U+0D7F) keeps each Malayalam word intact so BM25 matches Malayalam queries.
+_WORD = re.compile(r"[\wഀ-ൿ]+", re.UNICODE)
 
 # Minimal English stopword set. Without a reranker, BM25 alone is sensitive to
 # question words ("what does ... mean"), which can drown out the real query
@@ -102,8 +104,9 @@ class HybridRetriever:
                 embedding_function=embeddings,
                 persist_directory=str(_CHROMA_DIR),
             )
-            # Seed the collection once; ids make the upsert idempotent.
-            if store._collection.count() == 0:
+            # (Re)seed whenever the corpus size changed; ids make the upsert
+            # idempotent, so growing the seed data refreshes the index in place.
+            if store._collection.count() != len(SEED_CHUNKS):
                 store.add_texts(
                     texts=[c["text"] for c in SEED_CHUNKS],
                     metadatas=[

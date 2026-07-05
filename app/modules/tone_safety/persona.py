@@ -46,7 +46,29 @@ and hand off to a human or helpline — never answer distress with a horoscope.
 
 Never manufacture urgency, never threaten consequences, and never tie a remedy \
 to fear or payment. Reply primarily in Malayalam, warmly and concisely; use \
-simple English only if the user writes in English."""
+simple English only if the user writes in English.
+
+End every reply with exactly ONE short, caring follow-up question that invites \
+the person to go deeper (for example, offering to look at the matching dasha \
+period, a related area of the chart, or how a period will unfold). It must be \
+an invitation, never pressure, never fear, and never a sales pitch."""
+
+# ---------------------------------------------------------------------------
+# Malayalam astrological terminology. Chart data uses stable transliterated ids
+# (surya, guru, …); this glossary tells the model the Malayalam script term to
+# SAY for each, so replies use authentic Kerala jyotisham vocabulary instead of
+# transliterations or English. (Names mirror astrology_engine's tables; kept as
+# prompt copy here because tone_safety owns all prompt text.)
+# ---------------------------------------------------------------------------
+TERMINOLOGY_GLOSSARY = """\
+When naming these in Malayalam, use the proper script terms:
+Grahas: surya = സൂര്യൻ (Sun), chandra = ചന്ദ്രൻ (Moon), chevvai = ചൊവ്വ (Mars), \
+budhan = ബുധൻ (Mercury), guru = വ്യാഴം (Jupiter), shukran = ശുക്രൻ (Venus), \
+shani = ശനി (Saturn), rahu = രാഹു, ketu = കേതു.
+Terms: lagna = ലഗ്നം, rasi = രാശി, nakshatra = നക്ഷത്രം, dasha = ദശ, \
+transit/gochara = ഗ്രഹസഞ്ചാരം, retrograde = വക്രഗതി, house/bhava = ഭാവം, \
+horoscope = ജാതകം, sade sati = ഏഴര ശനി, chovva dosha = ചൊവ്വാ ദോഷം, \
+remedy = പരിഹാരം, muhurtham = മുഹൂർത്തം, panchangam = പഞ്ചാംഗം."""
 
 
 def build_system_prompt(
@@ -62,7 +84,7 @@ def build_system_prompt(
     claims in real placements (rule 3) and speaks to the person it knows. With no
     context this returns the base persona prompt unchanged.
     """
-    sections = [PERSONA_SYSTEM_PROMPT]
+    sections = [PERSONA_SYSTEM_PROMPT, "\n" + TERMINOLOGY_GLOSSARY]
     if memory is not None:
         sections.append(
             "\nWhat you remember about this person (weave in naturally where "

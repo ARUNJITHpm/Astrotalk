@@ -15,6 +15,7 @@ from app.modules.astrology_engine.swiss_ephemeris import (
     _varga_sign,
     compute_natal_chart,
     compute_panchangam,
+    compute_prashna_chart,
     compute_transits,
     compute_vargas,
 )
@@ -63,6 +64,39 @@ def test_natal_chart_astronomy_is_deterministic():
 def test_unknown_ayanamsa_raises():
     with pytest.raises(ValueError):
         compute_natal_chart(**_BIRTH, ayanamsa="bogus")
+
+
+def test_prashna_chart_known_values():
+    # Regression anchor: 2026-01-01 09:00 IST at Kochi. Prashna is the chart of
+    # the question moment — the udaya lagna anchors it, Moon + tithi support.
+    from zoneinfo import ZoneInfo
+
+    c = compute_prashna_chart(
+        datetime(2026, 1, 1, 9, 0, tzinfo=ZoneInfo("Asia/Kolkata")), 9.9312, 76.2673
+    )
+    assert c["mock"] is False and c["source"] == "swiss-ephemeris"
+    assert c["udaya_lagnam"] == "മകരം"
+    assert c["moon"]["rasi"] == "ഇടവം"
+    assert c["moon"]["nakshatram"] == "രോഹിണി"
+    assert (c["tithi"], c["paksha"]) == ("ത്രയോദശി", "shukla")
+    # Houses are whole-sign from the udaya lagna: the Moon in ഇടവം (index 1)
+    # from മകരം (index 9) is house 5.
+    assert c["moon"]["house"] == 5
+    assert len(c["planets"]) == 9
+    assert all(1 <= p["house"] <= 12 for p in c["planets"].values())
+
+
+def test_prashna_lagna_is_location_and_time_sensitive():
+    from zoneinfo import ZoneInfo
+
+    kochi_9am = compute_prashna_chart(
+        datetime(2026, 1, 1, 9, 0, tzinfo=ZoneInfo("Asia/Kolkata")), 9.9312, 76.2673
+    )
+    kochi_3pm = compute_prashna_chart(
+        datetime(2026, 1, 1, 15, 0, tzinfo=ZoneInfo("Asia/Kolkata")), 9.9312, 76.2673
+    )
+    # ~6 hours later the ascendant has moved several signs on.
+    assert kochi_9am["udaya_lagnam"] != kochi_3pm["udaya_lagnam"]
 
 
 def test_transits_real_shape():
