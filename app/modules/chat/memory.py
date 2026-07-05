@@ -31,6 +31,8 @@ logger = get_logger(__name__)
 _RESIDENCE_CUES = (
     "ഞാൻ", "താമസ", "എന്റെ വീട്", "ഇപ്പോൾ",
     "i live", "i am in", "i'm in", "i stay", "based in", "my home",
+    # Manglish (romanized) first-person/residence forms
+    "njan", "njaan", "thamasik", "ente veed", "ippol",
 )
 
 _DISTILL_SYSTEM = (

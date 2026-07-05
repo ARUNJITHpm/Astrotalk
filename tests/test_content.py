@@ -1,7 +1,17 @@
 """Tests for the content module's daily-message generation (mock path)."""
 
+import pytest
+
 from app.modules.content import templates
 from app.modules.content.service import ContentService
+
+
+@pytest.fixture(autouse=True)
+def _mock_llm(monkeypatch):
+    # Pin the mock regardless of the local .env — pytest must never make real
+    # LLM calls (this test silently burned API tokens before this pin).
+    monkeypatch.setenv("MOCK_LLM", "1")
+
 
 _PANCHANGAM = {
     "date": "2026-06-25",

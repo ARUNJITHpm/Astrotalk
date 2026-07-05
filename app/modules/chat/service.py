@@ -35,14 +35,20 @@ logger = get_logger(__name__)
 # the fixed D1 chart. Keywords cover Malayalam + English phrasings.
 _VARGA_TOPICS: list[tuple[str, tuple[str, ...]]] = [
     ("D10", ("career", "job", "work", "business", "promotion", "profession",
-             "ജോലി", "തൊഴിൽ", "ബിസിനസ", "കരിയർ", "ഉദ്യോഗ", "പ്രമോഷൻ")),
+             "ജോലി", "തൊഴിൽ", "ബിസിനസ", "കരിയർ", "ഉദ്യോഗ", "പ്രമോഷൻ",
+             # Manglish (romanized) — users often type Malayalam in Latin script
+             "joli", "jolik", "thozhil", "udyogam", "velakku")),
     ("D9", ("marriage", "relationship", "love", "spouse", "partner", "wedding",
             "divorce", "പൊരുത്തം", "വിവാഹ", "കല്യാണ", "പ്രണയ", "ഭർത്താ", "ഭാര്യ",
-            "ദാമ്പത്യ", "വിവാഹമോചന")),
+            "ദാമ്പത്യ", "വിവാഹമോചന",
+            "kalyanam", "vivaham", "porutham", "pranayam", "bharthavu",
+            "bharya", "dambatyam")),
     ("D7", ("child", "children", "baby", "pregnan", "കുട്ടി", "കുഞ്ഞ", "സന്താന",
-            "ഗർഭ")),
-    ("D12", ("parent", "mother", "father", "അമ്മ", "അച്ഛ", "മാതാപിതാ")),
-    ("D3", ("sibling", "brother", "sister", "സഹോദര")),
+            "ഗർഭ", "kutti", "kunju", "santhanam", "garbham")),
+    ("D12", ("parent", "mother", "father", "അമ്മ", "അച്ഛ", "മാതാപിതാ",
+             "achan", "achhan", "mathapithak")),
+    ("D3", ("sibling", "brother", "sister", "സഹോദര", "sahodaran", "sahodari",
+            "chettan", "aniyan", "chechi", "aniyathi")),
 ]
 
 # Explicit remedy/temple intent — the user is ASKING for devotional guidance.
@@ -52,6 +58,9 @@ _REMEDY_INTENT = (
     "prayer", "pray", "worship", "mantra", "offering", "darshan",
     "ക്ഷേത്ര", "അമ്പല", "വഴിപാട", "പരിഹാര", "പ്രാർത്ഥ", "പൂജ", "മന്ത്ര",
     "ദർശന", "തൊഴണ", "തൊഴാൻ",
+    # Manglish (romanized) forms
+    "kshethram", "kshetram", "ambalam", "vazhipad", "prarthana",
+    "mantram", "darshanam", "homam", "archana", "pushpanjali",
 )
 
 # Concern+dosha pairs where a temple suggestion is traditional even without the

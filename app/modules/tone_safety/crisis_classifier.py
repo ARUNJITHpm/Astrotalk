@@ -31,9 +31,12 @@ _MARKERS_EN = (
     "don't want to live",
     "dont want to live",
     "no reason to live",
+    "no point in living",
     "self harm",
     "self-harm",
     "hurt myself",
+    "harm myself",
+    "better off dead",
 )
 
 # Malayalam markers — explicit self-harm / suicidal intent.
@@ -42,11 +45,32 @@ _MARKERS_ML = (
     "ജീവനൊടുക്ക",      # "to end one's life"
     "ജീവിക്കാൻ വയ്യ",  # "cannot go on living"
     "മരിക്കണം",         # "want to die"
+    "ചാകണം",            # "want to die" (colloquial)
     "ജീവിതം അവസാനിപ്പിക്ക",  # "end (my) life"
+    "സ്വയം ഉപദ്രവിക്ക",       # "hurt myself"
+    "സ്വയം മുറിവേൽപ്പിക്ക",   # "injure myself"
+)
+
+# Manglish (romanized Malayalam) markers — Tara's users often type Malayalam
+# in Latin script; the Malayalam-script markers above never match those.
+# Spellings vary, so common variants are listed explicitly.
+_MARKERS_MANGLISH = (
+    "aathmahathya",
+    "athmahathya",
+    "atmahathya",
+    "jeevikkan vayya",
+    "jeevikan vayya",
+    "jeevikkan pattilla",
+    "marikkanam",
+    "marikanam",
+    "chakanam",
+    "chaakanam",
+    "jeevanodukk",
+    "jeevitham avasanippik",
 )
 
 # Full marker set. Kept short on purpose — see the placeholder warning above.
-_DISTRESS_MARKERS = _MARKERS_EN + _MARKERS_ML
+_DISTRESS_MARKERS = _MARKERS_EN + _MARKERS_ML + _MARKERS_MANGLISH
 
 
 def screen(text: str) -> bool:

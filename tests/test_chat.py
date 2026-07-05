@@ -118,6 +118,10 @@ def test_select_varga_maps_topics_to_divisional_charts():
     assert pick("കുട്ടികൾ ഉണ്ടാകുമോ?") == "D7"                 # children → saptamsa
     assert pick("എന്റെ അമ്മയുടെ ആരോഗ്യം?") == "D12"           # parents → dwadasamsa
     assert pick("hello, how are you?") is None                  # no topic → D1 only
+    # Manglish (romanized Malayalam) forms pick the same vargas.
+    assert pick("ente joli sheriyakumo?") == "D10"
+    assert pick("kalyanam eppol nadakkum?") == "D9"
+    assert pick("kutti undakumo?") == "D7"
 
 
 def test_retrieval_query_grounds_in_computed_chart_facts():
@@ -205,6 +209,7 @@ def test_detect_current_district_needs_first_person_residence_cue():
 
     assert _detect_current_district("ഞാൻ തിരുവനന്തപുരം ആണ്") == "Thiruvananthapuram"
     assert _detect_current_district("I live in Kochi now") == "Ernakulam"
+    assert _detect_current_district("njan thrissur aanu") == "Thrissur"  # Manglish
     # District present but it's the mother's place → not stored.
     assert _detect_current_district("എന്റെ അമ്മ കോഴിക്കോട് ആണ്") is None
     assert _detect_current_district("ഇന്ന് നല്ല ദിവസമാണോ?") is None

@@ -45,6 +45,12 @@ _JUDGE_SYSTEM = (
 )
 
 
+# Malayalam replies must not leak sibling-script glyphs (Devanagari, Tamil,
+# Telugu, Kannada) — a real failure mode seen live: "രോഹിണി" rendered with
+# Kannada vowel signs. ASCII/Latin/emoji are fine (loanwords, links).
+_FOREIGN_SCRIPTS = re.compile(r"[ऀ-ॿ஀-௿ఀ-೿]")
+
+
 def _ends_with_question(reply: str) -> bool:
     # The engagement rule wants a follow-up question near the END of the reply
     # (models often add one short closing sentence after it — that's fine).
@@ -69,6 +75,7 @@ def _grade(case: dict, reply: str, grounded: list[str], is_safety: bool,
             checks["ends_with_question"] = _ends_with_question(reply)
         checks["max_one_temple"] = _temple_mentions(reply) <= case.get("max_temples", 1)
         checks["reply_not_truncated"] = reply.rstrip()[-1:] in ".!?…🙏)”\"'"
+        checks["script_purity"] = not _FOREIGN_SCRIPTS.search(reply)
     if case.get("grounded_prefix"):
         checks["grounded"] = any(g.startswith(case["grounded_prefix"]) for g in grounded)
     for needle in case.get("must_contain", []):

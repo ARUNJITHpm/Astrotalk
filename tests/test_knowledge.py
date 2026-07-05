@@ -61,6 +61,9 @@ def test_corpus_covers_the_production_content_plan():
     # Prashnam: basics + honesty + sankhya-basics + 12 arudha + 12 lagna-house
     # + odd/even + 8 remainders.
     assert by_topic["prashnam"] == 37
+    # Vazhipadu offerings + Kerala deity profiles (both draft, reviewed=False).
+    assert by_topic["vazhipadu"] == 30
+    assert by_topic["deity"] == 15
 
 
 def test_retrieve_malayalam_nakshatra_query():
@@ -89,9 +92,58 @@ def test_retrieve_prashnam_cues():
     assert any(c.id == "prashnam-thamboola-rem-5" for c in thamboola)
 
 
+def test_retrieve_vazhipadu_and_deity_queries():
+    svc = _service()
+    # Malayalam script, Manglish, and English must each reach the pack.
+    thulabharam = svc.retrieve("തുലാഭാരം എന്താണ്?", k=3)
+    assert any(c.id == "vazhipadu-thulabharam" for c in thulabharam)
+
+    sade = svc.retrieve("ellu thiri shani saturday offering", k=3)
+    assert any(c.id == "vazhipadu-ellu-thiri" for c in sade)
+
+    deity = svc.retrieve("ഗുരുവായൂരപ്പൻ ആരാണ്?", k=3)
+    assert any(c.id == "deity-krishna" for c in deity)
+
+
 def test_retrieve_chovva_dosha_query():
     results = _service().retrieve("chovva dosha marriage mangal", k=3)
     assert any(c.id == "dosha-chovva" for c in results)
     # GUARDRAILS §1: dosha framing must carry agency, not doom.
     top = next(c for c in results if c.id == "dosha-chovva")
     assert "never a verdict" in top.text
+
+
+def test_chunk_text_splits_at_sentences_with_overlap():
+    from app.modules.knowledge.ingest import chunk_text
+
+    text = " ".join(f"Sentence number {i} carries some astrological meaning worth keeping around." for i in range(30))
+    chunks = chunk_text(text, chunk_chars=200)
+    assert len(chunks) > 3
+    assert all(len(c) >= 80 for c in chunks)
+    # Overlap: the first sentence of chunk N+1 is the last of chunk N.
+    first_of_second = chunks[1].split(".")[0]
+    assert first_of_second in chunks[0]
+
+
+def test_ingested_corpus_loads_and_ranks_below_curated(tmp_path, monkeypatch):
+    import json as _json
+
+    from app.modules.knowledge import corpus as corpus_mod
+    from app.modules.knowledge.retrieval import HybridRetriever
+
+    ingested = tmp_path / "ingested"
+    ingested.mkdir()
+    (ingested / "demo.json").write_text(_json.dumps([{
+        "id": "ingested-demo-0001",
+        "topic": "imported",
+        "text": "Mercury retrograde is a season for review not dread, says the imported text.",
+        "reviewed": False,
+        "source": "demo source (test)",
+    }]), encoding="utf-8")
+    monkeypatch.setattr(corpus_mod, "INGESTED_DIR", ingested)
+
+    retriever = HybridRetriever(use_dense=False)
+    ids = [cid for cid, _ in retriever.search("mercury retrograde review dread", k=5)]
+    assert "ingested-demo-0001" in ids  # imported chunk is retrievable...
+    # ...but the curated chunk with the same vocabulary outranks it.
+    assert ids.index("retrograde-mercury") < ids.index("ingested-demo-0001")

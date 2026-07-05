@@ -55,3 +55,19 @@ def test_system_prompt_injects_user_memory():
 
 def test_system_prompt_omits_memory_section_when_absent():
     assert "What you remember about this person" not in _svc.build_system_prompt()
+
+
+def test_screen_flags_manglish_distress():
+    # Romanized Malayalam distress must route to the helpline too — a large
+    # share of users type Malayalam in Latin script.
+    assert _svc.screen("enikku ini jeevikkan vayya") is True
+    assert _svc.screen("marikkanam ennu thonnunnu") is True
+    assert _svc.screen("aathmahathya cheyyan thonnunnu") is True
+    assert _svc.screen("chakanam ennu thonunnu") is True
+
+
+def test_screen_does_not_flag_longevity_astrology_talk():
+    # 8th-house / longevity questions are legitimate astrology, not distress
+    # (the classifier deliberately targets explicit self-harm intent only).
+    assert _svc.screen("ayussinte bhavam nokkamo? 8th house entha parayunnathu") is False
+    assert _svc.screen("what does my 8th house say about longevity") is False

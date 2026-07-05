@@ -155,3 +155,12 @@ async def test_suggest_endpoint(client):
     body = resp.json()
     assert body and body[0]["id"] == "ktm-panachikkadu-saraswati"
     assert body[0]["mantra"]
+
+
+def test_detect_concern_manglish():
+    # Romanized Malayalam concerns map like their Malayalam-script twins.
+    svc = TemplesService()
+    assert svc.detect_concern("kalyanam vaikunnu, enthu cheyyanam?") == "marriage"
+    assert svc.detect_concern("ente joli poyi") == "career"
+    assert svc.detect_concern("kutti undakan vazhipadu undo") == "children"
+    assert svc.detect_concern("pareeksha pass akumo") == "education"

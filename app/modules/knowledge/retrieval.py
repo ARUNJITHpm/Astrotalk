@@ -19,7 +19,7 @@ import importlib.util
 import re
 from pathlib import Path
 
-from app.modules.knowledge.seed_data import SEED_CHUNKS
+from app.modules.knowledge.corpus import IMPORT_PENALTY, load_corpus, penalized_ids
 from app.platform.config import get_settings
 from app.platform.logging_config import get_logger
 
@@ -69,7 +69,10 @@ class HybridRetriever:
     """
 
     def __init__(self, use_dense: bool = True) -> None:
-        self._ids = [c["id"] for c in SEED_CHUNKS]
+        self._corpus = load_corpus()
+        self._ids = [c["id"] for c in self._corpus]
+        # Unreviewed imported chunks rank below curated ones (see corpus.py).
+        self._penalized = penalized_ids(self._corpus)
         self._bm25 = self._build_bm25()
         self._dense = self._build_dense() if use_dense else None
         if self._dense is None:
@@ -82,7 +85,7 @@ class HybridRetriever:
     def _build_bm25(self):
         from rank_bm25 import BM25Okapi
 
-        corpus = [_tokenize(c["text"] + " " + c["topic"]) for c in SEED_CHUNKS]
+        corpus = [_tokenize(c["text"] + " " + c["topic"]) for c in self._corpus]
         return BM25Okapi(corpus)
 
     def _build_dense(self):
@@ -105,15 +108,15 @@ class HybridRetriever:
                 persist_directory=str(_CHROMA_DIR),
             )
             # (Re)seed whenever the corpus size changed; ids make the upsert
-            # idempotent, so growing the seed data refreshes the index in place.
-            if store._collection.count() != len(SEED_CHUNKS):
+            # idempotent, so growing the corpus refreshes the index in place.
+            if store._collection.count() != len(self._corpus):
                 store.add_texts(
-                    texts=[c["text"] for c in SEED_CHUNKS],
+                    texts=[c["text"] for c in self._corpus],
                     metadatas=[
                         {"chunk_id": c["id"], "topic": c["topic"], "reviewed": c["reviewed"]}
-                        for c in SEED_CHUNKS
+                        for c in self._corpus
                     ],
-                    ids=[c["id"] for c in SEED_CHUNKS],
+                    ids=[c["id"] for c in self._corpus],
                 )
             return store
         except Exception as exc:  # pragma: no cover - depends on network/optional dep
@@ -131,10 +134,27 @@ class HybridRetriever:
         for cid in set(sparse) | set(dense):
             s = sparse.get(cid, 0.0)
             d = dense.get(cid, 0.0)
-            combined[cid] = _DENSE_WEIGHT * d + _SPARSE_WEIGHT * s if dense else s
+            score = _DENSE_WEIGHT * d + _SPARSE_WEIGHT * s if dense else s
+            if cid in self._penalized:
+                score *= IMPORT_PENALTY  # unreviewed imports rank below curated
+            combined[cid] = score
 
         ranked = sorted(combined.items(), key=lambda kv: kv[1], reverse=True)
-        return [(cid, score) for cid, score in ranked[:k] if score > 0]
+        # Unreviewed imports may fill at most HALF the slots: a large ingested
+        # text (thousands of OCR chunks) must never crowd curated guidance out
+        # of the prompt entirely.
+        import_cap = max(1, k // 2)
+        out: list[tuple[str, float]] = []
+        imports_used = 0
+        for cid, score in ranked:
+            if score <= 0 or len(out) >= k:
+                break
+            if cid in self._penalized:
+                if imports_used >= import_cap:
+                    continue
+                imports_used += 1
+            out.append((cid, score))
+        return out
 
     def _search_bm25(self, query: str, k: int) -> dict[str, float]:
         tokens = _tokenize(query)

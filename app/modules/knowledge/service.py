@@ -11,7 +11,6 @@ no network. Cross-encoder reranking is deferred (added later).
 
 from app.modules.knowledge.retrieval import HybridRetriever
 from app.modules.knowledge.schemas import KnowledgeChunk
-from app.modules.knowledge.seed_data import SEED_CHUNKS
 from app.platform.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -22,7 +21,8 @@ class KnowledgeService:
         # prefer_chroma keeps the historical name/flag: True = hybrid (dense if
         # available), False = sparse-only (deterministic, offline).
         self._retriever = HybridRetriever(use_dense=prefer_chroma)
-        self._by_id = {c["id"]: c for c in SEED_CHUNKS}
+        # The retriever's corpus = curated seeds + ingested documents.
+        self._by_id = {c["id"]: c for c in self._retriever._corpus}
 
     def retrieve(self, query: str, k: int = 3) -> list[KnowledgeChunk]:
         """Return up to ``k`` interpretation chunks most relevant to ``query``."""

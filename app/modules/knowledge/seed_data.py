@@ -828,6 +828,233 @@ def _prashnam_chunks() -> list[SeedChunk]:
 
 
 # ---------------------------------------------------------------------------
+# Vazhipadu (temple offerings) — WHAT each offering is, WHOM it addresses, and
+# WHAT concern tradition pairs it with. Texts carry Malayalam script + Latin
+# transliteration so BM25 matches both scripts (users often type Manglish).
+# Framing per GUARDRAILS §1: offerings are acts of devotion chosen freely —
+# never demanded, never feared into, never tied to a price.
+# ---------------------------------------------------------------------------
+
+# (slug, Malayalam, transliteration, whom/where, traditionally-for, description)
+_VAZHIPADU: list[tuple[str, str, str, str, str, str]] = [
+    ("pushpanjali", "പുഷ്പാഞ്ജലി", "pushpanjali", "any deity",
+     "general blessing and devotion",
+     "flowers offered at the deity's feet while mantras are chanted — the "
+     "simplest and most universal Kerala offering"),
+    ("archana", "അർച്ചന", "archana", "any deity",
+     "personal blessing in one's own name",
+     "an offering performed in the devotee's name and janma nakshatram, "
+     "invoking the deity's attention personally"),
+    ("ganapathi-homam", "ഗണപതി ഹോമം", "ganapathi homam", "Ganapathi",
+     "removing obstacles before any new beginning",
+     "a fire ritual to Ganapathi performed at dawn — the classical start "
+     "before ventures, weddings, housewarmings, and exams"),
+    ("bhagavathi-seva", "ഭഗവതി സേവ", "bhagavathi seva", "Devi (Bhagavathi)",
+     "family welfare, protection, and peace at home",
+     "an evening lamp-lit seva to the Goddess, traditionally sought for "
+     "household harmony and protection"),
+    ("mrityunjaya-homam", "മൃത്യുഞ്ജയ ഹോമം", "mrityunjaya homam", "Shiva",
+     "health, recovery from illness, and longevity",
+     "a fire ritual with the Mrityunjaya mantra, performed during illness or "
+     "health anxieties — devotion alongside treatment, never instead of it"),
+    ("navagraha-pooja", "നവഗ്രഹ പൂജ", "navagraha pooja", "the nine grahas",
+     "graha preethi — softening difficult planetary periods",
+     "worship of all nine grahas together, common during dasha transitions "
+     "and dosha periods"),
+    ("thulabharam", "തുലാഭാരം", "thulabharam", "Krishna (famous at Guruvayur)",
+     "gratitude and fulfilment of a vow",
+     "the devotee is weighed against an offering (banana, sugar, jaggery) "
+     "given to the temple — a beloved Kerala act of thanksgiving"),
+    ("niramala", "നിറമാല", "niramala", "any deity",
+     "prosperity and full-hearted devotion",
+     "adorning the deity fully with garlands and lamps for a day"),
+    ("chuttuvilakku", "ചുറ്റുവിളക്ക്", "chuttuvilakku", "Devi and Shiva temples",
+     "dispelling gloom; light in a dark season",
+     "lighting every lamp around the temple — the shrine glowing whole"),
+    ("neyyabhishekam", "നെയ്യഭിഷേകം", "neyyabhishekam", "Ayyappan and Shiva",
+     "health and steadfast devotion",
+     "abhishekam of ghee over the deity, central to Sabarimala tradition"),
+    ("paal-payasam", "പാൽപായസം", "paal payasam nivedyam", "Krishna and Vishnu",
+     "well-being and sweetness in life",
+     "a milk-sweet nivedyam offered and received back as prasadam"),
+    ("appam-ada", "അപ്പം/അട നിവേദ്യം", "appam ada nivedyam",
+     "Krishna (famous at Ambalappuzha)",
+     "children's welfare and Krishna preethi",
+     "the classic appam and ada offering associated with little Krishna"),
+    ("vedivazhipadu", "വെടിവഴിപാട്", "vedivazhipadu",
+     "Devi and Muthappan temples of north Kerala",
+     "announcing gratitude or a fulfilled prayer",
+     "a firecracker offering — joy made audible"),
+    ("kalabhabhishekam", "കളഭാഭിഷേകം", "kalabhabhishekam", "Shiva and Ayyappan",
+     "peace of mind and cooling of distress",
+     "abhishekam of fragrant sandal paste over the deity"),
+    ("dhara", "ധാര", "dhara", "Shiva",
+     "calming anger, anxiety, and heat in the mind or body",
+     "an unbroken stream of water or milk poured over the Shivalinga"),
+    ("udayasthamana-pooja", "ഉദയാസ്തമന പൂജ", "udayasthamana pooja", "any major temple",
+     "a life-sized vow or deep gratitude",
+     "continuous poojas from sunrise to sunset — the grandest single-day "
+     "offering a family can make"),
+    ("noorum-palum", "നൂറും പാലും", "noorum palum", "the Nagas (serpent deities)",
+     "sarpa dosha, skin ailments (traditional), and progeny",
+     "rice flour, turmeric and milk offered to serpent deities, often with "
+     "ayilya pooja on the Ayilyam star day (Mannarasala is famous for it)"),
+    ("saraswati-pooja", "സരസ്വതി പൂജ", "saraswati pooja / vidyarambham", "Saraswati",
+     "learning, exams, arts — and a child's first letters",
+     "worship of the goddess of vidya; vidyarambham begins a child's learning"),
+    ("naranga-vilakku", "നാരങ്ങാവിളക്ക്", "naranga vilakku", "Devi",
+     "chovva dosha and mangalya prayers",
+     "lamps lit in halved lemon peels, a Devi-temple offering often chosen "
+     "while praying about marriage"),
+    ("annadanam", "അന്നദാനം", "annadanam", "any temple",
+     "universal merit; gratitude expressed as service",
+     "feeding devotees — held by tradition to be the highest offering"),
+    ("ellu-thiri", "എള്ള് തിരി", "ellu thiri / ellu payasam", "Sastha and Shani",
+     "ezhara shani (Sade Sati) and Saturn preethi",
+     "sesame-oil wicks or sesame payasam offered on Saturdays"),
+    ("swayamvara-pushpanjali", "സ്വയംവര പുഷ്പാഞ്ജലി", "swayamvara pushpanjali",
+     "Devi and Krishna",
+     "timely marriage (mangalya bhagya)",
+     "pushpanjali with the Swayamvara mantra, sought when marriage is delayed"),
+    ("santhanagopala-pushpanjali", "സന്താനഗോപാലം", "santhanagopala pushpanjali",
+     "Krishna",
+     "blessing of children (santana bhagya)",
+     "pushpanjali with the Santhanagopala mantra for couples hoping for a child"),
+    ("bhagyasuktha-pushpanjali", "ഭാഗ്യസൂക്തം", "bhagyasuktha pushpanjali",
+     "Devi and Vishnu",
+     "fortune and relief from a run of setbacks",
+     "pushpanjali with the Bhagya Sooktham verses"),
+    ("aikyamathya-pushpanjali", "ഐക്യമത്യ സൂക്തം", "aikyamathya sooktham pushpanjali",
+     "Shiva (famous at Vaikom)",
+     "harmony between couples and within families",
+     "pushpanjali with the unity sooktham, sought when a household is quarrelling"),
+    ("kalamezhuthu", "കളമെഴുത്തും പാട്ടും", "kalamezhuthu pattu",
+     "Bhadrakali and Ayyappan",
+     "protection and fulfilment of family vows",
+     "ritual floor-drawing of the deity in coloured powders with song — a "
+     "north-and-central Kerala tradition"),
+    ("guruthi", "ഗുരുതി", "guruthi pooja", "Bhadrakali",
+     "protection from persistent adversity (as tradition frames it)",
+     "an evening ritual of red guruthi liquid at Kali temples; Tara presents "
+     "it as devotion, never as fear of any entity"),
+    ("muttarukkal", "മുട്ടറുക്കൽ", "muttarukkal", "Ganapathi and Devi",
+     "breaking through a stuck obstacle (mutt = block)",
+     "smashing coconuts before the deity as prayers name the obstacle"),
+    ("vidya-ganapathi", "വിദ്യാഗണപതി ഹോമം", "vidya ganapathi homam", "Ganapathi",
+     "focus and success in studies and exams",
+     "the study-focused form of ganapathi homam, done before exam seasons"),
+    ("ayur-sooktham", "ആയുർസൂക്തം", "ayur sooktha pushpanjali", "Shiva and Dhanwantari",
+     "health and vitality",
+     "pushpanjali with the Ayur Sooktham, often alongside medical treatment"),
+]
+
+
+def _vazhipadu_chunks() -> list[SeedChunk]:
+    chunks: list[SeedChunk] = []
+    for slug, ml, translit, whom, for_what, desc in _VAZHIPADU:
+        chunks.append({
+            "id": f"vazhipadu-{slug}",
+            "topic": "vazhipadu",
+            "text": (
+                f"{ml} ({translit}) is a Kerala temple offering to {whom}, "
+                f"traditionally chosen for {for_what}: {desc}. Like every "
+                "vazhipadu, it is an act of devotion a person may freely "
+                "choose — tradition never demands it, ties it to fear, or "
+                "prices the blessing."
+            ),
+            "reviewed": False,
+        })
+    return chunks
+
+
+# ---------------------------------------------------------------------------
+# Deity profiles ("god details") — who each deity is in Kerala devotion and
+# what people traditionally approach them for. Pairs with remedy_map.DEITIES
+# (the deterministic suggestion tables); these chunks give the LLM narrative
+# depth. Bilingual + transliteration for BM25.
+# ---------------------------------------------------------------------------
+
+# (slug, Malayalam, transliteration/aliases, profile)
+_DEITY_PROFILES: list[tuple[str, str, str, str]] = [
+    ("ganapathi", "ഗണപതി", "Ganapathi / Vigneshwaran",
+     "the remover of obstacles, worshipped FIRST before any new beginning — "
+     "ventures, journeys, weddings, education. Coconut-breaking and modakam "
+     "offerings are his hallmarks"),
+    ("shiva", "ശിവൻ", "Shiva / Mahadevan",
+     "the great ascetic and dissolver, approached for health, longevity, "
+     "inner steadiness, and release from what must end. Mondays and "
+     "Pradosham evenings are his days"),
+    ("vishnu", "വിഷ്ണു", "Vishnu / Padmanabhan",
+     "the preserver, approached for overall wellbeing, prosperity, and Guru "
+     "preethi; Anantha Padmanabha of Thiruvananthapuram reclines on the "
+     "serpent Anantha"),
+    ("krishna", "കൃഷ്ണൻ / ഗുരുവായൂരപ്പൻ", "Krishna / Guruvayoorappan",
+     "beloved as the child of Guruvayur — approached for children, family "
+     "joy, and devotion that feels like friendship. Thulabharam and paal "
+     "payasam are his famous offerings"),
+    ("devi", "ദേവി", "Devi / Bhagavathi / Durga",
+     "the Mother in her many Kerala forms — Attukal, Chottanikkara, "
+     "Kodungallur — approached for protection, family welfare, mangalya "
+     "prayers, and strength in adversity"),
+    ("bhadrakali", "ഭദ്രകാളി", "Bhadrakali / Kali",
+     "the fierce protective form of the Mother, guardian against injustice "
+     "and persistent adversity; guruthi and kalamezhuthu belong to her "
+     "worship — fierce in form, motherly toward devotees"),
+    ("saraswati", "സരസ്വതി", "Saraswati",
+     "the goddess of vidya — learning, music, and the arts. Vidyarambham at "
+     "her shrines (Panachikkadu is Kerala's own Mookambika) begins every "
+     "child's education"),
+    ("lakshmi", "ലക്ഷ്മി", "Lakshmi / Mahalakshmi",
+     "the goddess of prosperity and grace, invoked for wealth that "
+     "circulates kindly — with the reminder that effort is her companion"),
+    ("subrahmanya", "സുബ്രഹ്മണ്യൻ", "Subrahmanyan / Murukan / Karthikeya",
+     "the commander of the devas, strongly tied to Chevvai (Mars) — "
+     "approached for courage, victory over rivalry, and chovva dosha "
+     "shanti; Haripad and Payyannur are famous seats"),
+    ("ayyappan", "അയ്യപ്പൻ / ശബരിമല ശാസ്താവ്", "Ayyappan / Sastha / Dharmasastha",
+     "the lord of Sabarimala, born of Hari and Hara — approached for "
+     "discipline, protection on hard paths, and Shani preethi; the "
+     "41-day vratham and irumudikettu mark his pilgrimage"),
+    ("hanuman", "ഹനുമാൻ", "Hanuman / Anjaneya",
+     "the embodiment of strength, service, and fearlessness — approached "
+     "for courage, career obstacles, and protection; vadamala and betel "
+     "garlands are his offerings, Tuesdays and Saturdays his days"),
+    ("naga", "നാഗരാജാവ്", "Nagaraja and Nagayakshi (serpent deities)",
+     "the serpent guardians of Kerala's sacred groves (kavu) — approached "
+     "for sarpa dosha, Rahu-Ketu periods, skin ailments (traditional), and "
+     "progeny; Mannarasala and Vetticode are their great seats"),
+    ("surya", "സൂര്യൻ", "Surya / Aditya",
+     "the Sun, source of vitality and clarity — approached for health, "
+     "confidence, and Surya preethi; Adithyapuram is Kerala's famous Sun "
+     "temple"),
+    ("dhanwantari", "ധന്വന്തരി", "Dhanwantari",
+     "the divine physician, Vishnu's healing form — approached during "
+     "illness and recovery, always alongside real treatment; Nelluvai and "
+     "Thottuva are his well-known Kerala temples"),
+    ("muthappan", "മുത്തപ്പൻ", "Muthappan",
+     "the folk deity of Parassinikkadavu, worshipped through the living "
+     "theyyam tradition — approachable without ritual barriers, beloved of "
+     "working people; offerings are simple: toddy, fish, and devotion"),
+]
+
+
+def _deity_chunks() -> list[SeedChunk]:
+    chunks: list[SeedChunk] = []
+    for slug, ml, aliases, profile in _DEITY_PROFILES:
+        chunks.append({
+            "id": f"deity-{slug}",
+            "topic": "deity",
+            "text": (
+                f"{ml} ({aliases}) — in Kerala devotion, {profile}. Approaching "
+                "any deity is a matter of love and steadiness of mind; the "
+                "blessing is in the devotion itself, never in fear or payment."
+            ),
+            "reviewed": False,
+        })
+    return chunks
+
+
+# ---------------------------------------------------------------------------
 # Final corpus.
 # ---------------------------------------------------------------------------
 
@@ -839,4 +1066,6 @@ SEED_CHUNKS: list[SeedChunk] = (
     + _lagna_chunks()
     + _DOSHA_AND_FAQ_CHUNKS
     + _prashnam_chunks()
+    + _vazhipadu_chunks()
+    + _deity_chunks()
 )

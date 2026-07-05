@@ -123,27 +123,35 @@ CONCERN_DEITIES: dict[str, tuple[list[str], str]] = {
               "peace of mind and steadiness"),
 }
 
-# Concern keyword map, English + Malayalam. First hit wins (ordered).
+# Concern keyword map, English + Malayalam + Manglish (romanized Malayalam —
+# a large share of users type Malayalam in Latin script). First hit wins.
 CONCERN_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
     ("career", ("job", "career", "work", "business", "promotion", "interview",
                 "ജോലി", "തൊഴിൽ", "ബിസിനസ", "കരിയർ", "ഉദ്യോഗ", "പ്രമോഷൻ",
-                "ഇന്റർവ്യൂ")),
+                "ഇന്റർവ്യൂ", "joli", "thozhil", "udyogam")),
     ("marriage", ("marriage", "wedding", "spouse", "mangalya",
-                  "വിവാഹ", "കല്യാണ", "മംഗല്യ", "പൊരുത്തം", "ദാമ്പത്യ")),
+                  "വിവാഹ", "കല്യാണ", "മംഗല്യ", "പൊരുത്തം", "ദാമ്പത്യ",
+                  "kalyanam", "vivaham", "porutham", "mangalyam")),
     ("children", ("child", "children", "baby", "pregnan", "santana",
-                  "കുട്ടി", "കുഞ്ഞ", "സന്താന", "ഗർഭ")),
+                  "കുട്ടി", "കുഞ്ഞ", "സന്താന", "ഗർഭ",
+                  "kutti", "kunju", "santhanam", "garbham")),
     ("education", ("exam", "study", "studies", "education", "vidya",
-                   "പഠന", "പഠി", "പരീക്ഷ", "വിദ്യ")),
+                   "പഠന", "പഠി", "പരീക്ഷ", "വിദ്യ",
+                   "padanam", "pareeksha", "vidyabhyasam")),
     ("health", ("health", "illness", "disease", "recovery",
-                "ആരോഗ്യ", "രോഗ", "അസുഖ", "ചികിത്സ")),
+                "ആരോഗ്യ", "രോഗ", "അസുഖ", "ചികിത്സ",
+                "aarogyam", "arogyam", "asukham", "rogam", "chikitsa")),
     ("wealth", ("money", "debt", "loan", "wealth", "financ",
-                "പണം", "കടം", "ധനം", "സാമ്പത്തിക", "ലോൺ")),
+                "പണം", "കടം", "ധനം", "സാമ്പത്തിക", "ലോൺ",
+                "panam", "kadam", "dhanam", "sampathika")),
     ("ancestors", ("ancestor", "pitru", "bali", "tharpanam",
-                   "പിതൃ", "ബലി", "തർപ്പണ")),
+                   "പിതൃ", "ബലി", "തർപ്പണ", "pithru")),
     ("obstacles", ("obstacle", "court", "case", "enemy", "delay", "blocked",
-                   "തടസ്സ", "കോടതി", "കേസ", "ശത്രു")),
+                   "തടസ്സ", "കോടതി", "കേസ", "ശത്രു",
+                   "thadassam", "kodathi", "shathru")),
     ("peace", ("peace", "anxiety", "stress", "sleep",
-               "സമാധാന", "മനസ്സമാധാന", "ഉറക്ക", "ടെൻഷൻ")),
+               "സമാധാന", "മനസ്സമാധാന", "ഉറക്ക", "ടെൻഷൻ",
+               "samadhanam", "urakkam", "tension")),
 ]
 
 # Graha (dasha lord / afflicted planet) → deities, Kerala remedial convention.
