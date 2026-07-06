@@ -1,3 +1,13 @@
+---
+title: Tara
+emoji: 🔮
+colorFrom: purple
+colorTo: indigo
+sdk: docker
+app_port: 3000
+pinned: false
+---
+
 # Tara — താര
 
 An honest, Malayalam-first AI astrology companion. The product promise is
