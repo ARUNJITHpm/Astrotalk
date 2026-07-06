@@ -24,6 +24,17 @@ class KnowledgeService:
         # The retriever's corpus = curated seeds + ingested documents.
         self._by_id = {c["id"]: c for c in self._retriever._corpus}
 
+    def nakshatra_relationship(self, nakshatram_ml: str) -> str | None:
+        """The compatibility-facing ("how they love") trait for a birth star.
+
+        Keyed by the Malayalam name the astrology engine emits. Returns ``None``
+        for an unknown star so callers degrade gracefully. Chat uses this to
+        ground a porutham reading in each partner's own nakshatra.
+        """
+        from app.modules.knowledge.seed_data import relationship_trait
+
+        return relationship_trait(nakshatram_ml)
+
     def retrieve(self, query: str, k: int = 3) -> list[KnowledgeChunk]:
         """Return up to ``k`` interpretation chunks most relevant to ``query``."""
         if k <= 0:

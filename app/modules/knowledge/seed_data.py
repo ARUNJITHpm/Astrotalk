@@ -373,14 +373,123 @@ _NAKSHATRA_PROFILES: list[tuple[str, str, str]] = [
 ]
 
 
+# Relationship / compatibility (പൊരുത്തം) dimension for each nakshatra, keyed by
+# the same Malayalam name. This is the "how they love" facet a porutham reading
+# leans on — how the star gives and receives affection, its relational strength,
+# and its growth edge in a partnership. Folded into the retrievable nakshatra
+# chunk AND surfaced by the chat service alongside the ten computed poruthams
+# (see chat.service._porutham_note) so a compatibility reading is grounded in
+# both people's stars, not the model's guesswork. Phrased as tendencies, never
+# fate — GUARDRAILS §1.
+_NAKSHATRA_RELATIONSHIP: dict[str, str] = {
+    "അശ്വതി":
+        "ardent and quick to commit, showing love through action and rescue; "
+        "they grow by slowing to let a partner's pace and feelings catch up.",
+    "ഭരണി":
+        "loving intensely and loyally, carrying a partner's burdens as their "
+        "own; harmony comes when they voice their own needs instead of quietly "
+        "bearing everything.",
+    "കാർത്തിക":
+        "honest and protective partners who say what they mean; wrapping that "
+        "truth in tenderness keeps their warmth from landing as criticism.",
+    "രോഹിണി":
+        "deeply affectionate and devoted, making a bond feel beautiful and "
+        "secure; loosening possessiveness lets that love breathe.",
+    "മകയിരം":
+        "playful and curious, they court through conversation and flourish with "
+        "a mate who keeps life interesting and reassures the restless mind.",
+    "തിരുവാതിര":
+        "they feel love as a storm — passionate and renewing; naming feelings "
+        "early, before they build, keeps the weather clear between them.",
+    "പുണർതം":
+        "forgiving and hopeful, always ready to begin again after a quarrel; "
+        "they thrive with a partner who values that resilience.",
+    "പൂയം":
+        "nurturing and steadfast, among the most caring of partners; their "
+        "lesson is to let themselves be cared for in return.",
+    "ആയില്യം":
+        "perceptive and intensely devoted, reading a partner's moods before "
+        "words; trust deepens when that insight reassures rather than tests.",
+    "മകം":
+        "proud and loyal, honouring family and tradition in a union; sharing "
+        "authority rather than holding it makes love easy.",
+    "പൂരം":
+        "warm, romantic, and generous with affection — they make partnership a "
+        "celebration; a little steadiness anchors their pleasures.",
+    "ഉത്രം":
+        "reliable and giving, the partner who keeps every promise; they grow by "
+        "asking for support as readily as they offer it.",
+    "അത്തം":
+        "attentive and clever, showing love through helpful small acts; saying "
+        "the feeling in words too completes the care.",
+    "ചിത്തിര":
+        "drawn to beauty and harmony, they build an elegant shared life; "
+        "patience with a partner's rough edges is their finishing art.",
+    "ചോതി":
+        "independent lovers who need room to breathe; given freedom and trust "
+        "they are among the most fair and devoted of mates.",
+    "വിശാഖം":
+        "devoted and determined once committed; enjoying the relationship as it "
+        "is, not only its goals, is where they grow.",
+    "അനിഴം":
+        "warm and cooperative, gifted at closeness across differences — natural "
+        "at partnership, with loyalty freely given as their strength.",
+    "തൃക്കേട്ട":
+        "protective and responsible, carrying the bond's weight; worn lightly, "
+        "that care feels like devotion, not control.",
+    "മൂലം":
+        "intense and searching in love, wanting depth and honesty; a partner "
+        "who welcomes their questions earns lasting devotion.",
+    "പൂരാടം":
+        "passionate and persuasive, loving wholeheartedly and inspiring a "
+        "partner; steadiness behind the warmth keeps promises kept.",
+    "ഉത്രാടം":
+        "patient and enduring, building love to last; choosing a mate worthy of "
+        "that constancy is their one care.",
+    "തിരുവോണം":
+        "attentive listeners who love by understanding; the bond thrives when "
+        "they speak their own heart as well as hearing their partner's.",
+    "അവിട്ടം":
+        "responsible, providing partners who value home and belonging; softening "
+        "leadership into shared decisions keeps harmony.",
+    "ചതയം":
+        "private and loyal, loving quietly and needing solitude too; a partner "
+        "who respects that space is trusted completely.",
+    "പൂരുരുട്ടാതി":
+        "idealistic and passionate, devoted to a shared purpose; compassion for "
+        "a slower-moving partner tempers their fire.",
+    "ഉത്രട്ടാതി":
+        "calm, faithful, and deeply steadying; letting their own depths be seen "
+        "invites the intimacy they give so freely.",
+    "രേവതി":
+        "tender, selfless, and protective in love; guarding against being taken "
+        "for granted keeps their giving joyful.",
+}
+
+
+def relationship_trait(nakshatram_ml: str) -> str | None:
+    """The compatibility-facing trait for a nakshatra by its Malayalam name.
+
+    Returns ``None`` for an unknown star so callers degrade gracefully. Used by
+    the chat service to ground a porutham reading in each partner's star.
+    """
+    return _NAKSHATRA_RELATIONSHIP.get(nakshatram_ml)
+
+
 def _nakshatra_chunks() -> list[SeedChunk]:
     chunks: list[SeedChunk] = []
     for ml, alias, profile in _NAKSHATRA_PROFILES:
+        relationship = _NAKSHATRA_RELATIONSHIP.get(ml)
+        love = (
+            f" In love and marriage (പൊരുത്തം) they are {relationship}"
+            if relationship else ""
+        )
         chunks.append({
             "id": f"nakshatra-{ml}",
             "topic": "nakshatra",
             "text": (
-                f"Those born under {ml} nakshatra ({alias} birth star) are {profile} "
+                f"Those born under {ml} nakshatra ({alias} birth star) are {profile}"
+                f"{love} "
                 "A birth star describes temperament and leanings — guidance for "
                 "self-understanding, never a fixed fate."
             ),

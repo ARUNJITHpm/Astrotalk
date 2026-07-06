@@ -19,9 +19,9 @@ import time
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.astrology_engine.service import AstrologyEngineService
-from app.modules.chat import user_memory
+from app.modules.chat import analytics, user_memory
 from app.modules.chat.llm_client import LLMClient
-from app.modules.chat.schemas import ChatResponse, PrashnamPick
+from app.modules.chat.schemas import ChatResponse, PoruthamPartner, PrashnamPick
 from app.modules.identity.service import IdentityService
 from app.modules.knowledge.service import KnowledgeService
 from app.modules.temples.service import TemplesService
@@ -89,6 +89,15 @@ class ChatService:
         self._llm = llm or LLMClient()
         self._temples = temples or TemplesService()
 
+    async def admin_stats(self) -> dict:
+        """Chat-volume metrics for the admin dashboard (read-only).
+
+        Exposes the chat module's own history aggregation as its public surface
+        so the admin module never touches ``chat_history`` directly. Degrades to
+        ``{"available": False}`` when the document store is off/unavailable.
+        """
+        return await analytics.chat_metrics()
+
     async def handle_message(
         self,
         user_id: str,
@@ -96,6 +105,7 @@ class ChatService:
         session: AsyncSession | None = None,
         debug: bool = False,
         prashnam: PrashnamPick | None = None,
+        porutham: PoruthamPartner | None = None,
         provider: str | None = None,
     ) -> ChatResponse:
         """Run the §6 orchestrator. When ``debug`` is set, attach a per-turn trace
@@ -168,6 +178,26 @@ class ChatService:
                 mode=prashnam.mode, cues=prashnam_cues,
             )
 
+        # --- Step 2c: porutham (compatibility) when a partner is attached ---
+        # Structured input → deterministic engine → the LLM only narrates. The
+        # user's OWN chart is one side; the partner's chart is computed here from
+        # the partner form (geocode + natal chart), then the ten Kerala
+        # poruthams are graded in Python. This is what makes "പൊരുത്തം നോക്കാമോ?"
+        # actually work instead of the LLM improvising over raw text.
+        porutham_note: str | None = None
+        if porutham is not None:
+            s = time.perf_counter()
+            porutham_note, porutham_result = await self._porutham_guidance(
+                porutham, chart, session, user_id
+            )
+            if porutham_result is not None:
+                grounded_in.append("porutham")
+            _mark(
+                "porutham", s, tool="astrology_engine.compute_porutham",
+                computed=porutham_result is not None,
+                score=(porutham_result or {}).get("score"),
+            )
+
         # --- Step 3: RAG grounded in the question + computed facts ---
         # The chart facts (mahadasha lord, janma nakshatram, doshas, sade sati)
         # are computed by astrology_engine; feeding them into the query pulls the
@@ -231,6 +261,8 @@ class ChatService:
         notes = [c.text for c in retrieved]
         if prashnam_note:
             notes.append(prashnam_note)
+        if porutham_note:
+            notes.append(porutham_note)
         if temple_note:
             notes.append(temple_note)
         system_prompt = self._tone_safety.build_system_prompt(
@@ -273,10 +305,27 @@ class ChatService:
         )
 
         # --- Step 6: reply (router schedules memory extraction) ---
+        provider_name = getattr(self._llm, "last_provider", "mock")
+        model_name = getattr(self._llm, "last_model", None)
+        usage = getattr(self._llm, "last_usage", None) or {}
+        prompt_tokens = usage.get("prompt_tokens") or 0
+        completion_tokens = usage.get("completion_tokens") or 0
+        total_tokens = usage.get("total_tokens") or (prompt_tokens + completion_tokens)
+
+        from app.platform.metrics import estimate_price
+        price_inr, price_usd = estimate_price(provider_name, model_name, prompt_tokens, completion_tokens)
+
         return ChatResponse(
             reply=reply,
             is_safety_response=False,
             grounded_in=grounded_in,
+            llm_provider=provider_name,
+            llm_model=model_name,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            total_tokens=total_tokens,
+            price_inr=price_inr,
+            price_usd=price_usd,
             debug=self._build_trace(
                 user_id, messages, steps, t0,
                 crisis=False, chart=chart, transits=transits, query=query,
@@ -476,6 +525,172 @@ class ChatService:
             "weigh — never as a decree, never with fear."
         )
 
+    async def _porutham_guidance(
+        self,
+        partner: PoruthamPartner,
+        chart: dict | None,
+        session: AsyncSession | None,
+        user_id: str,
+    ) -> tuple[str | None, dict | None]:
+        """Compute the ten Kerala poruthams between the user and the partner.
+
+        The logged-in user's OWN chart is one side; the partner's chart is
+        computed here from the partner form (geocode → natal chart).
+        ``partner.gender`` is the partner's — the user is taken as the opposite
+        sex, since the directional poruthams count from the bride's star to the
+        groom's. Returns (prompt note, result dict). Degrades to a helpful note
+        (result ``None``) when the user's own chart isn't computed yet or the
+        pair can't be scored — never a fabricated result.
+        """
+        # The user needs a real natal chart to match against. A missing or
+        # placeholder chart is exactly the "it didn't fetch my profile" case:
+        # tell them to complete their birth details rather than guessing.
+        if not self._chart_usable(chart):
+            return (
+                "Porutham request, but the logged-in user's own birth chart "
+                "isn't computed yet (it's missing or a placeholder). Gently tell "
+                "them you need their birth details on file first — ask them to "
+                "add or recompute their birth date, time and place in their "
+                "profile, then try the porutham again. Do NOT invent a "
+                "compatibility result.",
+                None,
+            )
+
+        # Partner's chart from the form. Geocoding failures degrade to a
+        # placeholder location inside identity — acceptable here, since the
+        # janma nakshatram/rasi the porutham needs are Moon-driven, not
+        # location-driven.
+        try:
+            lat, lng, tz = await self._identity.geocode_place(partner.birth_place)
+            partner_chart = await self._astrology.compute_natal_chart(
+                partner.dob, partner.birth_time, lat, lng, tz
+            )
+        except Exception as exc:  # pragma: no cover - depends on engine/network
+            logger.warning(
+                "chat: partner chart unavailable (%s); skipping porutham.", exc
+            )
+            return (
+                "Porutham request, but the partner's chart could not be computed "
+                "right now. Apologise briefly and ask them to re-check the "
+                "partner's birth date, time and place. Do NOT invent a result.",
+                None,
+            )
+
+        user_name = await self._user_name(session, user_id)
+        partner_name = partner.name or "പങ്കാളി"
+        if partner.gender == "female":
+            female_chart, female_name = partner_chart, partner_name
+            male_chart, male_name = chart, user_name or "നിങ്ങൾ"
+        else:
+            female_chart, female_name = chart, user_name or "നിങ്ങൾ"
+            male_chart, male_name = partner_chart, partner_name
+
+        try:
+            result = await self._astrology.compute_porutham(
+                female_chart, male_chart,
+                female_name=female_name, male_name=male_name,
+            )
+        except ValueError as exc:
+            logger.warning("chat: porutham not computable (%s); degrading.", exc)
+            return (
+                "Porutham request could not be scored (incomplete birth data). "
+                "Ask the person to confirm both sets of birth details. Do NOT "
+                "invent a result.",
+                None,
+            )
+        return self._porutham_note(result), result
+
+    @staticmethod
+    def _chart_usable(chart: dict | None) -> bool:
+        """True when the chart carries a real Moon placement (not mock/pending)."""
+        return (
+            isinstance(chart, dict)
+            and bool(chart.get("nakshatram"))
+            and not chart.get("mock")
+            and chart.get("status") != "pending"
+        )
+
+    def _porutham_note(self, result: dict) -> str:
+        """Deterministic prompt note for a porutham result, with the honesty rule.
+
+        Carries every computed porutham verbatim so the LLM narrates exactly
+        what the engine graded — never a marriage verdict, never fear. Each
+        partner's star personality (the "how they love" trait from the knowledge
+        base) is attached too, so the reading is grounded in BOTH people's stars
+        the way a real compatibility talk opens — personality first, then the
+        ten poruthams — rather than the model improvising temperament."""
+        female, male = result["female"], result["male"]
+        lines = [
+            f"Pathu porutham (ദശപൊരുത്തം) computed by the almanac method — "
+            f"score {result['score']}/{result['max_score']:g}:",
+            f"- {female['name']}: {female['nakshatram']} നക്ഷത്രം, "
+            f"{female['rasi']} രാശി (bride's side).",
+            f"- {male['name']}: {male['nakshatram']} നക്ഷത്രം, "
+            f"{male['rasi']} രാശി (groom's side).",
+        ]
+        # Star personalities, grounded from the knowledge base (never invented).
+        for who, person in (("bride", female), ("groom", male)):
+            trait = self._knowledge.nakshatra_relationship(person["nakshatram"])
+            if trait:
+                lines.append(
+                    f"- {person['nakshatram']} personality in love ({who}, "
+                    f"{person['name']}): {trait}"
+                )
+        for p in result["poruthams"].values():
+            lines.append(f"- {p['label']} [{p['grade']}]: {p['reason']}")
+        if result["rajju_dosha"]:
+            lines.append(
+                "- NOTE: രജ്ജുദോഷം is present (the couple share a rajju group), "
+                "traditionally the weightiest concern."
+            )
+        return (
+            "\n".join(lines)
+            + "\nIf THIS message asks for the porutham itself, present the full "
+            "reading and OPEN it by naming both people's janma nakshatram and "
+            "rasi from the lines above (for example: 'നിങ്ങളുടെ നക്ഷത്രം പൂരം, "
+            "പങ്കാളിയുടേത് രോഹിണി…') — seeing their own stars named is how the "
+            "couple trusts this came from THEIR charts, so never skip it."
+            "\nStructure the full reading like a warm astrologer's talk: (1) a "
+            "short personality sketch of EACH person from their 'personality in "
+            "love' line above, (2) the relationship's STRENGTHS drawn from the "
+            "uthamam poruthams, (3) the points to WATCH drawn from the adhamam / "
+            "madhyamam ones (name the porutham, e.g. യോനി or രജ്ജു, and what it "
+            "means for daily life — communication, ego, patience), and (4) an "
+            "honest close on what the score does and does not mean. Weave the "
+            "two personalities together (how these two temperaments meet) — do "
+            "not just list traits."
+            "\nIf this message is a FOLLOW-UP about the couple (their stars, a "
+            "specific porutham, what to do next), answer it directly from these "
+            "same computed facts — they are already on file, so NEVER ask for "
+            "the partner's birth details again."
+            "\nHONESTY RULE: narrate exactly these computed poruthams — do not "
+            "add or drop any, and do not invent placements or personality traits "
+            "beyond the lines above. Present this as the "
+            "traditional ten-porutham count families consult — useful guidance "
+            "the couple are free to weigh, NEVER a verdict on whether they may "
+            "marry, and never with fear or fatalism. A high score is "
+            "encouraging; a low one is a single input among many (dosha "
+            "remedies, elders' counsel, and above all the couple's own wishes). "
+            "Real relationships rest on mutual respect, trust, and communication "
+            "more than on a score. For anything binding, gently note a full "
+            "match is done by an astrologer with both complete horoscopes. "
+            "Warm, plain Malayalam."
+        )
+
+    async def _user_name(
+        self, session: AsyncSession | None, user_id: str
+    ) -> str | None:
+        """The logged-in user's display name, for narrating their side of a
+        porutham. Degrades to None without a session/registration."""
+        if session is None or not any(ch.isdigit() for ch in user_id):
+            return None
+        try:
+            user = await self._identity.get_user_by_phone(session, user_id)
+        except Exception as exc:  # pragma: no cover - depends on DB availability
+            logger.warning("chat: user lookup unavailable (%s); continuing.", exc)
+            return None
+        return user.name if user is not None else None
+
     async def _load_user_location(
         self, session: AsyncSession | None, user_id: str
     ) -> tuple[float | None, float | None]:
@@ -543,3 +758,41 @@ class ChatService:
                 cues.append("kala sarpa dosha")
 
         return " ".join([question, *cues]).strip()
+
+    async def get_chat_users(self) -> list[dict]:
+        """Fetch all unique users who have chat history, with turn counts and last active times.
+
+        Admin Dashboard use case. Returns empty if MongoDB is disabled/unavailable.
+        """
+        from app.platform.mongo import get_db
+        db = get_db()
+        if db is None:
+            return []
+        try:
+            cursor = await db["chat_history"].aggregate([
+                {"$group": {
+                    "_id": "$user_id",
+                    "turns": {"$sum": 1},
+                    "last_active": {"$max": "$created_at"}
+                }},
+                {"$sort": {"last_active": -1}}
+            ])
+            return [
+                {
+                    "phone": row["_id"],
+                    "turns": row["turns"],
+                    "last_active": row["last_active"]
+                }
+                async for row in cursor
+            ]
+        except Exception as exc:
+            logger.warning("chat.service: get_chat_users failed (%s)", exc)
+            return []
+
+    async def get_user_chat_history(self, phone: str, limit: int = 100) -> list[dict]:
+        """Fetch raw chat history for a specific user.
+
+        Admin Dashboard use case. Returns empty if MongoDB is disabled/unavailable.
+        """
+        from app.modules.chat import history
+        return await history.get_history(phone, limit=limit)

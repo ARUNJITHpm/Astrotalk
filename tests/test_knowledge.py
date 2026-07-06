@@ -66,6 +66,26 @@ def test_corpus_covers_the_production_content_plan():
     assert by_topic["deity"] == 15
 
 
+def test_every_engine_star_has_a_relationship_trait():
+    # The porutham reading grounds each partner's personality in this trait, so
+    # every star the astrology engine can emit must resolve one.
+    from app.modules.astrology_engine.swiss_ephemeris import NAKSHATRAS
+
+    svc = _service()
+    missing = [n for n in NAKSHATRAS if not svc.nakshatra_relationship(n)]
+    assert missing == [], f"stars with no relationship trait: {missing}"
+    assert svc.nakshatra_relationship("not-a-star") is None
+
+
+def test_relationship_trait_is_folded_into_nakshatra_chunk():
+    # The "how they love" facet must live inside the retrievable nakshatra chunk
+    # (not a separate chunk — the nakshatra topic count is pinned at 28).
+    svc = _service()
+    trait = svc.nakshatra_relationship("അവിട്ടം")
+    chunk = next(c for c in SEED_CHUNKS if c["id"] == "nakshatra-അവിട്ടം")
+    assert trait and trait in chunk["text"]
+
+
 def test_retrieve_malayalam_nakshatra_query():
     # Malayalam-script query must hit the matching nakshatra profile (the
     # tokenizer is unicode-aware and chunk texts carry Malayalam terms inline).
