@@ -18,4 +18,6 @@ COPY . .
 EXPOSE 3000
 
 # Default command runs the API; worker/beat services override this.
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "3000"]
+# Shell form so ${PORT} expands: Render (and most PaaS) inject the port to bind
+# to via $PORT; fall back to 3000 for local `docker run`.
+CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-3000}

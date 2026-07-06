@@ -6,6 +6,7 @@ this module only wires the engine/session — it does not create or alter tables
 """
 
 from collections.abc import AsyncIterator
+from urllib.parse import urlencode, urlsplit, urlunsplit, parse_qsl
 
 from sqlalchemy import Connection, inspect as sa_inspect
 from sqlalchemy.ext.asyncio import (
@@ -26,26 +27,49 @@ class Base(DeclarativeBase):
     """Declarative base for all module ORM models."""
 
 
+# libpq/psycopg connection options that the asyncpg driver does NOT accept as
+# URL query params (it would raise "invalid connection option"). Managed hosts
+# like Neon/Supabase append these to their copy-paste URLs, so we strip them
+# here and re-express SSL through connect_args instead (see _build_engine).
+_ASYNCPG_INCOMPATIBLE_PARAMS = {"sslmode", "channel_binding"}
+
+
 def _resolve_async_url(raw_url: str) -> str:
     """Return an async-driver SQLAlchemy URL.
 
     - empty            -> local SQLite (aiosqlite)
-    - postgres[ql]://  -> upgraded to the asyncpg driver
+    - postgres[ql]://  -> upgraded to the asyncpg driver, libpq-only query
+                          params (sslmode/channel_binding) stripped
     - already async    -> returned unchanged
     """
     if not raw_url:
         return _DEFAULT_SQLITE_URL
     if raw_url.startswith("postgresql://"):
-        return raw_url.replace("postgresql://", "postgresql+asyncpg://", 1)
-    if raw_url.startswith("postgres://"):
-        return raw_url.replace("postgres://", "postgresql+asyncpg://", 1)
-    return raw_url
+        raw_url = raw_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    elif raw_url.startswith("postgres://"):
+        raw_url = raw_url.replace("postgres://", "postgresql+asyncpg://", 1)
+    if not raw_url.startswith("postgresql+asyncpg://"):
+        return raw_url
+    parts = urlsplit(raw_url)
+    kept = [
+        (k, v)
+        for k, v in parse_qsl(parts.query, keep_blank_values=True)
+        if k not in _ASYNCPG_INCOMPATIBLE_PARAMS
+    ]
+    return urlunsplit(parts._replace(query=urlencode(kept)))
 
 
 def _build_engine() -> AsyncEngine:
     settings = get_settings()
     url = _resolve_async_url(settings.database_url)
-    connect_args = {"check_same_thread": False} if url.startswith("sqlite") else {}
+    if url.startswith("sqlite"):
+        connect_args = {"check_same_thread": False}
+    elif url.startswith("postgresql+asyncpg://"):
+        # Managed Postgres (Neon/Supabase) requires TLS. asyncpg wants SSL via
+        # connect_args, not the stripped-out ?sslmode= URL param.
+        connect_args = {"ssl": True}
+    else:
+        connect_args = {}
     return create_async_engine(url, future=True, connect_args=connect_args)
 
 
