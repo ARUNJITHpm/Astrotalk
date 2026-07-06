@@ -42,6 +42,9 @@ tara_project_overview.pdf
 # Local / scratch directories
 vinimon/
 
+# Local object storage (mock_storage=true) — generated cards/PDFs, never commit
+var/
+
 # Logs
 logs/
 *.log

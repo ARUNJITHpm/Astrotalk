@@ -22,6 +22,18 @@ class Settings(BaseSettings):
     session_ttl_hours: int = 47
     # Per-user ceiling on /chat/message calls (LLM cost / abuse protection).
     chat_rate_limit_per_hour: int = 30
+    # Shared secret gating the admin analytics dashboard (/admin). Empty in
+    # development means the dashboard is open locally (dev convenience); in
+    # production it MUST be set or the admin API returns 503. Sent by the page
+    # as the ``X-Admin-Token`` header. Never logged.
+    admin_token: str = ""
+
+    # Shared secret gating the scheduled "cron endpoints" (e.g. POST
+    # /content/run-daily), sent as ``X-Cron-Token`` by an external scheduler
+    # (GitHub Actions cron / cron-job.org). Same policy as admin_token:
+    # empty in dev = open locally; in production it MUST be set or the
+    # endpoint returns 503. Never logged.
+    cron_token: str = ""
 
     # ---- Database (PostgreSQL in prod; SQLite default in dev, see platform/db.py) ----
     # Empty = fall back to the local SQLite file so the app boots with no Postgres.
@@ -73,6 +85,20 @@ class Settings(BaseSettings):
     razorpay_key_id: str = ""
     razorpay_key_secret: str = ""
 
+    # ---- Object storage (Cloudflare R2, S3-compatible) ----
+    # Generated media (share cards, report PDFs, logos) can't live on the
+    # host's ephemeral disk. mock_storage=True (default) writes under
+    # ``storage_dir`` on the local filesystem instead — fine for dev, and
+    # files are served back via GET /media/{key}.
+    storage_dir: str = "var/storage"
+    r2_account_id: str = ""
+    r2_access_key_id: str = ""
+    r2_secret_access_key: str = ""
+    r2_bucket: str = "tara-media"
+    # Public base URL for the bucket (r2.dev subdomain or a custom domain).
+    # Empty = objects are proxied through GET /media/{key} like local files.
+    r2_public_base_url: str = ""
+
     # ---- Geocoding / timezone ----
     # Default provider is Open-Meteo's free geocoding API: no key required, and
     # it returns the IANA timezone with the coordinates (one call resolves a
@@ -88,6 +114,9 @@ class Settings(BaseSettings):
     mock_razorpay: bool = True
     mock_geocoding: bool = True
     mock_chroma: bool = True
+    # When True (default), generated media is stored on the local disk under
+    # ``storage_dir``. Set False + supply the r2_* credentials for Cloudflare R2.
+    mock_storage: bool = True
     # When True (default), chat history/memory persistence is skipped so the app
     # boots with no MongoDB. Set False + run mongod to enable durable chat storage.
     mock_mongo: bool = True

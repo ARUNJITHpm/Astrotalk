@@ -28,8 +28,10 @@ sys.path[:] = [p for p in sys.path if not _is_app_dir(p)]
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
-from fastapi import FastAPI
-from fastapi.responses import FileResponse
+import mimetypes
+
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from app.modules.admin.router import router as admin_router
@@ -88,6 +90,26 @@ async def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+# Generated media (share cards, report PDFs) — served out of platform storage.
+# With local storage this reads the file from disk; with R2 + a public base
+# URL, Storage.url() points browsers at the bucket and this route sits unused.
+@app.get("/media/{key:path}", include_in_schema=False)
+async def media(key: str) -> Response:
+    from anyio import to_thread
+
+    from app.platform.storage import StorageKeyError, get_storage
+
+    try:
+        data = await to_thread.run_sync(get_storage().get, key)
+    except StorageKeyError:
+        raise HTTPException(status_code=404, detail="Not found")
+    if data is None:
+        raise HTTPException(status_code=404, detail="Not found")
+    content_type = mimetypes.guess_type(key)[0] or "application/octet-stream"
+    return Response(content=data, media_type=content_type,
+                    headers={"Cache-Control": "public, max-age=86400"})
+
+
 # Dev convenience: never let the browser serve a stale copy of the web UI. The
 # app runs with uvicorn --reload locally, so edits to app.js / auth.js / styles
 # / the HTML pages must show up on refresh without a hard-reload.
@@ -95,7 +117,9 @@ async def health() -> dict[str, str]:
 async def _no_store_web_assets(request, call_next):
     response = await call_next(request)
     path = request.url.path
-    if path.startswith("/static") or path in ("/", "/auth", "/wa"):
+    if path.startswith("/static") or path in (
+        "/", "/auth", "/wa", "/ui", "/ui/login", "/admin",
+    ):
         response.headers["Cache-Control"] = "no-store"
     return response
 
@@ -117,12 +141,31 @@ async def auth_page() -> FileResponse:
     return FileResponse(_WEB_DIR / "auth.html")
 
 
+# New cinematic UI (dark cosmic skin) over the SAME backend: /ui is the chat,
+# /ui/login the auth page. Shares the localStorage session with the classic UI.
+@app.get("/ui", include_in_schema=False)
+async def ui_chat() -> FileResponse:
+    return FileResponse(_WEB_DIR / "ui" / "chat.html")
+
+
+@app.get("/ui/login", include_in_schema=False)
+async def ui_login() -> FileResponse:
+    return FileResponse(_WEB_DIR / "ui" / "login.html")
+
+
 # WhatsApp-style skin over the SAME chat brain (POST /chat/message). This is a
 # demo surface only — the real whatsapp module stays compliance-locked and does
 # NOT expose open-ended AI chat (GUARDRAILS.md §3).
 @app.get("/wa", include_in_schema=False)
 async def whatsapp_ui() -> FileResponse:
     return FileResponse(_WEB_DIR / "whatsapp.html")
+
+
+# Admin analytics dashboard (project overview: users, charts, chat, tokens).
+# The page is static; every data call it makes hits the token-gated /admin API.
+@app.get("/admin", include_in_schema=False)
+async def admin_page() -> FileResponse:
+    return FileResponse(_WEB_DIR / "admin.html")
 
 
 # Dev entrypoint: `python main.py` (from anywhere) starts the server. Production
@@ -139,5 +182,12 @@ if __name__ == "__main__":
     os.environ["PYTHONPATH"] = str(_ROOT) + os.pathsep + os.environ.get("PYTHONPATH", "")
 
     port = get_settings().port
-    print(f"Tara running →  website http://localhost:{port}/   ·   WhatsApp http://localhost:{port}/wa")
+    # ASCII-only banner: Windows consoles often default to cp1252, where
+    # printing "→"/"·" raises UnicodeEncodeError and kills the server at boot.
+    print(
+        f"Tara running -  website http://localhost:{port}/"
+        f"   |   new UI http://localhost:{port}/ui"
+        f"   |   WhatsApp http://localhost:{port}/wa"
+        f"   |   admin http://localhost:{port}/admin"
+    )
     uvicorn.run("app.main:app", host="127.0.0.1", port=port, reload=True)
