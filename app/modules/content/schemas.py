@@ -34,3 +34,22 @@ class RunDailySummary(BaseModel):
     day: str
     created: list[str]
     skipped: list[str]
+
+
+class ShareCardCreate(BaseModel):
+    """A personal share card request (Part 2): the insight the user wants out."""
+
+    title: str = ""
+    body: str
+    template: str = "story"  # story (WhatsApp Status / IG Stories) or feed
+
+
+class ShareCardOut(BaseModel):
+    """A rendered share card: where the image is and where the share lands."""
+
+    slug: str
+    kind: str
+    title: str
+    media_url: str
+    share_url: str
+    hits: int = 0

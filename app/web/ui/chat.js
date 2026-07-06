@@ -488,6 +488,40 @@
     });
     bar.appendChild(copyBtn);
 
+    // Share (Part 2): render this insight as a branded card and hand the
+    // /s link to the native share sheet (WhatsApp Status / Stories on mobile).
+    const shareBtn = mkAct("share", "📤", "പങ്കുവയ്ക്കൂ", async () => {
+      if (shareBtn.disabled) return;
+      shareBtn.disabled = true;
+      shareBtn.textContent = "⏳";
+      try {
+        let shareUrl = shareBtn.dataset.shareUrl;
+        if (!shareUrl) {
+          const res = await fetch("/content/cards", {
+            method: "POST",
+            headers: authHeaders({ "Content-Type": "application/json" }),
+            body: JSON.stringify({ title: "Tara പറഞ്ഞത് ✨", body: text.slice(0, 600) }),
+          });
+          if (!res.ok) throw new Error("HTTP " + res.status);
+          shareUrl = (await res.json()).share_url;
+          shareBtn.dataset.shareUrl = shareUrl;
+        }
+        if (navigator.share) {
+          await navigator.share({ title: "Tara", url: shareUrl });
+          shareBtn.textContent = "📤";
+        } else {
+          const ok = await copyText(shareUrl);
+          shareBtn.textContent = ok ? "🔗✓" : "📤";
+          setTimeout(() => { shareBtn.textContent = "📤"; }, 1600);
+        }
+      } catch (_) {
+        shareBtn.textContent = "📤";
+      } finally {
+        shareBtn.disabled = false;
+      }
+    });
+    bar.appendChild(shareBtn);
+
     if (canRetry) {
       bar.appendChild(mkAct("retry", "🔄", "വീണ്ടും ശ്രമിക്കൂ", retryLast));
     }

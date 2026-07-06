@@ -17,6 +17,11 @@
     return s.startsWith("+") ? "+" + digits : digits;
   };
 
+  // Referral code from a shared link (?ref=CODE) — kept through the visit so
+  // it still counts if the user lands, browses, then registers.
+  const refCode = new URLSearchParams(window.location.search).get("ref");
+  if (refCode) sessionStorage.setItem("tara_ref", refCode);
+
   const forms = {
     login: $("form-login"),
     register: $("form-register"),
@@ -133,7 +138,9 @@
     try {
       const data = await postJson("/identity/users", {
         name, phone, password, dob, birth_time, birth_place,
+        ref: sessionStorage.getItem("tara_ref") || null,
       });
+      sessionStorage.removeItem("tara_ref");
       completeAuth(data);
     } catch (err) {
       setError(

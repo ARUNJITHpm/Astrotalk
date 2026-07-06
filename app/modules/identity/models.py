@@ -77,3 +77,43 @@ class Chart(Base):
     computed_at: Mapped[datetime] = mapped_column(default=_utcnow)
 
     user: Mapped["User"] = relationship(back_populates="charts")
+
+
+class ReferralCode(Base):
+    """One share code per user (GROWTH_PLAN.md Part 2's referral loop).
+
+    Created lazily the first time the user opens their referral panel or
+    shares a card. ``reward_granted_at`` marks the one-time premium-report
+    reward as claimed — set when activations reach the configured threshold
+    (the grant itself lands in commerce's entitlements once Part 5a exists).
+    """
+
+    __tablename__ = "referral_codes"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), unique=True, index=True
+    )
+    code: Mapped[str] = mapped_column(unique=True, index=True)
+    reward_granted_at: Mapped[datetime | None] = mapped_column(nullable=True, default=None)
+    created_at: Mapped[datetime] = mapped_column(default=_utcnow)
+
+
+class Referral(Base):
+    """One referred signup. A user can be referred at most once (unique),
+    and only counts as ``activated`` once onboarding completed — i.e. their
+    birth chart was computed, which registration does in the same request."""
+
+    __tablename__ = "referrals"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    referrer_user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    referred_user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), unique=True
+    )
+    # The code as typed/linked — kept for audit even if the code row changes.
+    code: Mapped[str]
+    status: Mapped[str] = mapped_column(default="activated")  # pending|activated
+    created_at: Mapped[datetime] = mapped_column(default=_utcnow)

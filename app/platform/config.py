@@ -18,6 +18,13 @@ class Settings(BaseSettings):
     # ---- App ----
     app_env: str = "development"
     port: int = 3000
+    # Absolute origin the app is reachable at (e.g. https://arunjith-tara.hf.space).
+    # Used where a relative URL won't do: og:image on share landing pages, share
+    # links that leave the platform. Empty = derived from the incoming request.
+    public_base_url: str = ""
+    # Referral loop (GROWTH_PLAN.md Part 2): how many referred users must
+    # complete onboarding before the referrer's premium-report reward unlocks.
+    referral_reward_threshold: int = 3
     # Login session lifetime (bearer token TTL).
     session_ttl_hours: int = 47
     # Per-user ceiling on /chat/message calls (LLM cost / abuse protection).

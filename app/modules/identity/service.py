@@ -20,12 +20,18 @@ from typing import Any
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.identity.models import Chart, Session, User
+from app.modules.identity.models import Chart, Referral, ReferralCode, Session, User
 from app.modules.identity.schemas import UserCreate
+from app.platform import metrics
 from app.platform.config import get_settings
 from app.platform.logging_config import get_logger
 
 logger = get_logger(__name__)
+
+# Referral-code alphabet: unambiguous uppercase (no 0/O, 1/I/L) so codes
+# survive being read aloud or hand-typed from a printed card.
+_CODE_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"
+_CODE_LENGTH = 8
 
 # Password hashing — PBKDF2-HMAC-SHA256 from the stdlib, so no extra dependency.
 # Stored form: ``pbkdf2_sha256$<rounds>$<salt_b64>$<hash_b64>`` (self-describing,
@@ -439,6 +445,131 @@ class IdentityService:
             return None
         return await self.get_chart(session, user.id)
 
+    # ---- referral loop (GROWTH_PLAN.md Part 2) ----
+
+    async def get_or_create_referral_code(
+        self, session: AsyncSession, user_id: int
+    ) -> ReferralCode:
+        """The user's share code, minting one on first use."""
+        existing = (
+            await session.execute(
+                select(ReferralCode).where(ReferralCode.user_id == user_id)
+            )
+        ).scalars().first()
+        if existing is not None:
+            return existing
+        for _ in range(5):  # collision retry (32^8 space — first try in practice)
+            code = "".join(secrets.choice(_CODE_ALPHABET) for _ in range(_CODE_LENGTH))
+            clash = (
+                await session.execute(select(ReferralCode).where(ReferralCode.code == code))
+            ).scalars().first()
+            if clash is None:
+                break
+        row = ReferralCode(user_id=user_id, code=code)
+        session.add(row)
+        await session.flush()
+        await session.refresh(row)
+        return row
+
+    async def record_referral(
+        self, session: AsyncSession, code: str, referred_user_id: int
+    ) -> Referral | None:
+        """Credit a signup to the code's owner (registration's ``ref`` field).
+
+        Best-effort by design: an unknown code, a self-referral, or an already
+        referred user returns None — registration NEVER fails because a shared
+        link was stale. The row lands as ``activated`` because registration
+        computes the birth chart in the same request (the plan's definition of
+        real activation). Reaching the threshold marks the referrer's reward.
+        """
+        normalized = (code or "").strip().upper()
+        if not normalized:
+            return None
+        code_row = (
+            await session.execute(
+                select(ReferralCode).where(ReferralCode.code == normalized)
+            )
+        ).scalars().first()
+        if code_row is None or code_row.user_id == referred_user_id:
+            return None
+        already = (
+            await session.execute(
+                select(Referral).where(Referral.referred_user_id == referred_user_id)
+            )
+        ).scalars().first()
+        if already is not None:
+            return None
+        referral = Referral(
+            referrer_user_id=code_row.user_id,
+            referred_user_id=referred_user_id,
+            code=normalized,
+            status="activated",
+        )
+        session.add(referral)
+        await session.flush()
+        metrics.increment("identity.referrals_activated")
+        await self._maybe_grant_reward(session, code_row)
+        return referral
+
+    async def _maybe_grant_reward(
+        self, session: AsyncSession, code_row: ReferralCode
+    ) -> None:
+        """Mark the one-time reward once activations reach the threshold.
+
+        The durable grant (a premium-report entitlement in commerce) arrives
+        with Part 5a; until then the flag itself is the unlock the UI reads.
+        """
+        if code_row.reward_granted_at is not None:
+            return
+        activated = (
+            await session.scalar(
+                select(func.count(Referral.id)).where(
+                    Referral.referrer_user_id == code_row.user_id,
+                    Referral.status == "activated",
+                )
+            )
+            or 0
+        )
+        if activated < get_settings().referral_reward_threshold:
+            return
+        code_row.reward_granted_at = datetime.now(UTC)
+        await session.flush()
+        metrics.increment("identity.referral_rewards_granted")
+        logger.info(
+            "identity: referral reward unlocked for user %s (%s activations)",
+            code_row.user_id, activated,
+        )
+
+    async def referral_summary(self, session: AsyncSession, user_id: int) -> dict[str, Any]:
+        """What the logged-in user sees in their referral panel."""
+        code_row = await self.get_or_create_referral_code(session, user_id)
+        activated = (
+            await session.scalar(
+                select(func.count(Referral.id)).where(
+                    Referral.referrer_user_id == user_id,
+                    Referral.status == "activated",
+                )
+            )
+            or 0
+        )
+        return {
+            "code": code_row.code,
+            "activated": activated,
+            "threshold": get_settings().referral_reward_threshold,
+            "reward_granted": code_row.reward_granted_at is not None,
+        }
+
+    async def get_referral_code_for_user(
+        self, session: AsyncSession, user_id: int
+    ) -> str | None:
+        """The user's existing code WITHOUT minting one (for share-card CTAs)."""
+        row = (
+            await session.execute(
+                select(ReferralCode.code).where(ReferralCode.user_id == user_id)
+            )
+        ).scalars().first()
+        return row
+
     # ---- admin analytics (read-only) ----
     # The admin module is allowed cross-module READS for its dashboards
     # (Tara-Project-Documentation.md §2). It reaches these numbers only through
@@ -529,8 +660,25 @@ class IdentityService:
             for u in recent_rows
         ]
 
+        # Referral funnel (Part 2): codes shared → signups credited → rewards.
+        referral_codes_issued = await session.scalar(select(func.count(ReferralCode.id))) or 0
+        referred_signups = await session.scalar(select(func.count(Referral.id))) or 0
+        referral_rewards = (
+            await session.scalar(
+                select(func.count(ReferralCode.id)).where(
+                    ReferralCode.reward_granted_at.is_not(None)
+                )
+            )
+            or 0
+        )
+
         return {
             "total_users": total_users,
+            "referrals": {
+                "codes_issued": referral_codes_issued,
+                "referred_signups": referred_signups,
+                "rewards_granted": referral_rewards,
+            },
             "users_with_chart": users_with_chart,
             "users_without_chart": max(total_users - users_with_chart, 0),
             "total_charts": total_charts,

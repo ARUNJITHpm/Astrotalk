@@ -231,6 +231,12 @@
       tile("Total Cost (INR)", totalCostInr, "", `Estimated Cost (USD): ${totalCostUsd}`, true),
       tile("Tokens used", fmtNum(l.total_tokens), "", `${fmtNum(l.calls)} LLM calls · ${fmtNum(l.live_calls)} live`),
       tile("New today", fmtNum(u.new_users_24h), "", `${fmtNum(u.new_users_30d)} in 30 days`),
+      tile(
+        "Referrals",
+        fmtNum((u.referrals || {}).referred_signups),
+        "",
+        `${fmtNum((u.referrals || {}).codes_issued)} codes · ${fmtNum((u.referrals || {}).rewards_granted)} rewards`
+      ),
     ].join("");
   }
 

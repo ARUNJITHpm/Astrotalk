@@ -21,6 +21,7 @@ from app.modules.identity.schemas import (
     PasswordReset,
     PasswordResetVerify,
     ProfileOut,
+    ReferralSummary,
     UserCreate,
     UserOut,
 )
@@ -115,6 +116,9 @@ async def onboard_user(data: UserCreate, session: SessionDep) -> AuthResponse:
     user = await _service.create_user(session, data)
     natal_json = await _compute_natal_chart(user)
     await _service.save_chart(session, user.id, natal_json)
+    if data.ref:
+        # Chart saved above = onboarding complete = the referral activates now.
+        await _service.record_referral(session, data.ref, user.id)
     result = await _auth_response(session, user)
     await session.commit()
     return result
@@ -205,6 +209,23 @@ async def logout(
 async def me(user: CurrentUser) -> User:
     """The logged-in user's display profile (name only, no birth data)."""
     return user
+
+
+@router.get("/referral", response_model=ReferralSummary)
+async def my_referral(user: CurrentUser, session: SessionDep) -> ReferralSummary:
+    """The logged-in user's referral panel: code, link, progress, reward.
+
+    Minting the code is lazy — first open creates it. The share link lands on
+    the login page with ``?ref=`` prefilled; friends registering through it
+    are credited automatically.
+    """
+    summary = await _service.referral_summary(session, user.id)
+    await session.commit()
+    base = get_settings().public_base_url.rstrip("/")
+    return ReferralSummary(
+        share_link=f"{base}/ui/login?ref={summary['code']}",
+        **summary,
+    )
 
 
 @router.post("/recompute-chart", response_model=ChartOut)

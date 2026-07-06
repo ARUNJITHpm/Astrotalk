@@ -1,33 +1,72 @@
 """HTTP routes for the content module.
 
-Two access levels:
+Access levels:
   - POST /content/run-daily — the scheduled trigger (X-Cron-Token; an external
     scheduler like GitHub Actions cron fires it each morning).
   - /content/posts...      — the review/approve/publish surface for the /admin
     Content tab (X-Admin-Token).
+  - POST /content/cards     — personal share cards (logged-in users).
+  - GET /content/cards/daily/{nakshatra} + GET /s/{slug} — public virality
+    surfaces (Part 2): cacheable daily cards and the OG-tagged landing page.
 """
 
+import html as html_lib
 from datetime import date
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi.responses import HTMLResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.platform.admin_auth import AdminGuard
-from app.modules.content.schemas import ApprovePayload, ContentPostOut, RunDailySummary
+from app.modules.content import share_cards
+from app.modules.content.models import ShareCard
+from app.modules.content.schemas import (
+    ApprovePayload,
+    ContentPostOut,
+    RunDailySummary,
+    ShareCardCreate,
+    ShareCardOut,
+)
 from app.modules.content.service import (
     ContentPostNotFound,
     ContentService,
     InvalidTransition,
 )
+from app.modules.identity.auth import CurrentUser
+from app.modules.identity.service import IdentityService
+from app.platform.admin_auth import AdminGuard
+from app.platform.config import get_settings
 from app.platform.cron_auth import CronOrAdminGuard
 from app.platform.db import get_session
+from app.platform.storage import get_storage
 
 router = APIRouter(prefix="/content", tags=["content"])
 
+# Root-level share surface (/s/{slug}) — same module, no /content prefix so
+# links stay short enough for a WhatsApp caption.
+share_router = APIRouter(tags=["content"])
+
 _service = ContentService()
+_identity = IdentityService()
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
+
+
+def _public_base(request: Request) -> str:
+    configured = get_settings().public_base_url.rstrip("/")
+    return configured or str(request.base_url).rstrip("/")
+
+
+def _card_out(card: ShareCard, request: Request) -> ShareCardOut:
+    base = _public_base(request)
+    return ShareCardOut(
+        slug=card.slug,
+        kind=card.kind,
+        title=card.title,
+        media_url=get_storage().url(card.media_key),
+        share_url=f"{base}/s/{card.slug}",
+        hits=card.hits,
+    )
 
 
 @router.post(
@@ -81,3 +120,113 @@ async def publish_post(session: SessionDep, post_id: int) -> ContentPostOut:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Post not found")
     except InvalidTransition as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, detail=str(exc))
+
+
+# ---- Share cards (GROWTH_PLAN.md Part 2) ----
+
+
+@router.post(
+    "/cards",
+    response_model=ShareCardOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Render a personal share card for the logged-in user",
+)
+async def create_card(
+    payload: ShareCardCreate, user: CurrentUser, session: SessionDep, request: Request
+) -> ShareCardOut:
+    """The insight → a branded PNG + a /s link whose CTA carries the user's
+    referral code (sharing IS the referral loop's top of funnel)."""
+    if payload.template not in ("feed", "story"):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Unknown template")
+    if not payload.body.strip():
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Empty card body")
+    ref = await _identity.get_or_create_referral_code(session, user.id)
+    try:
+        card = await share_cards.create_personal_card(
+            session,
+            user_id=user.id,
+            ref_code=ref.code,
+            title=payload.title,
+            body=payload.body,
+            template=payload.template,
+        )
+    except share_cards.ToneViolation:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="This text cannot be turned into a public card",
+        )
+    await session.commit()
+    return _card_out(card, request)
+
+
+@router.get(
+    "/cards/daily/{nakshatra}",
+    response_model=ShareCardOut,
+    summary="Public daily card for one nakshatra (name or index 0-26)",
+)
+async def daily_card(nakshatra: str, session: SessionDep, request: Request) -> ShareCardOut:
+    try:
+        card = await share_cards.get_or_create_daily_card(session, nakshatra)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc))
+    await session.commit()
+    return _card_out(card, request)
+
+
+_LANDING_HTML = """<!doctype html>
+<html lang="ml">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{title} · Tara</title>
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Tara">
+<meta property="og:title" content="{title}">
+<meta property="og:description" content="{description}">
+<meta property="og:image" content="{image}">
+<meta property="og:url" content="{url}">
+<meta name="twitter:card" content="summary_large_image">
+<style>
+  body {{ margin:0; background:#0b0f2a; color:#f5f1e8; font-family:system-ui,sans-serif;
+         min-height:100vh; display:flex; flex-direction:column; align-items:center;
+         justify-content:center; gap:24px; padding:24px; box-sizing:border-box; }}
+  img {{ max-width:min(420px,92vw); border-radius:16px; box-shadow:0 12px 48px rgba(0,0,0,.5); }}
+  a.cta {{ background:#e8b64c; color:#0b0f2a; font-weight:700; text-decoration:none;
+           padding:14px 28px; border-radius:999px; font-size:16px; }}
+  p {{ color:#9aa3c4; font-size:13px; margin:0; }}
+</style>
+</head>
+<body>
+  <img src="{image}" alt="{title}">
+  <a class="cta" href="{cta}">നിങ്ങളുടെ സ്വന്തം reading നേടൂ ✨</a>
+  <p>Tara · AI ജ്യോതിഷ സഹായി</p>
+</body>
+</html>"""
+
+
+@share_router.get("/s/{slug}", include_in_schema=False, response_class=HTMLResponse)
+async def share_landing(slug: str, session: SessionDep, request: Request) -> HTMLResponse:
+    """The link a shared card unfurls to: OG image + a get-your-own CTA.
+
+    Every view bumps the card's durable hit counter — the plan's
+    "shares clicked" metric.
+    """
+    card = await share_cards.get_card(session, slug)
+    if card is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Card not found")
+    await share_cards.record_hit(session, card)
+    await session.commit()
+
+    base = _public_base(request)
+    media_url = get_storage().url(card.media_key)
+    image = media_url if media_url.startswith("http") else f"{base}{media_url}"
+    cta = f"{base}/ui/login?ref={card.ref_code}" if card.ref_code else f"{base}/ui"
+    description = " ".join(card.body.split())[:140]
+    page = _LANDING_HTML.format(
+        title=html_lib.escape(card.title),
+        description=html_lib.escape(description),
+        image=html_lib.escape(image),
+        url=html_lib.escape(f"{base}/s/{card.slug}"),
+        cta=html_lib.escape(cta),
+    )
+    return HTMLResponse(page, headers={"Cache-Control": "no-cache"})

@@ -40,6 +40,7 @@ from app.modules.chat.router import router as chat_router
 from app.modules.commerce.router import router as commerce_router
 from app.modules.community.router import router as community_router
 from app.modules.content.router import router as content_router
+from app.modules.content.router import share_router as content_share_router
 from app.modules.identity.router import router as identity_router
 from app.modules.knowledge.router import router as knowledge_router
 from app.modules.notifications.router import router as notifications_router
@@ -75,6 +76,7 @@ for router in (
     tone_safety_router,
     chat_router,
     content_router,
+    content_share_router,
     temples_router,
     whatsapp_router,
     community_router,

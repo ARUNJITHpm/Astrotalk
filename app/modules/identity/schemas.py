@@ -20,6 +20,19 @@ class UserCreate(BaseModel):
     dob: date
     birth_time: time | None = None
     birth_place: str
+    # Referral code the signup arrived with (?ref= on the login page). Optional
+    # and best-effort — a stale/unknown code never fails registration.
+    ref: str | None = None
+
+
+class ReferralSummary(BaseModel):
+    """The logged-in user's referral panel (GROWTH_PLAN.md Part 2)."""
+
+    code: str
+    share_link: str
+    activated: int
+    threshold: int
+    reward_granted: bool
 
 
 class LoginRequest(BaseModel):

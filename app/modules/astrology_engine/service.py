@@ -67,6 +67,16 @@ class AstrologyEngineService:
         """Panchangam for the day: nakshatram, nalla neram, tithi."""
         return await self._client.panchangam(day or date.today())
 
+    def nakshatra_names(self) -> list[str]:
+        """The 27 Malayalam nakshatra names, in canonical order.
+
+        Public so other modules (content's daily nakshatra cards) can validate
+        and enumerate stars without importing this module's internals.
+        """
+        from app.modules.astrology_engine.swiss_ephemeris import NAKSHATRAS
+
+        return list(NAKSHATRAS)
+
     async def get_prashna_chart(
         self,
         when: datetime | None = None,

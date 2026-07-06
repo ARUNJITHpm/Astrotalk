@@ -239,7 +239,10 @@
       const res = await fetch("/identity/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, password, name, dob, birth_time, birth_place }),
+        body: JSON.stringify({
+          phone, password, name, dob, birth_time, birth_place,
+          ref: new URLSearchParams(window.location.search).get("ref") || null,
+        }),
       });
       // Already registered → send them to login with the number pre-filled.
       if (res.status === 409) {
