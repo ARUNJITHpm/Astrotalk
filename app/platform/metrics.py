@@ -33,6 +33,10 @@ _totals = {
     "total_tokens": 0,
 }
 
+# Generic named event counters (e.g. "content.posts_drafted") — any module may
+# increment; the admin dashboard shows them as-is.
+_counters: dict[str, int] = defaultdict(int)
+
 # Per-provider and per-model breakdowns: name -> {calls, prompt, completion, total}.
 _by_provider: dict[str, dict[str, int]] = defaultdict(
     lambda: {"calls": 0, "prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
@@ -69,6 +73,15 @@ def record_llm_usage(
                 row["prompt_tokens"] += prompt
                 row["completion_tokens"] += completion
                 row["total_tokens"] += total
+    except Exception:  # pragma: no cover - metrics must never break the caller
+        pass
+
+
+def increment(name: str, n: int = 1) -> None:
+    """Bump a named event counter. Never raises (same contract as recording)."""
+    try:
+        with _lock:
+            _counters[name] += n
     except Exception:  # pragma: no cover - metrics must never break the caller
         pass
 
@@ -142,4 +155,5 @@ def snapshot() -> dict:
             "totals": totals_priced,
             "by_provider": by_provider_priced,
             "by_model": by_model_priced,
+            "counters": dict(_counters),
         }

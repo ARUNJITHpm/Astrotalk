@@ -378,6 +378,7 @@
     <div class="tabs">
       <button class="tab-btn active" onclick="switchTab('dashboard')" id="tab-dashboard">📊 Dashboard</button>
       <button class="tab-btn" onclick="switchTab('explorer')" id="tab-explorer">💬 User Chats</button>
+      <button class="tab-btn" onclick="switchTab('content')" id="tab-content">📰 Content</button>
     </div>
 
     <div id="banner" class="banner hidden"></div>
@@ -439,6 +440,12 @@
           <h3>By provider</h3>
           <div class="hbars" id="providerBars"></div>
           <div id="providerEmpty" class="empty hidden" style="color: var(--muted); font-size: 13px;">No LLM calls recorded yet.</div>
+        </div>
+
+        <div class="card">
+          <h3>Events (since restart)</h3>
+          <div class="hbars" id="counterBars"></div>
+          <div id="counterEmpty" class="empty hidden" style="color: var(--muted); font-size: 13px;">No events recorded yet — counters like content drafts/publishes appear here.</div>
         </div>
       </div>
 
@@ -513,6 +520,23 @@
           </div>
         </section>
 
+      </div>
+    </div>
+
+    <!-- VIEW 3: CONTENT (daily pack: review → approve → publish) -->
+    <div id="view-content" class="hidden">
+      <div class="status-section">
+        <h2 style="font-size: 15px; margin: 0; font-family: var(--display); color: #fff;">Daily content pack</h2>
+        <div class="row-actions">
+          <input type="date" id="contentDate" class="btn" style="color-scheme: dark;" onchange="loadContent()" />
+          <button class="btn" onclick="generatePack()" id="generateBtn">✨ Generate pack</button>
+          <button class="btn" onclick="loadContent()">↻ Reload</button>
+        </div>
+      </div>
+      <div id="contentStatus" class="banner hidden"></div>
+      <div class="grid2" id="contentPosts"></div>
+      <div id="contentEmpty" class="empty hidden" style="color: var(--muted); font-size: 13px; padding: 30px 0; text-align: center;">
+        No posts for this date yet — hit ✨ Generate pack (drafts are created; nothing publishes without your approval).
       </div>
     </div>
   </div>

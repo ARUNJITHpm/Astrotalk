@@ -44,3 +44,24 @@ async def require_cron(
 
 
 CronGuard = Depends(require_cron)
+
+
+async def require_cron_or_admin(
+    x_cron_token: Annotated[str | None, Header()] = None,
+    x_admin_token: Annotated[str | None, Header()] = None,
+) -> None:
+    """Accept EITHER credential: the scheduler's cron token or an admin's token.
+
+    Lets the /admin dashboard offer a manual "generate now" button for the
+    same endpoints the scheduler fires, without sharing the cron secret."""
+    from app.platform.admin_auth import require_admin
+
+    try:
+        await require_cron(x_cron_token)
+        return
+    except HTTPException:
+        pass
+    await require_admin(x_admin_token)
+
+
+CronOrAdminGuard = Depends(require_cron_or_admin)

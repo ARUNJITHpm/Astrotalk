@@ -107,7 +107,7 @@
   window.switchTab = function (tab) {
     currentTab = tab;
 
-    ["dashboard", "explorer"].forEach((t) => {
+    ["dashboard", "explorer", "content"].forEach((t) => {
       const btn = $("tab-" + t);
       const view = $("view-" + t);
       if (t === tab) {
@@ -121,6 +121,9 @@
 
     if (tab === "explorer" && !chatUsers.length) {
       loadChatUsers();
+    }
+    if (tab === "content" && !contentLoaded) {
+      loadContent();
     }
   };
 
@@ -196,6 +199,7 @@
     renderChatTrend(d.chat);
     renderModelUsageTable(d.llm);
     renderProviders(d.llm);
+    renderCounters(d.llm);
     renderTopUsers(d.chat);
     renderRecent(d.users);
   }
@@ -307,6 +311,23 @@
         const metaStr = `<span>${fmtNum(v.calls)} calls · ${fmtNum(v.prompt_tokens)} in / ${fmtNum(v.completion_tokens)} out</span>${costStr}`;
         return hbar(name, v.total_tokens || 0, max, metaStr);
       })
+      .join("");
+  }
+
+  function renderCounters(llm) {
+    const counters = (llm && llm.counters) || {};
+    const rows = Object.entries(counters);
+    const wrap = $("counterBars");
+    if (!rows.length) {
+      wrap.innerHTML = "";
+      $("counterEmpty").classList.remove("hidden");
+      return;
+    }
+    $("counterEmpty").classList.add("hidden");
+    const max = Math.max(...rows.map(([, v]) => v), 1);
+    wrap.innerHTML = rows
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, v]) => hbar(name, v, max))
       .join("");
   }
 
@@ -626,6 +647,129 @@
       "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
     }[ch]));
   }
+
+  // ---- Content tab (daily pack: review → approve → publish) ----
+
+  let contentLoaded = false;
+
+  const PLATFORM_LABELS = {
+    wa_channel: "🟢 WhatsApp Channel",
+    fb_post: "🔵 Facebook Post",
+    ig_reel: "🟣 Instagram Reel",
+    yt_short: "🔴 YouTube Short",
+  };
+
+  const STATUS_COLORS = { draft: "#8a93b8", approved: "#e8b64c", published: "#4caf82", failed: "#e05c6a" };
+
+  function contentBanner(msg, isError) {
+    const el = $("contentStatus");
+    if (!msg) { el.classList.add("hidden"); return; }
+    el.textContent = msg;
+    el.style.color = isError ? "var(--danger, #e05c6a)" : "";
+    el.classList.remove("hidden");
+  }
+
+  function contentDateValue() {
+    const el = $("contentDate");
+    if (!el.value) el.value = new Date().toISOString().slice(0, 10);
+    return el.value;
+  }
+
+  window.loadContent = async function () {
+    contentLoaded = true;
+    const day = contentDateValue();
+    const grid = $("contentPosts");
+    grid.innerHTML = "";
+    contentBanner("");
+    try {
+      const res = await fetch(`/content/posts?day=${day}`, { headers: authHeaders() });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const posts = await res.json();
+      $("contentEmpty").classList.toggle("hidden", posts.length > 0);
+      grid.innerHTML = posts.map(renderContentPost).join("");
+    } catch (err) {
+      contentBanner("Could not load posts: " + err.message, true);
+    }
+  };
+
+  function renderContentPost(p) {
+    const label = PLATFORM_LABELS[p.platform] || p.platform;
+    const statusColor = STATUS_COLORS[p.status] || "var(--muted)";
+    const canApprove = p.status === "draft" || p.status === "approved";
+    const canPublish = p.status === "approved";
+    const media = p.media_url
+      ? `<a href="${escapeHtml(p.media_url)}" target="_blank" rel="noopener">
+           <img src="${escapeHtml(p.media_url)}" alt="card" style="max-width: 120px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.12);" />
+         </a>`
+      : "";
+    const meta = p.status === "published" && p.external_id
+      ? `<span class="meta-badge">id ${escapeHtml(p.external_id)} · ${relTime(p.published_at)}</span>`
+      : "";
+    return `<div class="card" id="post-${p.id}">
+      <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;">
+        <h3 style="margin: 0;">${label}</h3>
+        <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: ${statusColor};">${escapeHtml(p.status)}</span>
+      </div>
+      <div style="display: flex; gap: 12px; margin-top: 10px; align-items: flex-start;">
+        ${media}
+        <textarea id="body-${p.id}" ${canApprove ? "" : "readonly"}
+          style="flex: 1; min-height: 130px; background: rgba(255,255,255,0.04); color: var(--ink, #dde3f5);
+                 border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 10px; font-size: 13px;
+                 font-family: inherit; resize: vertical;">${escapeHtml(p.body)}</textarea>
+      </div>
+      <div class="row-actions" style="margin-top: 10px; display: flex; gap: 8px; align-items: center;">
+        ${canApprove ? `<button class="btn" onclick="approvePost(${p.id})">✓ Approve${p.status === "approved" ? "d (re-save)" : ""}</button>` : ""}
+        ${canPublish ? `<button class="btn" onclick="publishPost(${p.id})">🚀 Publish</button>` : ""}
+        ${meta}
+      </div>
+    </div>`;
+  }
+
+  window.generatePack = async function () {
+    const day = contentDateValue();
+    const btn = $("generateBtn");
+    btn.disabled = true;
+    contentBanner("Generating drafts — panchangam + LLM + cards…");
+    try {
+      const res = await fetch(`/content/run-daily?day=${day}`, { method: "POST", headers: authHeaders() });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const summary = await res.json();
+      contentBanner(summary.created.length
+        ? `Created drafts: ${summary.created.join(", ")}`
+        : "All platforms already have posts for this date.");
+      await loadContent();
+    } catch (err) {
+      contentBanner("Generation failed: " + err.message, true);
+    } finally {
+      btn.disabled = false;
+    }
+  };
+
+  window.approvePost = async function (id) {
+    try {
+      const body = $("body-" + id).value;
+      const res = await fetch(`/content/posts/${id}/approve`, {
+        method: "POST", headers: authHeaders(), body: JSON.stringify({ body }),
+      });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      await loadContent();
+    } catch (err) {
+      contentBanner("Approve failed: " + err.message, true);
+    }
+  };
+
+  window.publishPost = async function (id) {
+    if (!confirm("Publish this post to its platform?")) return;
+    try {
+      const res = await fetch(`/content/posts/${id}/publish`, { method: "POST", headers: authHeaders() });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const post = await res.json();
+      contentBanner(post.status === "published" ? "Published ✓" : "Publish FAILED — see server logs.", post.status !== "published");
+      await loadContent();
+    } catch (err) {
+      contentBanner("Publish failed: " + err.message, true);
+    }
+  };
 
   boot();
 })();

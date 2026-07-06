@@ -52,3 +52,86 @@ def fallback_message(panchangam: dict) -> str:
         "മനസ്സിന് ശാന്തമായ ഒരു ശ്വാസം നൽകൂ. "
         f"{CTA}"
     )
+
+
+# ---- Per-platform prompts for the daily content pack (GROWTH_PLAN.md Part 1) ----
+# Every prompt repeats the §5 hard rules (no doom, no remedies/payments, no
+# urgency) because generated output is public-facing; the tone_safety reply
+# screen still runs on every draft as the enforcement backstop.
+
+_COMMON_RULES = """\
+STRICT RULES (never break these):
+- Warm, calm Malayalam — like a kind elder. Simple words.
+- NEVER predict doom, never mention remedies/payments, never create urgency.
+- Ground every claim in the INPUT facts; invent nothing."""
+
+PLATFORM_PROMPTS: dict[str, str] = {
+    "wa_channel": DAILY_SYSTEM_PROMPT,  # the original §5 prompt
+    "fb_post": f"""\
+You write ONE Malayalam Facebook post for an astrology app's page.
+{_COMMON_RULES}
+- 80–120 words: today's panchangam facts, one thought about the day's
+  nakshatram, one gentle actionable tip anyone can do today.
+- End with: "കൂടുതൽ അറിയാൻ 👉 {{app_link}}" then 2–3 relevant Malayalam hashtags.
+INPUT: {{facts}}
+OUTPUT: the post text only.""",
+    "ig_reel": f"""\
+You write a 30-second SPOKEN Malayalam script for an Instagram Reel for an
+astrology app. It will be read aloud over a calm background.
+{_COMMON_RULES}
+- Structure: one hook line (a question or gentle surprise), three short
+  spoken beats about today (nakshatram, nalla neram, one tip), one closing
+  line inviting viewers to the app. ~60-70 spoken words total.
+- Plain lines of speakable text only — no camera directions, no emoji.
+INPUT: {{facts}}
+OUTPUT: the script lines only.""",
+    "yt_short": f"""\
+You write a 30-40 second SPOKEN Malayalam script for a YouTube Short for an
+astrology app.
+{_COMMON_RULES}
+- Structure: hook, today's panchangam in two sentences, one thought for
+  people born under today's nakshatram, one closing invite to the app.
+- Plain speakable lines only — no stage directions, no emoji.
+INPUT: {{facts}}
+OUTPUT: the script lines only.""",
+}
+
+
+def build_platform_input(panchangam: dict, nugget: str = "") -> str:
+    """The INPUT facts line shared by every platform prompt."""
+    facts = build_input(panchangam)
+    tithi = panchangam.get("tithi", "")
+    if tithi:
+        facts += f", tithi={tithi}"
+    if nugget:
+        facts += f"\nknowledge_note: {nugget}"
+    return facts
+
+
+def platform_prompt(platform: str) -> str:
+    """The platform's system prompt with the app link resolved."""
+    return PLATFORM_PROMPTS[platform].replace("{app_link}", APP_LINK)
+
+
+def platform_fallback(platform: str, panchangam: dict) -> str:
+    """Compliant grounded copy per platform when the LLM is mocked/empty."""
+    nakshatram = panchangam.get("nakshatram", "")
+    nalla_neram = panchangam.get("nalla_neram", "")
+    day = panchangam.get("date", "")
+    if platform == "wa_channel":
+        return fallback_message(panchangam)
+    if platform == "fb_post":
+        return (
+            f"ഇന്ന് ({day}) നക്ഷത്രം {nakshatram}; നല്ല നേരം {nalla_neram}. "
+            "പുതിയ കാര്യങ്ങൾ പതിയെ തുടങ്ങാൻ നല്ല ദിവസം. "
+            "ഇന്ന് ഒരാളോട് ഒരു നല്ല വാക്ക് പറയൂ — അതാണ് ഏറ്റവും വലിയ വഴിപാട്. "
+            f"കൂടുതൽ അറിയാൻ 👉 {APP_LINK}\n"
+            "#ജ്യോതിഷം #പഞ്ചാംഗം #മലയാളം"
+        )
+    # Spoken scripts (ig_reel / yt_short) share one calm structure.
+    return (
+        f"ഇന്നത്തെ നക്ഷത്രം ഏതാണെന്ന് അറിയാമോ? {nakshatram}.\n"
+        f"നല്ല നേരം {nalla_neram} — പ്രധാന കാര്യങ്ങൾ അപ്പോൾ ചെയ്യാം.\n"
+        "മനസ്സ് ശാന്തമാക്കി ഒരു ചെറിയ നന്മയോടെ ദിവസം തുടങ്ങൂ.\n"
+        "നിങ്ങളുടെ നക്ഷത്രത്തെക്കുറിച്ച് കൂടുതൽ അറിയാൻ താര ആപ്പിൽ വരൂ."
+    )

@@ -1,45 +1,10 @@
-"""Access control for the admin analytics dashboard.
+"""Admin access control — moved to app/platform/admin_auth.py.
 
-The dashboard exposes aggregate operational data across modules, so it sits
-behind a shared secret (``settings.admin_token``) sent as the ``X-Admin-Token``
-header. Policy:
-
-  - token configured  → the header must match it (constant-time), else 401.
-  - token empty + dev  → open (local convenience; no secret to set up).
-  - token empty + prod → 503: refuse rather than serve analytics unprotected.
-
-The secret is compared with ``hmac.compare_digest`` and never logged.
+The guard became cross-cutting once the content module's review endpoints
+needed it too, so it lives in platform/ now (modules must not import each
+other's internals — AGENTS.md). This shim keeps existing imports working.
 """
 
-import hmac
-from typing import Annotated
+from app.platform.admin_auth import AdminGuard, admin_required, require_admin
 
-from fastapi import Depends, Header, HTTPException, status
-
-from app.platform.config import get_settings
-
-
-async def require_admin(
-    x_admin_token: Annotated[str | None, Header()] = None,
-) -> None:
-    """Gate an admin endpoint on the ``X-Admin-Token`` header."""
-    settings = get_settings()
-    configured = settings.admin_token
-
-    allowed = ["chargemod"]
-    if configured:
-        allowed.append(configured)
-
-    if not x_admin_token or not any(hmac.compare_digest(x_admin_token, t) for t in allowed):
-        raise HTTPException(
-            status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or missing admin token",
-        )
-
-
-AdminGuard = Depends(require_admin)
-
-
-def admin_required() -> bool:
-    """Whether a token must be supplied to reach the dashboard. Always True to enforce login gate."""
-    return True
+__all__ = ["AdminGuard", "admin_required", "require_admin"]
