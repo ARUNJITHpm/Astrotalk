@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="ml">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>താര ✦ — ജ്യോതിഷ സംഭാഷണം</title>
+  <link rel="stylesheet" href="/static/ui/tara-ui.css" />
+</head>
+<body data-case="default">
+  <canvas id="starfield"></canvas>
+  <div class="aurora"></div>
+  <div class="grain"></div>
+  <div id="cursor-dot"></div>
+  <div id="cursor-ring"></div>
+
+  <div class="chat-app">
+    <!-- ============ SIDEBAR ============ -->
+    <aside class="side">
+      <div class="side-logo">
+        <span class="star">✦</span> താര <small>JYOTHISHAM</small>
+      </div>
+      <button class="btn new-chat" id="new-chat">＋ &nbsp;പുതിയ സംഭാഷണം</button>
+
+      <div class="side-section">സംഭാഷണങ്ങൾ</div>
+      <div class="history" id="history"></div>
+      <div class="history-empty" id="history-empty">ആദ്യ ചോദ്യം ചോദിക്കൂ ✨</div>
+
+      <div class="memory-panel" id="memory-panel" hidden>
+        <button class="memory-toggle" id="memory-toggle" aria-expanded="false">
+          <span>🧠 താര ഓർക്കുന്നത്</span><span>▾</span>
+        </button>
+        <ul class="memory-facts" id="memory-facts" hidden></ul>
+      </div>
+
+      <div class="side-user">
+        <div class="side-avatar" id="side-avatar">✦</div>
+        <div class="side-user-meta" id="side-user-meta">
+          <div class="side-user-name" id="side-user-name">—</div>
+          <div class="side-user-phone" id="side-user-phone"></div>
+        </div>
+        <button class="side-logout" id="logout-btn" title="ലോഗ്ഔട്ട്">⏻</button>
+      </div>
+    </aside>
+
+    <!-- ============ MAIN ============ -->
+    <main class="main">
+      <!-- case-morphing top banner: icon/title/accent change per context -->
+      <header class="topbar" id="topbar">
+        <div class="case-badge" id="case-badge">✦</div>
+        <div class="case-meta" id="case-meta">
+          <div class="case-title" id="case-title">താര</div>
+          <div class="case-sub" id="case-sub">നിങ്ങളുടെ ജ്യോതിഷ കൂട്ടുകാരി</div>
+        </div>
+        <div class="top-actions">
+          <div class="panchang-strip" id="panchang-strip" hidden></div>
+          <select class="model-select" id="model-select" title="AI മോഡൽ">
+            <option value="sarvam">Sarvam</option>
+            <option value="sarvam-fast">Sarvam Fast</option>
+            <option value="openai">OpenAI</option>
+          </select>
+          <button class="btn btn-icon" id="chart-open" title="എന്റെ ജാതകം" data-magnetic>🪔</button>
+        </div>
+      </header>
+
+      <!-- messages -->
+      <div class="messages" id="messages-scroll">
+        <div class="messages-inner" id="messages"></div>
+      </div>
+      <button class="jump-latest" id="jump-latest" hidden>⬇ &nbsp;പുതിയ മറുപടിയിലേക്ക്</button>
+
+      <!-- composer -->
+      <div class="composer">
+        <form class="composer-inner" id="composer-form">
+          <textarea id="input" rows="1" placeholder="താരയോട് ചോദിക്കൂ… (Enter അയയ്ക്കാൻ)"></textarea>
+          <button type="button" class="btn btn-icon" id="prashnam-open" title="പ്രശ്നം ചോദിക്കൂ">🪷</button>
+          <button type="button" class="btn btn-icon" id="porutham-open" title="പൊരുത്തം നോക്കൂ">💑</button>
+          <button type="submit" class="btn btn-icon btn-aurora" id="send" title="അയയ്ക്കൂ" data-magnetic>➤</button>
+        </form>
+        <div class="composer-hint">താര ഒരു AI ആണ് — പ്രധാന തീരുമാനങ്ങൾക്ക് വിദഗ്ധരെ സമീപിക്കൂ 🙏</div>
+      </div>
+    </main>
+  </div>
+
+  <!-- ============ CHART DRAWER ============ -->
+  <div class="drawer-backdrop" id="chart-backdrop" hidden></div>
+  <aside class="drawer" id="chart-drawer" aria-label="ജാതകം">
+    <div class="drawer-head">
+      <span style="font-size:22px">🪔</span>
+      <h3>എന്റെ ജാതകം</h3>
+      <button class="modal-close" id="chart-close" style="position:static">✕</button>
+    </div>
+    <div class="drawer-body" id="chart-body">
+      <div class="muted" style="text-align:center;padding:40px 0">ജാതകം ലോഡ് ചെയ്യുന്നു…</div>
+    </div>
+  </aside>
+
+  <!-- ============ PRASHNAM MODAL ============ -->
+  <div class="modal-backdrop" id="prashnam-modal" hidden>
+    <div class="modal glass">
+      <button class="modal-close" id="prashnam-close">✕</button>
+      <div class="eyebrow">🪷 പ്രശ്നം</div>
+      <h2 class="display" style="font-size:26px;margin-top:8px">മനസ്സിലെ ചോദ്യം ചോദിക്കൂ</h2>
+      <div class="field" style="margin-top:16px">
+        <label for="prashnam-question">നിങ്ങളുടെ ചോദ്യം</label>
+        <textarea id="prashnam-question" rows="2" placeholder="ഉദാ: ഈ ജോലി മാറ്റം എനിക്ക് ഗുണകരമാകുമോ?"></textarea>
+      </div>
+
+      <div class="prashnam-modes">
+        <button type="button" class="prashnam-mode active" data-mode="swarna">
+          <span class="ico">🌕</span>സ്വർണ പ്രശ്നം
+        </button>
+        <button type="button" class="prashnam-mode" data-mode="thamboola">
+          <span class="ico">🍃</span>താംബൂലം
+        </button>
+        <button type="button" class="prashnam-mode" data-mode="sankhya">
+          <span class="ico">🔢</span>സംഖ്യ
+        </button>
+      </div>
+
+      <div class="prashnam-pane" id="prashnam-swarna">
+        <p class="muted" style="font-size:13.5px">
+          മനസ്സിൽ ചോദ്യം ധ്യാനിച്ച്, തോന്നുന്ന ഒരു കളത്തിൽ തൊടൂ — അതാണ് നിങ്ങളുടെ ആരൂഢം.
+        </p>
+        <div class="arudha-grid" id="arudha-grid"></div>
+      </div>
+
+      <div class="prashnam-pane hidden" id="prashnam-thamboola">
+        <p class="muted" style="font-size:13.5px">
+          കയ്യിലെടുത്ത വെറ്റിലകളുടെ എണ്ണം പറയൂ (1–108).
+        </p>
+        <div class="inline">
+          <input id="leaf-count" type="number" min="1" max="108" placeholder="വെറ്റിലകളുടെ എണ്ണം"
+            style="background:rgba(6,6,18,.55);border:1px solid var(--line);border-radius:12px;color:var(--ink);padding:13px 16px;font:500 15px var(--font-body);outline:none" />
+          <button type="button" class="btn btn-aurora" id="thamboola-send">ചോദിക്കൂ</button>
+        </div>
+      </div>
+
+      <div class="prashnam-pane hidden" id="prashnam-sankhya">
+        <p class="muted" style="font-size:13.5px">
+          1 മുതൽ 108 വരെയുള്ള ഒരു സംഖ്യ മനസ്സിൽ കണ്ട് പറയൂ.
+        </p>
+        <div class="inline">
+          <input id="sankhya-number" type="number" min="1" max="108" placeholder="നിങ്ങളുടെ സംഖ്യ"
+            style="background:rgba(6,6,18,.55);border:1px solid var(--line);border-radius:12px;color:var(--ink);padding:13px 16px;font:500 15px var(--font-body);outline:none" />
+          <button type="button" class="btn btn-aurora" id="sankhya-send">ചോദിക്കൂ</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ PORUTHAM MODAL ============ -->
+  <div class="modal-backdrop" id="porutham-modal" hidden>
+    <div class="modal glass">
+      <button class="modal-close" id="porutham-close">✕</button>
+      <div class="eyebrow">💑 പൊരുത്തം</div>
+      <h2 class="display" style="font-size:26px;margin-top:8px">പങ്കാളിയുടെ വിവരങ്ങൾ</h2>
+      <p class="muted" style="font-size:13.5px;margin-top:8px">
+        നിങ്ങളുടെ ജാതകം ഒരു വശം — പങ്കാളിയുടെ ജനനവിവരങ്ങളിൽ നിന്ന് മറുവശം
+        കണക്കാക്കി, പരമ്പരാഗത <strong>പത്ത് പൊരുത്തങ്ങൾ</strong> നോക്കും.
+      </p>
+      <div class="prashnam-modes modes-2">
+        <button type="button" class="prashnam-mode porutham-sex active" data-gender="female">
+          <span class="ico">👰</span>പങ്കാളി — സ്ത്രീ
+        </button>
+        <button type="button" class="prashnam-mode porutham-sex" data-gender="male">
+          <span class="ico">🤵</span>പങ്കാളി — പുരുഷൻ
+        </button>
+      </div>
+      <div class="auth-form" style="gap:14px">
+        <div class="field">
+          <label for="porutham-name">പേര് <span class="muted">(ഓപ്ഷണൽ)</span></label>
+          <input id="porutham-name" type="text" placeholder="പങ്കാളിയുടെ പേര്" />
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label for="porutham-dob">ജനന തീയതി</label>
+            <input id="porutham-dob" type="date" />
+          </div>
+          <div class="field">
+            <label for="porutham-time">സമയം <span class="muted">(ഓപ്ഷണൽ)</span></label>
+            <input id="porutham-time" type="time" />
+          </div>
+        </div>
+        <div class="field">
+          <label for="porutham-place">ജനന സ്ഥലം</label>
+          <input id="porutham-place" type="text" placeholder="ഉദാ: തൃശ്ശൂർ, കേരളം" />
+        </div>
+        <div class="form-error hidden" id="porutham-error"></div>
+        <button type="button" class="btn btn-aurora" id="porutham-send">പൊരുത്തം നോക്കൂ 💫</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ PROFILE MODAL ============ -->
+  <div class="modal-backdrop" id="profile-modal" hidden>
+    <div class="modal glass">
+      <button class="modal-close" id="profile-close">✕</button>
+      <div class="pf-head">
+        <div class="pf-avatar" id="pf-avatar">✦</div>
+        <div>
+          <div style="font:600 20px var(--font-display)" id="pf-name">—</div>
+          <div class="muted" style="font-size:13px" id="pf-phone">—</div>
+        </div>
+      </div>
+      <div class="pf-rows">
+        <div class="pf-row"><span class="k">ജനന തീയതി</span><span class="v" id="pf-dob">—</span></div>
+        <div class="pf-row"><span class="k">ജനന സമയം</span><span class="v" id="pf-time">—</span></div>
+        <div class="pf-row"><span class="k">ജനന സ്ഥലം</span><span class="v" id="pf-place">—</span></div>
+        <div class="pf-row"><span class="k">ജന്മനക്ഷത്രം</span><span class="v gold" id="pf-star">…</span></div>
+        <div class="pf-row"><span class="k">ജന്മരാശി</span><span class="v gold" id="pf-rasi">…</span></div>
+        <div class="pf-row"><span class="k">ലഗ്നം</span><span class="v gold" id="pf-lagnam">…</span></div>
+        <div class="pf-row"><span class="k">ഇപ്പോഴത്തെ ദശ</span><span class="v gold" id="pf-dasha">…</span></div>
+      </div>
+      <button class="btn btn-aurora" id="pf-chart" style="margin-top:20px;width:100%">🪔 &nbsp;പൂർണ്ണ ജാതകം കാണൂ</button>
+      <button class="btn" id="profile-logout" style="margin-top:10px;width:100%">⏻ &nbsp;ലോഗ്ഔട്ട്</button>
+    </div>
+  </div>
+
+  <script src="/static/ui/starfield.js"></script>
+  <script src="/static/ui/chart.js"></script>
+  <script src="/static/ui/chat.js"></script>
+</body>
+</html>

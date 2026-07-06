@@ -4,8 +4,11 @@
   const tabRegister = document.getElementById("tab-register");
   const loginForm = document.getElementById("login-form");
   const registerForm = document.getElementById("register-form");
+  const resetForm = document.getElementById("reset-form");
   const loginError = document.getElementById("login-error");
   const regError = document.getElementById("reg-error");
+  const resetError = document.getElementById("reset-error");
+  const tabs = document.querySelector(".tabs");
   const sub = document.getElementById("sub");
 
   // Already signed in (number AND a live session token)? Skip to the chat.
@@ -57,6 +60,9 @@
   // --- Tab switching ---
   function selectTab(mode) {
     const login = mode !== "register";
+    // Leaving the (tab-less) reset flow: restore the tab bar.
+    tabs.hidden = false;
+    resetForm.hidden = true;
     tabLogin.classList.toggle("active", login);
     tabRegister.classList.toggle("active", !login);
     loginForm.hidden = !login;
@@ -69,6 +75,108 @@
   }
   tabLogin.addEventListener("click", () => selectTab("login"));
   tabRegister.addEventListener("click", () => selectTab("register"));
+
+  // --- Forgot password: a self-contained view (no tabs) with two steps ---
+  const resetStep1 = document.getElementById("reset-step1");
+  const resetStep2 = document.getElementById("reset-step2");
+  const resetSubmit = document.getElementById("reset-submit");
+
+  function showReset() {
+    // Hand off the number they were already typing, if any.
+    const typed = document.getElementById("login-phone").value;
+    if (typed) document.getElementById("reset-phone").value = typed;
+    tabs.hidden = true;
+    loginForm.hidden = true;
+    registerForm.hidden = true;
+    resetForm.hidden = false;
+    // Always start at step 1 (identity), not a stale step 2.
+    resetStep1.hidden = false;
+    resetStep2.hidden = true;
+    resetError.hidden = true;
+    resetSubmit.textContent = "തുടരുക →";
+    sub.textContent = "പാസ്‌വേഡ് പുനഃസജ്ജമാക്കൂ";
+  }
+  document.getElementById("forgot-link").addEventListener("click", showReset);
+  document.getElementById("reset-back").addEventListener("click", () => selectTab("login"));
+
+  // Step 1 — prove identity, then reveal the new-password step.
+  async function resetVerifyStep() {
+    const phone = normalizePhone(document.getElementById("reset-phone").value);
+    const name = document.getElementById("reset-name").value.trim();
+    const dob = document.getElementById("reset-dob").value;
+    if (!phone || !name || !dob) {
+      showError(resetError, "മൊബൈൽ നമ്പർ, പേര്, ജനന തീയതി — എല്ലാം നൽകൂ.");
+      return;
+    }
+    resetSubmit.disabled = true;
+    try {
+      const res = await fetch("/identity/password/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone, name, dob }),
+      });
+      if (res.status === 401) {
+        showError(resetError, "ഈ വിവരങ്ങൾ ഒരു അക്കൗണ്ടുമായി പൊരുത്തപ്പെടുന്നില്ല.");
+        return;
+      }
+      if (!res.ok) throw new Error("verify failed");
+      resetStep1.hidden = true;
+      resetStep2.hidden = false;
+      resetSubmit.textContent = "പാസ്‌വേഡ് പുതുക്കൂ →";
+      document.getElementById("reset-password").focus();
+    } catch (err) {
+      showError(resetError, "ക്ഷമിക്കണം, എന്തോ പിശക്. വീണ്ടും ശ്രമിക്കൂ.");
+    } finally {
+      resetSubmit.disabled = false;
+    }
+  }
+
+  // Step 2 — set the new password (server re-verifies), then log straight in.
+  async function resetPasswordStep() {
+    const phone = normalizePhone(document.getElementById("reset-phone").value);
+    const name = document.getElementById("reset-name").value.trim();
+    const dob = document.getElementById("reset-dob").value;
+    const pw = document.getElementById("reset-password").value;
+    const pw2 = document.getElementById("reset-password2").value;
+    if (pw.length < 4) {
+      showError(resetError, "പാസ്‌വേഡ് കുറഞ്ഞത് 4 അക്ഷരം വേണം.");
+      return;
+    }
+    if (pw !== pw2) {
+      showError(resetError, "രണ്ട് പാസ്‌വേഡുകളും ഒരുപോലെ ആയിരിക്കണം.");
+      return;
+    }
+    resetSubmit.disabled = true;
+    try {
+      const res = await fetch("/identity/password/reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone, name, dob, new_password: pw }),
+      });
+      if (res.status === 401) {
+        // Identity changed under us (rare) — send them back to step 1.
+        showError(resetError, "ഈ വിവരങ്ങൾ ഒരു അക്കൗണ്ടുമായി പൊരുത്തപ്പെടുന്നില്ല.");
+        resetStep2.hidden = true;
+        resetStep1.hidden = false;
+        resetSubmit.textContent = "തുടരുക →";
+        return;
+      }
+      if (!res.ok) throw new Error("reset failed");
+      const data = await res.json(); // AuthResponse — {user, token, expires_at}
+      enter(phone, data.user, data.token);
+    } catch (err) {
+      showError(resetError, "ക്ഷമിക്കണം, എന്തോ പിശക്. വീണ്ടും ശ്രമിക്കൂ.");
+    } finally {
+      resetSubmit.disabled = false;
+    }
+  }
+
+  resetForm.addEventListener("submit", (e) => {
+    e.preventDefault();
+    resetError.hidden = true;
+    if (resetStep2.hidden) resetVerifyStep();
+    else resetPasswordStep();
+  });
 
   // --- Login: authenticate an existing mobile against SQL ---
   loginForm.addEventListener("submit", async (e) => {

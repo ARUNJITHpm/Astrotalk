@@ -35,6 +35,21 @@ class PhoneLookup(BaseModel):
     phone: str
 
 
+class PasswordResetVerify(BaseModel):
+    """Identity proof for a forgotten-password reset: the birth details the
+    account owner gave at registration. Sensitive (dob) — never logged/in a URL."""
+
+    phone: str
+    name: str
+    dob: date
+
+
+class PasswordReset(PasswordResetVerify):
+    """A verified reset: the identity proof plus the new password to set."""
+
+    new_password: str
+
+
 class ProfileOut(BaseModel):
     """Minimal, non-sensitive profile — safe to show in the UI header/greeting."""
 

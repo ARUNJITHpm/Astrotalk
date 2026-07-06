@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Tara — താര</title>
-  <link rel="stylesheet" href="/static/styles.css?v=11" />
+  <link rel="stylesheet" href="/static/styles.css?v=12" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link
     href="https://fonts.googleapis.com/css2?family=Noto+Sans+Malayalam:wght@400;500;600&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,400&display=swap"
@@ -54,6 +54,7 @@
             <option value="sarvam-fast">⚡ Sarvam Fast</option>
             <option value="openai">OpenAI</option>
           </select>
+          <button id="chart-open" class="chart-btn" type="button" title="എന്റെ ജാതകം">🪔 ജാതകം</button>
           <button id="debug-toggle" class="debug-toggle" type="button" title="Developer debug: show how each reply is built">🐞 Debug</button>
           <button id="user-badge" class="user-badge" type="button" title="പ്രൊഫൈൽ കാണുക" hidden></button>
           <button id="logout-btn" class="logout-btn" type="button">ലോഗ്ഔട്ട്</button>
@@ -78,6 +79,8 @@
         <form id="composer-form" class="composer-form">
           <button id="prashnam-open" class="prashnam-open" type="button"
                   title="പ്രശ്നം ചോദിക്കൂ — ചോദ്യനിമിഷത്തിന്റെ ചാർട്ട്">🪷</button>
+          <button id="porutham-open" class="prashnam-open" type="button"
+                  title="പൊരുത്തം നോക്കൂ — പങ്കാളിയുമായുള്ള ദശപൊരുത്തം">💑</button>
           <textarea
             id="input"
             class="input"
@@ -101,6 +104,21 @@
     <div id="debug-body" class="debug-drawer-body"></div>
   </aside>
 
+  <!-- എന്റെ ജാതകം: the logged-in user's natal chart, right-side drawer.
+       Shares the /ui renderer (chart.js → TaraChart) and the same
+       /identity/users/{id}/chart endpoint; the CSS below re-skins it warm. -->
+  <div id="chart-backdrop" class="drawer-backdrop" hidden></div>
+  <aside id="chart-drawer" class="drawer" aria-label="ജാതകം">
+    <div class="drawer-head">
+      <span style="font-size:22px">🪔</span>
+      <h3>എന്റെ ജാതകം</h3>
+      <button id="chart-close" class="modal-close" type="button" aria-label="Close">×</button>
+    </div>
+    <div id="chart-body" class="drawer-body">
+      <div class="muted" style="text-align:center;padding:40px 0">ജാതകം ലോഡ് ചെയ്യുന്നു…</div>
+    </div>
+  </aside>
+
   <!-- Profile: the logged-in user's details -->
   <div id="profile-modal" class="modal" hidden>
     <div class="modal-card">
@@ -113,6 +131,10 @@
         <div class="profile-row"><dt>ജനന തീയതി</dt><dd id="pf-dob">—</dd></div>
         <div class="profile-row"><dt>ജനന സമയം</dt><dd id="pf-time">—</dd></div>
         <div class="profile-row"><dt>ജനന സ്ഥലം</dt><dd id="pf-place">—</dd></div>
+        <div class="profile-row"><dt>ജന്മനക്ഷത്രം</dt><dd id="pf-star" class="pf-astro">…</dd></div>
+        <div class="profile-row"><dt>ജന്മരാശി</dt><dd id="pf-rasi" class="pf-astro">…</dd></div>
+        <div class="profile-row"><dt>ലഗ്നം</dt><dd id="pf-lagnam" class="pf-astro">…</dd></div>
+        <div class="profile-row"><dt>ഇപ്പോഴത്തെ ദശ</dt><dd id="pf-dasha" class="pf-astro">…</dd></div>
       </dl>
       <button id="profile-logout" class="modal-logout" type="button">ലോഗ്ഔട്ട്</button>
     </div>
@@ -168,8 +190,56 @@
     </div>
   </div>
 
+  <!-- Porutham (ദശപൊരുത്തം): partner's birth details → the ten Kerala poruthams.
+       The SERVER computes the partner's chart and grades the match; this form
+       only collects the partner's details. Your own chart supplies your side. -->
+  <div id="porutham-modal" class="modal" hidden>
+    <div class="modal-card prashnam-card">
+      <button id="porutham-close" class="modal-close" type="button" aria-label="Close">×</button>
+      <div class="prashnam-title">💑 പൊരുത്തം നോക്കൂ</div>
+      <p class="prashnam-sub">
+        പങ്കാളിയുടെ ജനനവിവരങ്ങൾ നൽകൂ — നിങ്ങളുടെ ജാതകവുമായി ചേർത്ത് പരമ്പരാഗത
+        ദശപൊരുത്തം കണക്കാക്കാം. പൂർണമായ പൊരുത്തനിർണയത്തിന് ഒരു ജ്യോതിഷിയെ കാണുന്നതാണ് നല്ലത്.
+      </p>
+
+      <div class="porutham-form">
+        <label class="porutham-field">
+          <span>പങ്കാളിയുടെ പേര്</span>
+          <input id="porutham-name" type="text" class="leaf-count" placeholder="ഉദാ: ചൈതന്യ" />
+        </label>
+
+        <label class="porutham-field">
+          <span>പങ്കാളി</span>
+          <div class="porutham-gender">
+            <button type="button" class="porutham-sex active" data-gender="female">സ്ത്രീ ♀</button>
+            <button type="button" class="porutham-sex" data-gender="male">പുരുഷൻ ♂</button>
+          </div>
+        </label>
+
+        <label class="porutham-field">
+          <span>ജനന തീയതി</span>
+          <input id="porutham-dob" type="date" class="leaf-count" />
+        </label>
+
+        <label class="porutham-field">
+          <span>ജനന സമയം <small>(അറിയാമെങ്കിൽ)</small></span>
+          <input id="porutham-time" type="time" class="leaf-count" />
+        </label>
+
+        <label class="porutham-field">
+          <span>ജനന സ്ഥലം</span>
+          <input id="porutham-place" type="text" class="leaf-count" placeholder="ഉദാ: ഒറ്റപ്പാലം" />
+        </label>
+
+        <div class="porutham-error" id="porutham-error" hidden></div>
+        <button id="porutham-send" class="thamboola-send" type="button">പൊരുത്തം നോക്കൂ</button>
+      </div>
+    </div>
+  </div>
+
   <script src="/static/vendor/gsap.min.js"></script>
-  <script src="/static/app.js?v=11"></script>
+  <script src="/static/ui/chart.js?v=1"></script>
+  <script src="/static/app.js?v=13"></script>
   <script src="/static/motion.js?v=2"></script>
 </body>
 </html>

@@ -1,6 +1,6 @@
 """Pydantic schemas (DTOs) for the chat module's public boundary."""
 
-from datetime import datetime
+from datetime import date, datetime, time
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
@@ -37,6 +37,24 @@ class PrashnamPick(BaseModel):
         return self
 
 
+class PoruthamPartner(BaseModel):
+    """A partner's birth details for a ``pathu porutham`` (compatibility) turn.
+
+    Structured input from the partner form — parsed into a chart by the engine,
+    never guessed from free text. ``gender`` is the PARTNER's; the logged-in
+    user is taken to be the opposite sex, since the directional poruthams (dina,
+    mahendra, stree-deergha) count from the bride's star to the groom's. The
+    logged-in user's own chart supplies their side — this carries only the
+    partner's.
+    """
+
+    name: str = ""
+    gender: Literal["female", "male"]
+    dob: date
+    birth_time: time | None = None
+    birth_place: str = Field(min_length=1)
+
+
 class ChatRequest(BaseModel):
     user_id: str = "demo"
     messages: list[ChatMessage]
@@ -45,6 +63,9 @@ class ChatRequest(BaseModel):
     conversation_id: str | None = None
     # Set when this turn is a prashnam interaction (the "പ്രശ്നം ചോദിക്കൂ" flow).
     prashnam: PrashnamPick | None = None
+    # Set when this turn is a porutham (compatibility) check with a partner's
+    # details entered in the partner form.
+    porutham: PoruthamPartner | None = None
     # Optional per-message LLM provider pick (the UI's model selector).
     # None = the configured default (sarvam). Keyless providers fall back.
     provider: Literal["sarvam", "sarvam-fast", "openai"] | None = None
@@ -63,6 +84,13 @@ class ChatResponse(BaseModel):
     # Per-turn orchestration trace (params, tools, timings, LLM config). Present
     # only when debug was requested in a non-production environment.
     debug: dict[str, Any] | None = None
+    llm_provider: str | None = None
+    llm_model: str | None = None
+    prompt_tokens: int | None = None
+    completion_tokens: int | None = None
+    total_tokens: int | None = None
+    price_inr: float | None = None
+    price_usd: float | None = None
 
 
 class ChatHistoryEntry(BaseModel):
@@ -73,6 +101,13 @@ class ChatHistoryEntry(BaseModel):
     messages: list[ChatMessage]
     reply: str
     created_at: datetime
+    llm_provider: str | None = None
+    llm_model: str | None = None
+    prompt_tokens: int | None = None
+    completion_tokens: int | None = None
+    total_tokens: int | None = None
+    price_inr: float | None = None
+    price_usd: float | None = None
 
 
 class MemoryFact(BaseModel):

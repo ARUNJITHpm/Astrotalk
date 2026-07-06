@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <title>Tara — Admin Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Noto+Sans+Malayalam:wght@300;400;500;600;700&family=Cinzel:wght@500;700&display=swap"
+    rel="stylesheet"
+  />
+  <style>
+    :root {
+      --bg-gradient: radial-gradient(circle at 50% 0%, #161933 0%, #0b0d19 100%);
+      --surface: rgba(22, 28, 54, 0.6);
+      --surface-solid: #141a33;
+      --surface-hover: rgba(33, 41, 77, 0.7);
+      --border: rgba(255, 255, 255, 0.08);
+      --border-hover: rgba(99, 102, 241, 0.35);
+      --ink: #f3f4f6;
+      --muted: #9ca3af;
+      --faint: #6b7280;
+      --accent: #818cf8;
+      --accent-deep: #6366f1;
+      --accent-glow: rgba(99, 102, 241, 0.5);
+      --gold: #fbbf24;
+      --good: #34d399;
+      --warn: #fbbf24;
+      --danger: #f87171;
+      --radius: 16px;
+      --font: "Plus Jakarta Sans", "Noto Sans Malayalam", system-ui, -apple-system, sans-serif;
+      --display: "Cinzel", Georgia, serif;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; min-height: 100vh; font-family: var(--font); background: #080a10; color: var(--ink); }
+    body {
+      background: var(--bg-gradient);
+      background-attachment: fixed;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .wrap { max-width: 1280px; margin: 0 auto; padding: 24px 24px 64px; }
+    .hidden { display: none !important; }
+
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 8px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.22); }
+
+    /* Top Navigation Banner */
+    header.top {
+      display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;
+      margin-bottom: 20px; padding-bottom: 18px; border-bottom: 1px solid var(--border);
+    }
+    .brand {
+      font-family: var(--display); font-size: 26px; font-weight: 700;
+      display: flex; align-items: center; gap: 10px; color: var(--ink);
+      text-shadow: 0 0 15px rgba(129, 140, 248, 0.4);
+    }
+    .brand .star { color: var(--gold); }
+    .brand small {
+      font-family: var(--font); font-size: 10px; font-weight: 600;
+      color: var(--accent); letter-spacing: 1px;
+      text-transform: uppercase; border: 1px solid rgba(129,140,248,0.5);
+      padding: 3px 10px; border-radius: 20px; box-shadow: 0 0 10px rgba(99, 102, 241, 0.2);
+    }
+    .row-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .gen-at { font-size: 12px; color: var(--muted); }
+    .gen-at b { color: var(--ink); font-weight: 600; }
+
+    /* Tabs — segmented control */
+    .tabs {
+      display: inline-flex; gap: 4px; margin-bottom: 22px; padding: 4px;
+      background: rgba(0,0,0,0.25); border: 1px solid var(--border); border-radius: 12px;
+    }
+    .tab-btn {
+      font-family: var(--font); font-size: 13px; font-weight: 600; cursor: pointer;
+      background: transparent; color: var(--muted); border: none;
+      border-radius: 9px; padding: 9px 20px; transition: all 0.2s ease;
+      display: inline-flex; align-items: center; gap: 7px;
+    }
+    .tab-btn:hover { color: var(--ink); background: rgba(255, 255, 255, 0.05); }
+    .tab-btn.active {
+      color: #fff; background: var(--accent-deep);
+      box-shadow: 0 2px 12px var(--accent-glow);
+    }
+
+    button.btn {
+      font-family: var(--font); font-size: 13px; font-weight: 600; cursor: pointer;
+      background: var(--surface); color: var(--ink);
+      border: 1px solid var(--border); border-radius: 10px; padding: 9px 16px;
+      transition: all 0.2s ease; backdrop-filter: blur(8px);
+    }
+    button.btn:hover { border-color: var(--accent); box-shadow: 0 0 10px var(--accent-glow); }
+    button.btn:disabled { opacity: 0.6; cursor: default; }
+    button.btn.primary { background: var(--accent-deep); color: #fff; border-color: var(--accent-deep); box-shadow: 0 4px 14px rgba(99, 102, 241, 0.3); }
+    button.btn.primary:hover { filter: brightness(1.1); box-shadow: 0 6px 18px rgba(99, 102, 241, 0.5); }
+
+    /* KPI Grid & Cards */
+    .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; margin-bottom: 26px; }
+    .tile {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 18px 20px;
+      backdrop-filter: blur(12px); transition: transform 0.2s, border-color 0.2s;
+      position: relative; overflow: hidden;
+    }
+    .tile::after {
+      content: ""; position: absolute; inset: 0 0 auto 0; height: 2px;
+      background: linear-gradient(90deg, transparent, rgba(129,140,248,0.5), transparent);
+      opacity: 0; transition: opacity 0.25s;
+    }
+    .tile:hover { transform: translateY(-2px); border-color: var(--border-hover); }
+    .tile:hover::after { opacity: 1; }
+    .tile .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; font-weight: 600; }
+    .tile .value { font-size: 30px; font-weight: 700; margin-top: 8px; line-height: 1.1; color: #fff; font-variant-numeric: tabular-nums; }
+    .tile .value small { font-size: 13px; color: var(--muted); font-weight: 500; }
+    .tile .foot { font-size: 12px; color: var(--muted); margin-top: 10px; display: flex; align-items: center; gap: 4px; }
+    .tile .foot .up { color: var(--good); font-weight: 600; }
+    .tile.accent { border-color: rgba(129, 140, 248, 0.3); background: rgba(99, 102, 241, 0.1); }
+
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 18px; }
+    @media (max-width: 800px) { .grid2 { grid-template-columns: 1fr; } }
+
+    .card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 20px 22px; backdrop-filter: blur(12px);
+    }
+    .card h3 { margin: 0 0 16px; font-size: 14px; font-weight: 700; color: #fff; letter-spacing: 0.3px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 10px; }
+
+    /* Bar charts */
+    .bars { display: flex; align-items: flex-end; gap: 6px; height: 130px; margin-top: 10px; }
+    .bar { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; position: relative; }
+    .bar .fill { width: 100%; background: var(--accent); border-radius: 4px 4px 0 0; min-height: 3px; transition: height 0.4s ease; opacity: 0.8; }
+    .bar:hover .fill { opacity: 1; background: #93c5fd; box-shadow: 0 0 8px rgba(147, 197, 253, 0.6); }
+    .bar .cap { font-size: 9px; color: var(--muted); margin-top: 6px; font-variant-numeric: tabular-nums; }
+    .bars-legend { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-top: 8px; }
+
+    /* Hbars (broken down models / providers) */
+    .hbars { display: flex; flex-direction: column; gap: 14px; }
+    .hbar .hb-top { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 5px; }
+    .hbar .hb-top b { color: #fff; }
+    .hbar .track { background: rgba(255, 255, 255, 0.05); border-radius: 6px; height: 8px; overflow: hidden; }
+    .hbar .track > span { display: block; height: 100%; background: linear-gradient(90deg, var(--accent), #a78bfa); border-radius: 6px; }
+    .hbar .meta { font-size: 11px; color: var(--muted); margin-top: 4px; display: flex; justify-content: space-between; }
+    .hbar .meta .cost { color: var(--gold); font-weight: 600; }
+
+    /* Tables */
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { text-align: left; padding: 11px 10px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+    th { font-size: 10px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); font-weight: 700; }
+    td { color: #e5e7eb; }
+    td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+    tbody tr { transition: background 0.15s; }
+    tbody tr:hover td { background: rgba(255,255,255,0.025); }
+    tbody tr:last-child td { border-bottom: none; }
+
+    /* System Status */
+    .status-section { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
+    .pills { display: flex; flex-wrap: wrap; gap: 8px; }
+    .pill {
+      font-size: 11px; font-weight: 600; padding: 6px 14px; border-radius: 20px;
+      border: 1px solid var(--border); background: rgba(255,255,255,0.03);
+      display: inline-flex; align-items: center; gap: 8px; color: var(--muted);
+    }
+    .pill .dot { width: 8px; height: 8px; border-radius: 50%; background: #4b5563; flex-shrink: 0; }
+    .pill.on { border-color: rgba(52, 211, 153, 0.3); color: #fff; }
+    .pill.on .dot { background: var(--good); box-shadow: 0 0 8px var(--good); }
+    .pill.off .dot { background: var(--danger); box-shadow: 0 0 8px var(--danger); }
+    .pill.off { border-color: rgba(248, 113, 113, 0.3); }
+
+    /* ============ CHAT EXPLORER (3-pane) ============ */
+    .explorer {
+      display: grid; grid-template-columns: 280px 300px 1fr; gap: 14px;
+      height: calc(100vh - 210px); min-height: 480px; align-items: stretch;
+    }
+
+    .pane {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); display: flex; flex-direction: column; overflow: hidden;
+      backdrop-filter: blur(12px); min-height: 0;
+    }
+    .pane-head {
+      padding: 14px 16px; border-bottom: 1px solid rgba(255,255,255,0.06);
+      display: flex; align-items: center; gap: 10px; flex-shrink: 0; min-height: 62px;
+    }
+    .pane-title { font-size: 14px; font-weight: 700; color: #fff; }
+    .pane-sub { font-size: 11px; color: var(--muted); margin-top: 2px; font-variant-numeric: tabular-nums; }
+    .pane-body { flex: 1; overflow-y: auto; min-height: 0; }
+    .pane-placeholder {
+      flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      color: var(--faint); font-size: 13px; gap: 10px; padding: 30px; text-align: center;
+    }
+    .pane-placeholder .icon { font-size: 32px; opacity: 0.4; }
+
+    .back-btn {
+      display: none; background: rgba(255,255,255,0.05); border: 1px solid var(--border);
+      color: var(--ink); border-radius: 8px; width: 32px; height: 32px; cursor: pointer;
+      font-size: 15px; line-height: 1; flex-shrink: 0;
+    }
+    .back-btn:hover { border-color: var(--accent); }
+
+    /* Users pane */
+    .search-box { position: relative; width: 100%; }
+    .search-box .search-icon {
+      position: absolute; left: 11px; top: 50%; transform: translateY(-50%);
+      color: var(--faint); font-size: 13px; pointer-events: none;
+    }
+    .search-box input {
+      width: 100%; background: rgba(0,0,0,0.25); border: 1px solid var(--border);
+      border-radius: 9px; padding: 9px 12px 9px 32px; font-size: 13px; color: #fff;
+      font-family: var(--font); transition: border-color 0.2s;
+    }
+    .search-box input:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 8px rgba(99, 102, 241, 0.2); }
+    .search-box input::placeholder { color: var(--faint); }
+
+    .user-item {
+      padding: 12px 14px; border-bottom: 1px solid rgba(255,255,255,0.04);
+      cursor: pointer; transition: background 0.15s; display: flex; gap: 11px; align-items: center;
+      border-left: 3px solid transparent;
+    }
+    .user-item:hover { background: rgba(255, 255, 255, 0.03); }
+    .user-item.active { background: rgba(99, 102, 241, 0.14); border-left-color: var(--accent); }
+    .avatar {
+      width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; font-weight: 700; color: #fff;
+      background: linear-gradient(135deg, var(--accent-deep), #a78bfa);
+    }
+    .user-item .u-body { flex: 1; min-width: 0; }
+    .user-item .u-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+    .user-item .name { font-weight: 600; color: #fff; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .user-item .time { font-size: 10px; color: var(--faint); flex-shrink: 0; }
+    .user-item .u-bottom { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 3px; }
+    .user-item .phone { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+    .user-item .turns { font-size: 10px; background: rgba(255,255,255,0.08); padding: 1px 7px; border-radius: 10px; color: var(--muted); flex-shrink: 0; }
+
+    /* Sessions pane */
+    .session-item {
+      padding: 12px 14px; border-bottom: 1px solid rgba(255,255,255,0.04);
+      cursor: pointer; transition: background 0.15s; border-left: 3px solid transparent;
+    }
+    .session-item:hover { background: rgba(255, 255, 255, 0.03); }
+    .session-item.active { background: rgba(99, 102, 241, 0.14); border-left-color: var(--accent); }
+    .session-item .s-title {
+      font-size: 13px; font-weight: 600; color: #fff; line-height: 1.35;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .session-item .s-meta { display: flex; justify-content: space-between; gap: 8px; margin-top: 5px; font-size: 11px; color: var(--muted); }
+    .session-item .s-meta .s-cost { color: var(--gold); font-weight: 600; flex-shrink: 0; }
+    .session-item .s-date { font-size: 10px; color: var(--faint); margin-top: 3px; }
+
+    /* Conversation pane */
+    .chat-header-info { flex: 1; min-width: 0; }
+    .chat-header-info h4 { margin: 0; font-size: 15px; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .chat-header-stats {
+      display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; flex-shrink: 0;
+    }
+    .stat-chip {
+      font-size: 11px; color: var(--muted); background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 4px 10px;
+      font-variant-numeric: tabular-nums; white-space: nowrap;
+    }
+    .stat-chip b { color: #fff; font-weight: 600; }
+    .stat-chip.cost b { color: var(--gold); }
+
+    .chat-messages { flex: 1; overflow-y: auto; padding: 20px 22px; display: flex; flex-direction: column; gap: 4px; min-height: 0; }
+    .day-divider {
+      display: flex; align-items: center; gap: 12px; margin: 14px 0 10px;
+      font-size: 11px; color: var(--faint); font-weight: 600;
+    }
+    .day-divider::before, .day-divider::after { content: ""; flex: 1; height: 1px; background: rgba(255,255,255,0.06); }
+
+    .chat-turn { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+    .msg-bubble { border-radius: 14px; padding: 11px 15px; max-width: 78%; font-size: 13.5px; line-height: 1.55; overflow-wrap: break-word; }
+    .msg-bubble.user {
+      background: rgba(99, 102, 241, 0.22); color: #fff; align-self: flex-end;
+      border-bottom-right-radius: 4px;
+    }
+    .msg-bubble.assistant {
+      background: rgba(255,255,255,0.05); color: #e5e7eb; align-self: flex-start;
+      border: 1px solid rgba(255,255,255,0.05); border-bottom-left-radius: 4px;
+    }
+    .msg-time { font-size: 10px; color: var(--faint); align-self: flex-end; margin-bottom: 1px; }
+
+    .turn-meta {
+      display: flex; flex-wrap: wrap; gap: 6px; font-size: 10.5px; color: var(--muted);
+      align-items: center; margin-top: 2px;
+    }
+    .meta-badge {
+      background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255,255,255,0.05);
+      border-radius: 6px; padding: 2px 8px; display: inline-flex; align-items: center; gap: 4px;
+      font-variant-numeric: tabular-nums;
+    }
+    .meta-badge b { color: #d1d5db; font-weight: 600; }
+    .meta-badge.cost { color: var(--gold); border-color: rgba(251, 191, 36, 0.2); background: rgba(251, 191, 36, 0.05); }
+    .meta-badge.cost b { color: var(--gold); }
+
+    /* Responsive explorer: drill-down panes on narrow screens */
+    @media (max-width: 980px) {
+      .explorer { grid-template-columns: 1fr; height: calc(100vh - 200px); }
+      .explorer .pane { display: none; }
+      .explorer[data-stage="users"] .pane-users { display: flex; }
+      .explorer[data-stage="sessions"] .pane-sessions { display: flex; }
+      .explorer[data-stage="chat"] .pane-chat { display: flex; }
+      .back-btn { display: inline-flex; align-items: center; justify-content: center; }
+    }
+    @media (min-width: 981px) {
+      .explorer .pane { display: flex !important; }
+    }
+
+    /* Token login gate styling */
+    .gate {
+      max-width: 420px; margin: 15vh auto 0; background: var(--surface);
+      border: 1px solid var(--border); border-radius: var(--radius); padding: 32px;
+      backdrop-filter: blur(16px); text-align: center;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+    }
+    .gate h1 { font-family: var(--display); font-size: 26px; margin: 0 0 10px; color: #fff; text-shadow: 0 0 10px rgba(99,102,241,0.3); }
+    .gate p { color: var(--muted); font-size: 13px; margin: 0 0 24px; }
+    .gate label { display: block; text-align: left; font-size: 12px; font-weight: 600; margin-bottom: 6px; color: var(--muted); text-transform: uppercase; }
+    .gate input {
+      width: 100%; font-family: var(--font); font-size: 14px; padding: 12px 14px;
+      background: rgba(0,0,0,0.3); border: 1px solid var(--border); border-radius: 10px;
+      color: #fff; margin-bottom: 16px; transition: border-color 0.2s;
+    }
+    .gate input:focus { border-color: var(--accent); outline: none; }
+    .gate .err { color: var(--danger); font-size: 12px; min-height: 18px; margin-bottom: 12px; font-weight: 500; }
+    .gate .hint-link { font-size: 12px; color: var(--muted); margin-top: 14px; display: block; text-decoration: none; }
+    .gate .hint-link b { color: var(--accent); }
+
+    /* Banner */
+    .banner {
+      background: rgba(248, 113, 113, 0.15); border: 1px solid rgba(248, 113, 113, 0.25);
+      color: #fca5a5; border-radius: 12px; padding: 14px 20px; font-size: 13px; margin-bottom: 24px;
+      backdrop-filter: blur(8px);
+    }
+
+    /* Skeleton loading shimmer */
+    .skeleton {
+      background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.09) 50%, rgba(255,255,255,0.04) 75%);
+      background-size: 200% 100%; animation: shimmer 1.4s infinite; border-radius: 8px;
+    }
+    @keyframes shimmer { to { background-position: -200% 0; } }
+  </style>
+</head>
+<body>
+  <!-- Token / Credentials Gate -->
+  <div id="gate" class="gate hidden">
+    <h1><span class="star">✦</span> Tara Admin</h1>
+    <p>Sign in with admin credentials to access analytics.</p>
+
+    <label for="usernameInput">Username</label>
+    <input id="usernameInput" type="text" value="admin" autocomplete="username" />
+
+    <label for="passwordInput">Password</label>
+    <input id="passwordInput" type="password" placeholder="••••••••" autocomplete="current-password" />
+
+    <div id="gateErr" class="err"></div>
+    <button class="btn primary" style="width:100%" onclick="submitLogin()">Unlock Dashboard</button>
+
+    <a href="#" class="hint-link" onclick="prefillCreds(event)">Use default credentials: <b>admin / chargemod</b></a>
+  </div>
+
+  <!-- Dashboard Main Window -->
+  <div id="dash" class="wrap hidden">
+    <header class="top">
+      <div class="brand"><span class="star">✦</span> Tara <small>Admin</small></div>
+      <div class="row-actions">
+        <span class="gen-at">Updated <b id="genAt">—</b></span>
+        <button class="btn" onclick="refreshData()" id="refreshBtn">↻ Refresh</button>
+        <button class="btn" onclick="signOut()" id="signOutBtn">Sign out</button>
+      </div>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('dashboard')" id="tab-dashboard">📊 Dashboard</button>
+      <button class="tab-btn" onclick="switchTab('explorer')" id="tab-explorer">💬 User Chats</button>
+    </div>
+
+    <div id="banner" class="banner hidden"></div>
+
+    <!-- VIEW 1: DASHBOARD -->
+    <div id="view-dashboard">
+      <!-- Headline KPIs -->
+      <div class="tiles" id="kpis"></div>
+
+      <!-- System status -->
+      <div class="status-section">
+        <h2 style="font-size: 15px; margin: 0; font-family: var(--display); color: #fff;">System Integrations</h2>
+        <div class="pills" id="statusPills"></div>
+      </div>
+
+      <!-- Growth + chat trend -->
+      <div class="grid2">
+        <div class="card">
+          <h3>New users · last 14 days</h3>
+          <div class="bars" id="signupBars"></div>
+          <div class="bars-legend"><span id="signupFrom">—</span><span id="signupTo">—</span></div>
+        </div>
+        <div class="card">
+          <h3>Chat turns · last 14 days</h3>
+          <div id="chatTrendWrap">
+            <div class="bars" id="chatBars"></div>
+            <div class="bars-legend"><span id="chatFrom">—</span><span id="chatTo">—</span></div>
+          </div>
+          <div id="chatTrendEmpty" class="empty hidden" style="color: var(--muted); font-size: 13px;"></div>
+        </div>
+      </div>
+
+      <!-- Model-wise and Provider breakdown -->
+      <div class="grid2">
+        <div class="card">
+          <h3>Token Usage by Model</h3>
+          <div style="overflow-x: auto;">
+            <table id="modelUsageTable">
+              <thead>
+                <tr>
+                  <th>Model</th>
+                  <th class="num">Calls</th>
+                  <th class="num">Prompt</th>
+                  <th class="num">Completion</th>
+                  <th class="num">Total Tokens</th>
+                  <th class="num">Cost (INR)</th>
+                  <th class="num">Cost (USD)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- Populated dynamically -->
+              </tbody>
+            </table>
+          </div>
+          <div id="modelUsageEmpty" class="empty hidden" style="color: var(--muted); font-size: 13px; padding-top: 10px;">No LLM calls recorded yet.</div>
+        </div>
+
+        <div class="card">
+          <h3>By provider</h3>
+          <div class="hbars" id="providerBars"></div>
+          <div id="providerEmpty" class="empty hidden" style="color: var(--muted); font-size: 13px;">No LLM calls recorded yet.</div>
+        </div>
+      </div>
+
+      <!-- Users Tables -->
+      <div class="grid2">
+        <div class="card">
+          <h3>Most active users</h3>
+          <table id="topUsersTable">
+            <thead><tr><th>User Phone</th><th class="num">Turns</th></tr></thead>
+            <tbody></tbody>
+          </table>
+          <div id="topUsersEmpty" class="empty hidden" style="color: var(--muted); font-size: 13px;"></div>
+        </div>
+        <div class="card">
+          <h3>Recent signups</h3>
+          <table id="recentTable">
+            <thead><tr><th>Name</th><th>Phone</th><th>Chart Status</th><th>Joined</th></tr></thead>
+            <tbody></tbody>
+          </table>
+          <div id="recentEmpty" class="empty hidden" style="color: var(--muted); font-size: 13px;">No users yet.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW 2: CHAT EXPLORER (users → sessions → conversation) -->
+    <div id="view-explorer" class="hidden">
+      <div class="explorer" id="explorer" data-stage="users">
+
+        <!-- Pane 1: Users -->
+        <aside class="pane pane-users">
+          <div class="pane-head">
+            <div class="search-box">
+              <span class="search-icon">⌕</span>
+              <input type="text" id="userSearch" placeholder="Search name or phone…" oninput="filterChatUsers()" />
+            </div>
+          </div>
+          <div class="pane-body" id="explorerUserList">
+            <!-- Populated dynamically -->
+          </div>
+        </aside>
+
+        <!-- Pane 2: Sessions of selected user -->
+        <aside class="pane pane-sessions">
+          <div class="pane-head">
+            <button class="back-btn" onclick="explorerStage('users')" title="Back to users">←</button>
+            <div class="chat-header-info">
+              <div class="pane-title" id="sessionsPaneTitle">Sessions</div>
+              <div class="pane-sub" id="sessionsPaneSub">Select a user</div>
+            </div>
+          </div>
+          <div class="pane-body hidden" id="sessionList"></div>
+          <div class="pane-placeholder" id="sessionsPlaceholder">
+            <span class="icon">🗂️</span>
+            <span>Pick a user on the left to browse their chat sessions.</span>
+          </div>
+        </aside>
+
+        <!-- Pane 3: Conversation viewer -->
+        <section class="pane pane-chat">
+          <div class="pane-head hidden" id="chatHeader">
+            <button class="back-btn" onclick="explorerStage('sessions')" title="Back to sessions">←</button>
+            <div class="chat-header-info">
+              <h4 id="chatHeaderName">—</h4>
+              <div class="pane-sub" id="chatHeaderPhone">—</div>
+            </div>
+            <div class="chat-header-stats" id="chatHeaderStats"></div>
+          </div>
+          <div class="chat-messages hidden" id="chatMessagesView"></div>
+          <div class="pane-placeholder" id="chatPlaceholder">
+            <span class="icon">💬</span>
+            <span>Select a session to inspect the full conversation with tokens and cost per turn.</span>
+          </div>
+        </section>
+
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/admin.js?v=3"></script>
+</body>
+</html>

@@ -49,7 +49,7 @@ _ORIGINAL_CHUNKS: list[SeedChunk] = [
             "in midlife — the stars incline toward steady growth here, they do not "
             "compel any single outcome."
         ),
-        "reviewed": False,
+        "reviewed": True,
     },
     {
         "id": "planet-in-house-jupiter-5",
@@ -60,7 +60,7 @@ _ORIGINAL_CHUNKS: list[SeedChunk] = [
             "optimism and good counsel. A gentle reminder: its blessings grow when "
             "you act on them, not by waiting for luck."
         ),
-        "reviewed": False,
+        "reviewed": True,
     },
     {
         "id": "retrograde-mercury",
@@ -71,7 +71,7 @@ _ORIGINAL_CHUNKS: list[SeedChunk] = [
             "invitation to slow down, re-read, and reconnect with old threads — "
             "there is nothing here to fear, only things worth double-checking."
         ),
-        "reviewed": False,
+        "reviewed": True,
     },
     {
         "id": "retrograde-saturn",
@@ -82,7 +82,7 @@ _ORIGINAL_CHUNKS: list[SeedChunk] = [
             "is reflective rather than punishing — a chance to realign work with "
             "what genuinely matters to you."
         ),
-        "reviewed": False,
+        "reviewed": True,
     },
     {
         "id": "porutham-basics",
@@ -94,7 +94,7 @@ _ORIGINAL_CHUNKS: list[SeedChunk] = [
             "balanced conversation starter about compatibility, never as a verdict "
             "or a source of fear. A low score is information to discuss, not doom."
         ),
-        "reviewed": False,
+        "reviewed": True,
     },
     {
         "id": "nakshatra-moon-mind",
@@ -105,7 +105,7 @@ _ORIGINAL_CHUNKS: list[SeedChunk] = [
             "person processes feelings and stress. It describes tendencies and "
             "leanings — it is guidance for self-understanding, not a fixed fate."
         ),
-        "reviewed": False,
+        "reviewed": True,
     },
 ]
 
@@ -251,7 +251,7 @@ def _planet_house_chunks() -> list[SeedChunk]:
                 "never compel, and your choices decide how it unfolds."
             )
             chunks.append(
-                {"id": cid, "topic": "planet-in-house", "text": text, "reviewed": False}
+                {"id": cid, "topic": "planet-in-house", "text": text, "reviewed": True}
             )
     return chunks
 
@@ -493,7 +493,7 @@ def _nakshatra_chunks() -> list[SeedChunk]:
                 "A birth star describes temperament and leanings — guidance for "
                 "self-understanding, never a fixed fate."
             ),
-            "reviewed": False,
+            "reviewed": True,
         })
     return chunks
 
@@ -558,7 +558,7 @@ def _dasha_chunks() -> list[SeedChunk]:
                 f"system is {profile} A dasha sets the season's weather, not your "
                 "decisions — the stars incline, they never compel."
             ),
-            "reviewed": False,
+            "reviewed": True,
         })
     return chunks
 
@@ -630,7 +630,7 @@ def _lagna_chunks() -> list[SeedChunk]:
                 f"tends to be {profile} The lagna colours the outer temperament — "
                 "one lens among many in the chart, never the whole person."
             ),
-            "reviewed": False,
+            "reviewed": True,
         })
     return chunks
 
@@ -654,7 +654,7 @@ _DOSHA_AND_FAQ_CHUNKS: list[SeedChunk] = [
             "and countless such marriages thrive. It is information for matching, "
             "never a verdict and never a reason for fear."
         ),
-        "reviewed": False,
+        "reviewed": True,
     },
     {
         "id": "dosha-kala-sarpa",
@@ -668,7 +668,7 @@ _DOSHA_AND_FAQ_CHUNKS: list[SeedChunk] = [
             "misfortune. Steady effort and devotion are its classical answers; "
             "fear is not required."
         ),
-        "reviewed": False,
+        "reviewed": True,
     },
     {
         "id": "dosha-sade-sati",
@@ -683,7 +683,7 @@ _DOSHA_AND_FAQ_CHUNKS: list[SeedChunk] = [
             "patience and simple living — it is a season of maturing, not a "
             "sentence of misfortune."
         ),
-        "reviewed": False,
+        "reviewed": True,
     },
     {
         "id": "remedies-framing",
@@ -696,7 +696,7 @@ _DOSHA_AND_FAQ_CHUNKS: list[SeedChunk] = [
             "no genuine tradition ties results to payment. The most classical "
             "remedy of all is conduct: patience, honesty, and consistent effort."
         ),
-        "reviewed": False,
+        "reviewed": True,
     },
     {
         "id": "muhurtham-basics",
@@ -709,7 +709,7 @@ _DOSHA_AND_FAQ_CHUNKS: list[SeedChunk] = [
             "of care and auspicious intention; missing one is never a curse, and a "
             "sincere beginning carries its own blessing."
         ),
-        "reviewed": False,
+        "reviewed": True,
     },
     {
         "id": "panchangam-basics",
@@ -722,7 +722,7 @@ _DOSHA_AND_FAQ_CHUNKS: list[SeedChunk] = [
             "a rhythm to plan with, like a tide table — practical guidance, not a "
             "source of anxiety."
         ),
-        "reviewed": False,
+        "reviewed": True,
     },
 ]
 
@@ -831,7 +831,7 @@ def _prashnam_chunks() -> list[SeedChunk]:
                 "mirror held up to the question, guidance to reflect with, never a "
                 "fixed decree."
             ),
-            "reviewed": False,
+            "reviewed": True,
         },
         {
             "id": "prashnam-honesty",
@@ -847,7 +847,7 @@ def _prashnam_chunks() -> list[SeedChunk]:
                 "frames. Take it as reflective guidance; for a full prashnam, "
                 "tradition points to a qualified astrologer in person."
             ),
-            "reviewed": False,
+            "reviewed": True,
         },
         {
             "id": "prashnam-sankhya-basics",
@@ -864,7 +864,7 @@ def _prashnam_chunks() -> list[SeedChunk]:
                 "temperament. The number carries the moment's signature — "
                 "guidance to reflect with, never a verdict."
             ),
-            "reviewed": False,
+            "reviewed": True,
         },
         {
             "id": "prashnam-thamboola-odd",
@@ -877,7 +877,7 @@ def _prashnam_chunks() -> list[SeedChunk]:
                 "questions about beginnings, journeys, and decisions — the "
                 "counsel is to move, mindfully."
             ),
-            "reviewed": False,
+            "reviewed": True,
         },
         {
             "id": "prashnam-thamboola-even",
@@ -891,7 +891,7 @@ def _prashnam_chunks() -> list[SeedChunk]:
                 "stability, family, and preservation — the counsel is to hold "
                 "steady and strengthen the base."
             ),
-            "reviewed": False,
+            "reviewed": True,
         },
     ]
     for ml, alias, flavour in _ARUDHA_PROFILES:
@@ -906,7 +906,7 @@ def _prashnam_chunks() -> list[SeedChunk]:
                 "orients the answer without deciding it — the choice stays with "
                 "the person."
             ),
-            "reviewed": False,
+            "reviewed": True,
         })
     for house, klass, meaning in _PRASHNA_HOUSE_MEANINGS:
         chunks.append({
@@ -919,7 +919,7 @@ def _prashnam_chunks() -> list[SeedChunk]:
                 "describe the terrain of the question — they advise the route, "
                 "they do not close the road."
             ),
-            "reviewed": False,
+            "reviewed": True,
         })
     for rem, theme in _THAMBOOLA_REMAINDERS:
         chunks.append({
@@ -931,7 +931,7 @@ def _prashnam_chunks() -> list[SeedChunk]:
                 f"{theme}. This simplified count-reading is guidance to reflect "
                 "with, offered in the spirit of the tradition."
             ),
-            "reviewed": False,
+            "reviewed": True,
         })
     return chunks
 
@@ -1071,7 +1071,7 @@ def _vazhipadu_chunks() -> list[SeedChunk]:
                 "choose — tradition never demands it, ties it to fear, or "
                 "prices the blessing."
             ),
-            "reviewed": False,
+            "reviewed": True,
         })
     return chunks
 
@@ -1158,7 +1158,7 @@ def _deity_chunks() -> list[SeedChunk]:
                 "any deity is a matter of love and steadiness of mind; the "
                 "blessing is in the devotion itself, never in fear or payment."
             ),
-            "reviewed": False,
+            "reviewed": True,
         })
     return chunks
 

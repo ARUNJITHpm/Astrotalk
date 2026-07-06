@@ -37,6 +37,32 @@ class AstrologyEngineService:
         """Current planetary transits, optionally relative to a natal chart."""
         return await self._client.transits(now or datetime.now(), chart)
 
+    async def compute_porutham(
+        self,
+        female_chart: dict,
+        male_chart: dict,
+        *,
+        female_name: str = "",
+        male_name: str = "",
+    ) -> dict:
+        """The ten Kerala poruthams for a (female, male) pair of natal charts.
+
+        Deterministic — the janma nakshatram / rasi in each chart drive the
+        classical grading (see ``porutham.py``). Directional poruthams count
+        from the bride's star to the groom's, so the caller must pass the
+        charts in the right roles. Raises ``ValueError`` if either chart lacks a
+        real moon placement (mock / pending), so the caller can degrade instead
+        of scoring a placeholder.
+        """
+        from app.modules.astrology_engine.porutham import (
+            compute_porutham,
+            star_from_chart,
+        )
+
+        female = star_from_chart(female_chart, "female", female_name)
+        male = star_from_chart(male_chart, "male", male_name)
+        return compute_porutham(female, male)
+
     async def get_panchangam(self, day: date | None = None) -> dict:
         """Panchangam for the day: nakshatram, nalla neram, tithi."""
         return await self._client.panchangam(day or date.today())

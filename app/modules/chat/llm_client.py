@@ -15,6 +15,7 @@ this works offline out of the box.
 
 import os
 
+from app.platform import metrics
 from app.platform.config import get_settings
 from app.platform.logging_config import get_logger
 
@@ -31,9 +32,10 @@ _MOCK_REPLY_ML = (
     "എപ്പോഴും നിങ്ങളുടേതാണ്. കൂടുതൽ പറയാമോ, എന്താണ് മനസ്സിൽ?"
 )
 
-# Per-provider completion budget. Sarvam models write long-form Malayalam and
-# truncate mid-sentence at 1024 (seen live); give them the API's own default.
-_MAX_TOKENS = {"sarvam": 2048, "sarvam-fast": 2048, "openai": 1024}
+# Per-provider completion budget. Sarvam models write long-form Malayalam AND
+# spend reasoning tokens from the same budget — 2048 truncated porutham
+# readings mid-sentence (seen live 2026-07-06), so give them real headroom.
+_MAX_TOKENS = {"sarvam": 4096, "sarvam-fast": 4096, "openai": 1024}
 _DEFAULT_MAX_TOKENS = 1024
 
 # "sarvam-fast" is the same account/endpoint with the lower-latency 30B model.
@@ -117,6 +119,7 @@ class LLMClient:
             logger.info("chat.llm: mock reply (no live provider call).")
             self.last_usage = None
             self.last_provider, self.last_model = "mock", None
+            metrics.record_llm_usage("mock", None, None, mock=True)
             return _MOCK_REPLY_ML
 
         from openai import AsyncOpenAI
@@ -130,13 +133,49 @@ class LLMClient:
             # Malayalam replies mid-sentence (seen in evals). Chat is
             # conversational — low effort is faster and leaves room to speak.
             extra["extra_body"] = {"reasoning_effort": "low"}
+
+        max_tokens = _MAX_TOKENS.get(name, _DEFAULT_MAX_TOKENS)
+        reply = await self._call(client, name, model, payload, max_tokens, extra)
+        if not reply.strip():
+            # Seen live with sarvam-105b: the model occasionally spends the
+            # WHOLE completion budget on internal reasoning and returns empty
+            # content (usage.completion_tokens == max_tokens). One retry with a
+            # doubled budget gives it room to finish thinking AND speak.
+            logger.warning(
+                "chat.llm: %s returned empty content (usage=%s) — retrying "
+                "with a doubled completion budget.", name, self.last_usage,
+            )
+            reply = await self._call(
+                client, name, model, payload, max_tokens * 2, extra
+            )
+        if not reply.strip():
+            # Still nothing — never surface an empty bubble to the user.
+            logger.error("chat.llm: %s empty after retry; sending fallback.", name)
+            reply = (
+                "ക്ഷമിക്കണം, എനിക്ക് ഒരു ചെറിയ തടസ്സം നേരിട്ടു 🙏 "
+                "ഒരു നിമിഷം കഴിഞ്ഞ് അതേ ചോദ്യം ഒന്നുകൂടി ചോദിക്കാമോ?"
+            )
+        return reply
+
+    async def _call(
+        self,
+        client,
+        name: str,
+        model: str | None,
+        payload: list[dict[str, str]],
+        max_tokens: int,
+        extra: dict,
+    ) -> str:
+        """One completion call; records provider/model/usage for the debug panel."""
         response = await client.chat.completions.create(
             model=model,
-            max_tokens=_MAX_TOKENS.get(name, _DEFAULT_MAX_TOKENS),
+            max_tokens=max_tokens,
             messages=payload,
             **extra,
         )
         # Capture what actually served the reply for the debug panel.
         self.last_provider, self.last_model = name, model
         self.last_usage = response.usage.model_dump() if response.usage else None
+        # Feed the admin analytics counters (aggregate tokens only, no content).
+        metrics.record_llm_usage(name, model, self.last_usage)
         return response.choices[0].message.content or ""

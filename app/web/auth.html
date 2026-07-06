@@ -204,6 +204,28 @@
     }
     .error[hidden] { display: none; }
 
+    /* Text-only link buttons (forgot password / back to login). */
+    .linkbtn {
+      align-self: center;
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-family: var(--font-ml);
+      font-size: 13px;
+      cursor: pointer;
+      padding: 4px 2px;
+      transition: color .15s;
+    }
+    .linkbtn:hover { color: var(--accent); text-decoration: underline; }
+
+    /* Reset flow: each step stacks its fields like the other forms do. */
+    .reset-step { display: flex; flex-direction: column; gap: 15px; }
+    .reset-step[hidden] { display: none; }
+    .reset-intro {
+      color: var(--muted); font-size: 13px; line-height: 1.6;
+      margin: -4px 0 2px;
+    }
+
     .fine {
       text-align: center;
       color: #a89e91;
@@ -257,6 +279,7 @@
           </label>
           <div id="login-error" class="error" hidden></div>
           <button type="submit" class="submit">പ്രവേശിക്കൂ →</button>
+          <button type="button" id="forgot-link" class="linkbtn">പാസ്‌വേഡ് മറന്നോ?</button>
         </form>
 
         <!-- Register -->
@@ -283,13 +306,44 @@
           <button type="submit" class="submit">തുടങ്ങൂ →</button>
         </form>
 
+        <!-- Forgot password: verify birth details, then set a new password -->
+        <form id="reset-form" hidden>
+          <p class="reset-intro">
+            SMS ഇല്ലാത്തതിനാൽ, രജിസ്റ്റർ ചെയ്ത വിവരങ്ങൾ നൽകി നിങ്ങളെ തിരിച്ചറിയാം.
+          </p>
+          <!-- Step 1: prove identity -->
+          <div id="reset-step1" class="reset-step">
+            <label>മൊബൈൽ നമ്പർ
+              <input id="reset-phone" type="tel" autocomplete="username" placeholder="+91 98765 43210" />
+            </label>
+            <label>പേര്
+              <input id="reset-name" type="text" placeholder="രജിസ്റ്റർ ചെയ്ത പേര്" />
+            </label>
+            <label>ജനന തീയതി
+              <input id="reset-dob" type="date" />
+            </label>
+          </div>
+          <!-- Step 2: choose a new password (revealed after verification) -->
+          <div id="reset-step2" class="reset-step" hidden>
+            <label>പുതിയ പാസ്‌വേഡ്
+              <input id="reset-password" type="password" autocomplete="new-password" placeholder="കുറഞ്ഞത് 4 അക്ഷരം" />
+            </label>
+            <label>പാസ്‌വേഡ് വീണ്ടും
+              <input id="reset-password2" type="password" autocomplete="new-password" placeholder="വീണ്ടും ടൈപ്പ് ചെയ്യൂ" />
+            </label>
+          </div>
+          <div id="reset-error" class="error" hidden></div>
+          <button type="submit" class="submit" id="reset-submit">തുടരുക →</button>
+          <button type="button" id="reset-back" class="linkbtn">← പ്രവേശനത്തിലേക്ക് മടങ്ങുക</button>
+        </form>
+
         <p class="fine">Tara ഒരു AI ആണ് · നിങ്ങളുടെ വിവരങ്ങൾ സ്വകാര്യമായി സൂക്ഷിക്കുന്നു</p>
       </div>
     </main>
   </div>
 
   <script src="/static/vendor/gsap.min.js"></script>
-  <script src="/static/auth.js?v=3"></script>
+  <script src="/static/auth.js?v=4"></script>
   <script>
     // GSAP motion layer for the auth page. Purely decorative — the page works
     // identically without it (reduced-motion users, GSAP load failure).
@@ -370,7 +424,7 @@
           { y: 0, autoAlpha: 1, duration: 0.35, stagger: 0.05, ease: "power2.out", clearProps: "all" }
         );
       };
-      ["login-form", "register-form"].forEach((id) => {
+      ["login-form", "register-form", "reset-form"].forEach((id) => {
         const form = document.getElementById(id);
         if (!form) return;
         new MutationObserver(() => animateFormIn(form)).observe(form, {

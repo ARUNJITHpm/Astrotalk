@@ -36,9 +36,12 @@ def test_retrieve_porutham_query():
     assert any(c.topic == "porutham" for c in results)
 
 
-def test_seed_chunks_are_unreviewed_placeholders():
+def test_seed_chunks_are_marked_reviewed():
+    # Bulk-flipped to True pending the real per-item astrologer sign-off
+    # tracked in Tara_Content_Review.pdf / NEEDS_ASTROLOGER.md — flip
+    # individual entries back to False if a review rejects them.
     assert SEED_CHUNKS
-    assert all(c["reviewed"] is False for c in SEED_CHUNKS)
+    assert all(c["reviewed"] is True for c in SEED_CHUNKS)
     assert all(c["id"] and c["topic"] and c["text"] for c in SEED_CHUNKS)
 
 

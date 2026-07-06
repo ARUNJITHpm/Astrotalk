@@ -80,6 +80,45 @@ async def test_authenticate_checks_the_password(session):
     assert await service.authenticate(session, "+910000000000", "secret123") is None
 
 
+async def test_verify_identity_matches_birth_details(session):
+    service = IdentityService()
+    await service.create_user(session, _SAMPLE)
+
+    # Name matches case-/whitespace-insensitively; dob must match exactly.
+    ok = await service.verify_identity(
+        session, "+91-98765-43210", "  arya  ", date(1995, 4, 12)
+    )
+    assert ok is not None and ok.phone == "+919876543210"
+
+    # Wrong name, wrong dob, or unknown number all fail.
+    assert await service.verify_identity(
+        session, "+919876543210", "Someone", date(1995, 4, 12)
+    ) is None
+    assert await service.verify_identity(
+        session, "+919876543210", "Arya", date(1990, 1, 1)
+    ) is None
+    assert await service.verify_identity(
+        session, "+910000000000", "Arya", date(1995, 4, 12)
+    ) is None
+
+
+async def test_reset_password_rehashes_and_revokes_sessions(session):
+    service = IdentityService()
+    user = await service.create_user(session, _SAMPLE)
+
+    # An outstanding session exists; the old password authenticates.
+    login = await service.create_session(session, user)
+    assert await service.get_session_user(session, login.token) is not None
+    assert await service.authenticate(session, user.phone, "secret123") is not None
+
+    await service.reset_password(session, user, "brandnew")
+
+    # New password works, old one no longer does, old session is revoked.
+    assert await service.authenticate(session, user.phone, "brandnew") is not None
+    assert await service.authenticate(session, user.phone, "secret123") is None
+    assert await service.get_session_user(session, login.token) is None
+
+
 async def test_session_tokens_expire_and_revoke(session, monkeypatch):
     service = IdentityService()
     user = await service.create_user(session, _SAMPLE)
@@ -294,6 +333,91 @@ async def test_onboard_flow_via_api():
             natal = chart.json()["natal_json"]
             assert natal["mock"] is True
             assert natal["nakshatram"]
+    finally:
+        app.dependency_overrides.clear()
+        await engine.dispose()
+
+
+async def test_forgot_password_reset_flow_via_api():
+    """End-to-end: verify birth details, reset the password, and log in with it.
+    Wrong details are rejected; the old password stops working afterward."""
+    import httpx
+    from httpx import ASGITransport
+
+    from app.main import app
+    from app.platform.db import get_session
+
+    engine = create_async_engine(
+        "sqlite+aiosqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+
+    async def _override_get_session():
+        async with factory() as s:
+            yield s
+
+    app.dependency_overrides[get_session] = _override_get_session
+    try:
+        transport = ASGITransport(app=app)
+        async with httpx.AsyncClient(
+            transport=transport, base_url="http://test"
+        ) as client:
+            body = {
+                "phone": "+919876543210",
+                "password": "secret123",
+                "name": "Arya",
+                "dob": "1995-04-12",
+                "birth_time": "06:30:00",
+                "birth_place": "Thrissur, Kerala",
+            }
+            assert (await client.post("/identity/users", json=body)).status_code == 201
+
+            proof = {"phone": "+91 98765 43210", "name": "arya", "dob": "1995-04-12"}
+
+            # Wrong birth date → 401 on both verify and reset.
+            bad = {**proof, "dob": "1990-01-01"}
+            assert (
+                await client.post("/identity/password/verify", json=bad)
+            ).status_code == 401
+            assert (
+                await client.post(
+                    "/identity/password/reset", json={**bad, "new_password": "hacker"}
+                )
+            ).status_code == 401
+
+            # Too-short new password is rejected (422) even with correct details.
+            short = await client.post(
+                "/identity/password/reset", json={**proof, "new_password": "no"}
+            )
+            assert short.status_code == 422, short.text
+
+            # Correct details → verify passes (204), then reset logs in (200).
+            assert (
+                await client.post("/identity/password/verify", json=proof)
+            ).status_code == 204
+            done = await client.post(
+                "/identity/password/reset", json={**proof, "new_password": "freshpass"}
+            )
+            assert done.status_code == 200, done.text
+            assert done.json()["token"] and done.json()["user"]["phone"] == "+919876543210"
+
+            # New password logs in; the old one no longer does.
+            assert (
+                await client.post(
+                    "/identity/login",
+                    json={"phone": "+919876543210", "password": "freshpass"},
+                )
+            ).status_code == 200
+            assert (
+                await client.post(
+                    "/identity/login",
+                    json={"phone": "+919876543210", "password": "secret123"},
+                )
+            ).status_code == 401
     finally:
         app.dependency_overrides.clear()
         await engine.dispose()

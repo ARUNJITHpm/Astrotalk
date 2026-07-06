@@ -18,6 +18,8 @@ from app.modules.identity.schemas import (
     AuthResponse,
     ChartOut,
     LoginRequest,
+    PasswordReset,
+    PasswordResetVerify,
     ProfileOut,
     UserCreate,
     UserOut,
@@ -134,6 +136,52 @@ async def login(data: LoginRequest, session: SessionDep) -> AuthResponse:
     # Self-heal: charts stored while the ephemeris was mocked get recomputed with
     # the real engine on the user's next login.
     await _refresh_chart_if_stale(session, user)
+    result = await _auth_response(session, user)
+    await session.commit()
+    return result
+
+
+@router.post("/password/verify", status_code=status.HTTP_204_NO_CONTENT)
+async def verify_reset_identity(
+    data: PasswordResetVerify, session: SessionDep
+) -> None:
+    """Check the birth details behind a forgotten-password reset.
+
+    Gates the UI's second step (choose a new password) so the user isn't asked
+    for one until they've proven who they are. Returns 204 on a match, 401
+    otherwise — without saying which detail was wrong, so the account space
+    can't be probed. /password/reset re-verifies, so this is UX only, not the
+    security boundary.
+    """
+    user = await _service.verify_identity(session, data.phone, data.name, data.dob)
+    if user is None:
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED,
+            detail="These details do not match an account",
+        )
+
+
+@router.post("/password/reset", response_model=AuthResponse)
+async def reset_password(data: PasswordReset, session: SessionDep) -> AuthResponse:
+    """Reset the password after re-verifying the birth details, then log in.
+
+    A forgotten-password recovery for a channel with no SMS/email: the owner
+    re-proves identity with their registration birth details and sets a new
+    password. On success every old session is revoked and a fresh one is minted,
+    so the response logs them straight in. 401 on any identity mismatch.
+    """
+    if len(data.new_password) < 4:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Password must be at least 4 characters",
+        )
+    user = await _service.verify_identity(session, data.phone, data.name, data.dob)
+    if user is None:
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED,
+            detail="These details do not match an account",
+        )
+    await _service.reset_password(session, user, data.new_password)
     result = await _auth_response(session, user)
     await session.commit()
     return result

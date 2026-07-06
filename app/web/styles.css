@@ -537,6 +537,30 @@ details.debug-sec[open] > summary { margin-bottom: 7px; }
 }
 .thamboola-send:hover { filter: brightness(1.06); }
 
+/* Porutham (compatibility) partner form — reuses the prashnam modal shell */
+.porutham-form { display: flex; flex-direction: column; gap: 12px; }
+.porutham-field { display: flex; flex-direction: column; gap: 6px; }
+.porutham-field > span {
+  font-size: 13px; color: var(--muted); font-family: var(--font-ml);
+}
+.porutham-field > span small { font-size: 11px; }
+.porutham-gender { display: flex; gap: 8px; }
+.porutham-sex {
+  flex: 1;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 12px;
+  padding: 10px;
+  font-family: var(--font-ml);
+  font-size: 14px;
+  cursor: pointer;
+}
+.porutham-sex.active { border-color: var(--accent); background: var(--accent-soft); }
+.porutham-error {
+  font-size: 13px; color: #c0392b; font-family: var(--font-ml); line-height: 1.4;
+}
+.porutham-form .thamboola-send { width: 100%; margin-top: 2px; }
+
 /* Follow-up chips under each assistant reply (engagement, deterministic) */
 .followups { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 .chip-followup {
@@ -565,3 +589,225 @@ details.debug-sec[open] > summary { margin-bottom: 7px; }
   cursor: pointer;
 }
 .model-select:hover { border-color: var(--accent); }
+
+/* Fixed astro identity rows on the profile card (nakshatram/rasi/lagnam/dasha) */
+.pf-astro { color: var(--accent); font-weight: 600; }
+
+/* Message action bar (copy / retry / feedback), Claude-desktop style */
+.msg-actions {
+  display: flex; align-items: center; gap: 4px; margin-top: 8px;
+  opacity: 0.6; transition: opacity 0.2s;
+}
+.row:hover .msg-actions, .msg-actions:focus-within { opacity: 1; }
+@media (pointer: coarse) { .msg-actions { opacity: 1; } }
+.msg-act {
+  border: none; background: transparent; color: #8a8377;
+  width: 30px; height: 30px; border-radius: 8px; cursor: pointer;
+  font-size: 13.5px; display: inline-flex; align-items: center; justify-content: center;
+  transition: background 0.2s, color 0.2s;
+}
+.msg-act:hover { background: rgba(0, 0, 0, 0.07); color: #3d3833; }
+.msg-act.done { color: #1a7f6b; }
+.msg-act.fb-up.active { color: #1a7f6b; background: rgba(26, 127, 107, 0.12); }
+.msg-act.fb-down.active { color: var(--accent); background: rgba(196, 90, 59, 0.12); }
+.msg-act-note { font-size: 11px; color: #8a8377; margin-left: 4px; }
+
+/* ============================================================
+   എന്റെ ജാതകം — header button + right-side natal-chart drawer.
+   Ported from the /ui skin so the classic root page shows the same
+   chart. The inner markup is produced by /static/ui/chart.js
+   (window.TaraChart); the rules below re-skin it to this page's warm
+   cream palette. Every design token the chart reads is remapped on
+   #chart-drawer, so the drawer is fully self-contained.
+   ============================================================ */
+.chart-btn {
+  font-family: var(--font-ml); font-size: 12.5px;
+  color: var(--accent);
+  background: var(--surface);
+  border: 1px solid var(--accent-soft);
+  border-radius: 999px;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.chart-btn:hover { color: #fff; background: var(--accent); border-color: var(--accent); }
+
+.drawer-backdrop {
+  position: fixed; inset: 0; z-index: 150;
+  background: rgba(44, 38, 34, 0.30);
+  backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px);
+}
+.drawer-backdrop[hidden] { display: none; }
+.drawer {
+  position: fixed; top: 0; right: 0; bottom: 0; z-index: 151;
+  width: min(520px, 94vw);
+  transform: translateX(100%);
+  transition: transform 0.5s var(--ease-out);
+  display: flex; flex-direction: column;
+}
+.drawer.open { transform: none; }
+.drawer-head {
+  display: flex; align-items: center; gap: 12px; position: relative;
+  padding: 20px 24px; border-bottom: 1px solid var(--line-soft);
+}
+.drawer-head h3 { font-family: var(--font-display); font-size: 21px; flex: 1; margin: 0; }
+.drawer-body { flex: 1; overflow-y: auto; padding: 22px 24px 40px; display: flex; flex-direction: column; gap: 26px; }
+.drawer-body .muted { color: var(--muted); }
+.drawer-sec h4 {
+  font-size: 11.5px; letter-spacing: 0.22em; text-transform: uppercase;
+  color: var(--gold); margin: 0 0 12px; font-weight: 600;
+}
+
+/* warm-white skin: remap every token the chart reads onto the drawer */
+#chart-drawer {
+  --ink: #2b2722;
+  --muted: #8a8178;
+  --faint: #a99e90;
+  --gold: #c45a3b;
+  --gold-soft: #b0563a;
+  --indigo: #c45a3b;
+  --violet: #e08a6a;
+  --rose: #c0503a;
+  --glass: #f7f4ee;
+  --glass-2: #f4f1ea;
+  --line: #e4ddd0;
+  --line-soft: #ece4d6;
+  --radius-sm: 12px;
+  --font-body: var(--font-ml);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+  background: #fbfaf7;
+  border-left: 1px solid #e4ddd0;
+  color: var(--ink);
+  box-shadow: -18px 0 50px rgba(44, 38, 34, 0.14);
+  font-family: var(--font-ml);
+}
+#chart-drawer .drawer-head { background: #f4f1ea; border-bottom: 1px solid #e4ddd0; }
+#chart-drawer .drawer-head h3 { color: var(--ink); }
+#chart-drawer .muted { color: var(--muted); }
+
+/* South Indian chart on cream */
+#chart-drawer .si-chart {
+  border: 1px solid #e4ddd0; background: #fbfaf7;
+  box-shadow: 0 1px 10px rgba(44, 38, 34, 0.06) inset;
+}
+#chart-drawer .si-cell { background: #fffdf9; }
+#chart-drawer .si-center { background: radial-gradient(circle, rgba(196, 90, 59, 0.08), transparent 70%); }
+#chart-drawer .si-center .om { text-shadow: 0 0 18px rgba(196, 90, 59, 0.35); }
+#chart-drawer .si-cell.lagna { background: rgba(196, 90, 59, 0.08); }
+#chart-drawer .si-planet {
+  background: color-mix(in srgb, var(--p-color) 15%, #ffffff);
+  color: color-mix(in srgb, var(--p-color) 62%, #2b2722);
+  border-color: color-mix(in srgb, var(--p-color) 45%, #e4ddd0);
+}
+#chart-drawer .planet-table .grah { color: color-mix(in srgb, var(--p-color) 58%, #2b2722); }
+#chart-drawer .birth-tile,
+#chart-drawer .dasha-item,
+#chart-drawer .dosha-card { background: #f7f4ee; border-color: #e4ddd0; }
+#chart-drawer .si-toggle button { background: #f4f1ea; border-color: #e4ddd0; color: var(--muted); }
+#chart-drawer .si-toggle button.active {
+  background: linear-gradient(115deg, #c45a3b, #d97b53);
+  color: #fff; border-color: #c45a3b;
+}
+#chart-drawer .dasha-item .lord { color: color-mix(in srgb, var(--p-color) 55%, #2b2722); }
+#chart-drawer .dasha-item.current {
+  border-color: rgba(196, 90, 59, 0.45);
+  background: linear-gradient(100deg, rgba(196, 90, 59, 0.10), transparent 70%);
+}
+#chart-drawer .dasha-item.current .lord { color: #c45a3b; }
+#chart-drawer .dasha-progress { background: linear-gradient(90deg, #c45a3b, #e08a6a); }
+#chart-drawer .dasha-now-chip { color: #c45a3b; border-color: rgba(196, 90, 59, 0.5); }
+#chart-drawer .dosha-state.present { color: #b8562f; border-color: rgba(184, 86, 47, 0.5); background: rgba(184, 86, 47, 0.08); }
+#chart-drawer .dosha-state.absent  { color: #3f7d5e; border-color: rgba(63, 125, 94, 0.4); background: rgba(63, 125, 94, 0.08); }
+
+/* birth summary tiles */
+.birth-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.birth-tile {
+  border: 1px solid var(--line-soft); border-radius: var(--radius-sm);
+  background: var(--glass); padding: 12px; text-align: center;
+}
+.birth-tile .k { font-size: 10.5px; letter-spacing: 0.12em; color: var(--faint); text-transform: uppercase; }
+.birth-tile .v { font-size: 15.5px; font-weight: 600; color: var(--gold-soft); margin-top: 3px; }
+
+/* South Indian rasi chart */
+.si-wrap { position: relative; }
+.si-toggle { display: flex; gap: 6px; margin-bottom: 12px; }
+.si-toggle button {
+  flex: 1; border: 1px solid var(--line); border-radius: 10px;
+  background: var(--glass); color: var(--muted); padding: 8px 0;
+  font: 600 12.5px var(--font-body); cursor: pointer; transition: all 0.25s;
+}
+.si-toggle button.active {
+  background: linear-gradient(115deg, var(--indigo), var(--violet));
+  color: #fff; border-color: var(--indigo);
+}
+.si-chart {
+  display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(4, 1fr);
+  aspect-ratio: 1; border-radius: var(--radius-sm); overflow: hidden;
+  border: 1px solid var(--line);
+}
+.si-cell {
+  border: 0.5px solid var(--line-soft); position: relative;
+  padding: 6px; display: flex; flex-direction: column; gap: 3px;
+  min-height: 0; overflow: hidden;
+}
+.si-center {
+  grid-area: 2 / 2 / 4 / 4;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  text-align: center;
+}
+.si-center .om { font-size: 30px; color: var(--gold); }
+.si-center .label { font-family: var(--font-display); font-size: 16px; color: var(--ink); }
+.si-center .sub { font-size: 10.5px; color: var(--faint); padding: 0 8px; }
+.si-rasi-name { font-size: 9.5px; color: var(--faint); letter-spacing: 0.04em; }
+.si-cell.lagna::after {
+  content: "ലഗ്നം"; position: absolute; top: 4px; right: 6px;
+  font-size: 8.5px; color: var(--gold); letter-spacing: 0.08em;
+}
+.si-cell.lagna .si-rasi-name { color: var(--gold-soft); }
+.si-planets { display: flex; flex-wrap: wrap; gap: 3px; }
+.si-planet {
+  font-size: 10px; font-weight: 700; line-height: 1;
+  border-radius: 6px; padding: 3px 5px;
+  cursor: default;
+}
+.si-planet.retro::after { content: "℞"; font-size: 8px; margin-left: 2px; opacity: 0.8; }
+
+/* planet table */
+.planet-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.planet-table th {
+  text-align: left; color: var(--faint); font-weight: 600; font-size: 10.5px;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  padding: 6px 8px; border-bottom: 1px solid var(--line);
+}
+.planet-table td { padding: 7px 8px; border-bottom: 1px solid var(--line-soft); color: var(--muted); }
+.planet-table td:first-child { color: var(--ink); font-weight: 600; }
+.planet-table .grah { color: var(--p-color, var(--ink)); font-weight: 600; }
+.planet-table .retro-flag { color: var(--rose); font-size: 11px; }
+
+/* dasha timeline */
+.dasha-list { display: flex; flex-direction: column; gap: 8px; }
+.dasha-item {
+  border: 1px solid var(--line-soft); border-radius: var(--radius-sm);
+  background: var(--glass); padding: 10px 14px;
+  display: flex; align-items: center; gap: 12px;
+}
+.dasha-item .lord { font-weight: 700; font-size: 14px; width: 76px; flex: none; color: var(--p-color, var(--ink)); }
+.dasha-item .span { font-size: 11.5px; color: var(--faint); flex: 1; }
+.dasha-item .years { font-size: 11.5px; color: var(--muted); }
+.dasha-item.current { position: relative; overflow: hidden; }
+.dasha-progress { position: absolute; left: 0; bottom: 0; height: 2px; }
+.dasha-now-chip {
+  font-size: 9.5px; letter-spacing: 0.14em;
+  border: 1px solid; border-radius: 99px; padding: 2px 8px;
+}
+
+/* dosha chips */
+.dosha-grid { display: flex; flex-direction: column; gap: 8px; }
+.dosha-card {
+  border: 1px solid var(--line-soft); border-radius: var(--radius-sm);
+  background: var(--glass); padding: 11px 14px;
+  display: flex; align-items: center; gap: 10px; font-size: 13px;
+}
+.dosha-card .name { font-weight: 600; flex: 1; }
+.dosha-state { font-size: 11px; letter-spacing: 0.1em; border-radius: 99px; padding: 3px 10px; border: 1px solid; }

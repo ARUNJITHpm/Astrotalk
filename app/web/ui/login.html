@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="ml">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>താര ✦ — ലോഗിൻ</title>
+  <link rel="stylesheet" href="/static/ui/tara-ui.css" />
+</head>
+<body data-case="default">
+  <canvas id="starfield"></canvas>
+  <div class="aurora"></div>
+  <div class="grain"></div>
+  <div id="cursor-dot"></div>
+  <div id="cursor-ring"></div>
+
+  <main class="auth-stage">
+    <!-- brand / hero panel -->
+    <section class="brand-panel">
+      <div class="orbits" aria-hidden="true">
+        <div class="orbit"><i></i></div>
+        <div class="orbit o2"><i></i></div>
+        <div class="orbit o3"><i></i></div>
+      </div>
+      <div class="brand-mark eyebrow" data-reveal>✦ &nbsp;MALAYALAM AI JYOTHISHAM</div>
+      <h1 class="display brand-title text-grad" data-reveal>താര</h1>
+      <p class="brand-sub" data-reveal>
+        നക്ഷത്രങ്ങൾ അറിയുന്ന കൂട്ടുകാരി. ജാതകം, ദശാകാലം, പ്രശ്നം, ക്ഷേത്ര
+        വഴിപാടുകൾ — എല്ലാം ഒരു സംഭാഷണത്തിൽ.
+      </p>
+      <div class="brand-points" data-reveal>
+        <span class="chip">🪔 Swiss Ephemeris ജാതകം</span>
+        <span class="chip">🪷 പ്രശ്നം — 3 വിധം</span>
+        <span class="chip">🛕 53 ക്ഷേത്രങ്ങൾ</span>
+        <span class="chip">✨ ദശ &amp; ഗോചരം</span>
+      </div>
+    </section>
+
+    <!-- auth card -->
+    <section class="auth-panel">
+      <div class="auth-card glass" data-reveal>
+        <div class="auth-tabs" role="tablist">
+          <button class="auth-tab active" id="tab-login" role="tab">ലോഗിൻ</button>
+          <button class="auth-tab" id="tab-register" role="tab">രജിസ്റ്റർ</button>
+        </div>
+
+        <!-- LOGIN -->
+        <form class="auth-form" id="form-login" novalidate>
+          <h2>വീണ്ടും സ്വാഗതം 🙏</h2>
+          <div class="field" id="f-login-phone">
+            <label for="login-phone">മൊബൈൽ നമ്പർ</label>
+            <input id="login-phone" type="tel" inputmode="tel" placeholder="+91 98765 43210" autocomplete="tel" />
+          </div>
+          <div class="field" id="f-login-password">
+            <label for="login-password">പാസ്‌വേഡ്</label>
+            <input id="login-password" type="password" placeholder="••••••••" autocomplete="current-password" />
+          </div>
+          <div class="form-error hidden" id="login-error"></div>
+          <button class="btn btn-primary" type="submit" id="login-submit" data-magnetic>
+            പ്രവേശിക്കൂ ✦
+          </button>
+          <div class="auth-alt">
+            പാസ്‌വേഡ് മറന്നോ? <button type="button" id="goto-forgot">വീണ്ടെടുക്കാം</button>
+          </div>
+        </form>
+
+        <!-- REGISTER -->
+        <form class="auth-form hidden" id="form-register" novalidate>
+          <h2>ജാതകം തയ്യാറാക്കാം ✨</h2>
+          <div class="field" id="f-reg-name">
+            <label for="reg-name">പേര്</label>
+            <input id="reg-name" type="text" placeholder="നിങ്ങളുടെ പേര്" autocomplete="name" />
+          </div>
+          <div class="row2">
+            <div class="field" id="f-reg-phone">
+              <label for="reg-phone">മൊബൈൽ</label>
+              <input id="reg-phone" type="tel" inputmode="tel" placeholder="+91…" autocomplete="tel" />
+            </div>
+            <div class="field" id="f-reg-password">
+              <label for="reg-password">പാസ്‌വേഡ്</label>
+              <input id="reg-password" type="password" placeholder="കുറഞ്ഞത് 4" autocomplete="new-password" />
+            </div>
+          </div>
+          <div class="row2">
+            <div class="field" id="f-reg-dob">
+              <label for="reg-dob">ജനന തീയതി</label>
+              <input id="reg-dob" type="date" />
+            </div>
+            <div class="field">
+              <label for="reg-time">ജനന സമയം <span class="muted">(ഓപ്ഷണൽ)</span></label>
+              <input id="reg-time" type="time" />
+            </div>
+          </div>
+          <div class="field" id="f-reg-place">
+            <label for="reg-place">ജനന സ്ഥലം</label>
+            <input id="reg-place" type="text" placeholder="ഉദാ: കൊച്ചി, കേരളം" />
+            <span class="hint">കൃത്യമായ ലഗ്നത്തിന് സ്ഥലം പ്രധാനമാണ്</span>
+          </div>
+          <div class="form-error hidden" id="register-error"></div>
+          <button class="btn btn-primary" type="submit" id="register-submit" data-magnetic>
+            ജാതകം കണക്കാക്കൂ ✦
+          </button>
+        </form>
+
+        <!-- FORGOT: step 1 verify identity, step 2 new password -->
+        <form class="auth-form hidden" id="form-forgot" novalidate>
+          <h2>പാസ്‌വേഡ് വീണ്ടെടുക്കൽ 🔑</h2>
+          <div id="forgot-step1">
+            <div class="auth-form">
+              <div class="field">
+                <label for="fg-phone">മൊബൈൽ നമ്പർ</label>
+                <input id="fg-phone" type="tel" inputmode="tel" placeholder="+91…" />
+              </div>
+              <div class="row2">
+                <div class="field">
+                  <label for="fg-name">പേര്</label>
+                  <input id="fg-name" type="text" placeholder="രജിസ്റ്റർ ചെയ്ത പേര്" />
+                </div>
+                <div class="field">
+                  <label for="fg-dob">ജനന തീയതി</label>
+                  <input id="fg-dob" type="date" />
+                </div>
+              </div>
+            </div>
+          </div>
+          <div id="forgot-step2" class="hidden">
+            <div class="form-ok" style="margin-bottom:14px">✓ വിവരങ്ങൾ ശരിയാണ് — പുതിയ പാസ്‌വേഡ് നൽകൂ</div>
+            <div class="field">
+              <label for="fg-newpass">പുതിയ പാസ്‌വേഡ്</label>
+              <input id="fg-newpass" type="password" placeholder="കുറഞ്ഞത് 4 അക്ഷരം" autocomplete="new-password" />
+            </div>
+          </div>
+          <div class="form-error hidden" id="forgot-error"></div>
+          <button class="btn btn-primary" type="submit" id="forgot-submit" data-magnetic>
+            പരിശോധിക്കൂ →
+          </button>
+          <div class="auth-alt">
+            <button type="button" id="back-to-login">← ലോഗിനിലേക്ക് മടങ്ങാം</button>
+          </div>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <script src="/static/ui/starfield.js"></script>
+  <script src="/static/ui/login.js"></script>
+</body>
+</html>

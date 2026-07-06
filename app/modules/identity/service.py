@@ -14,10 +14,10 @@ import hmac
 import os
 import re
 import secrets
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.identity.models import Chart, Session, User
@@ -73,6 +73,16 @@ def normalize_phone(phone: str) -> str:
     stripped = phone.strip()
     digits = re.sub(r"\D", "", stripped)
     return f"+{digits}" if stripped.startswith("+") else digits
+
+
+def _norm_name(name: str) -> str:
+    """Canonicalize a display name for identity comparison (reset flow).
+
+    Case-folded with runs of whitespace collapsed, so "Arya  Menon" and
+    "arya menon" match — a name typed months later shouldn't fail on spacing
+    or capitalization. Not for storage; the original casing is kept on the row.
+    """
+    return " ".join(name.split()).casefold()
 
 # Fallback when geocoding is mocked (config.mock_geocoding), fails, or finds no
 # match. Kochi, Kerala / IST — keeps onboarding working offline; the chart can
@@ -230,6 +240,33 @@ async def _google_lookup(client, place: str, key: str) -> tuple[float, float, st
     return lat, lng, tz
 
 
+def _as_utc(value: datetime | None) -> datetime | None:
+    """Treat a stored (SQLite-naive) datetime as UTC for safe comparison."""
+    if value is None:
+        return None
+    return value if value.tzinfo is not None else value.replace(tzinfo=UTC)
+
+
+def _is_real_chart(natal_json: Any) -> bool:
+    """True when a stored chart is a real computed chart, not a mock/pending
+    placeholder (mirrors identity.router._chart_is_stale's mock/pending test)."""
+    if not isinstance(natal_json, dict):
+        return False
+    return not natal_json.get("mock") and natal_json.get("status") != "pending"
+
+
+def _mask_phone(phone: str) -> str:
+    """Reduce a mobile number to a non-identifying tail for admin display.
+
+    Even in an authenticated admin view we don't render full numbers — the last
+    two digits are enough to eyeball distinct accounts without exposing the key.
+    """
+    digits = re.sub(r"\D", "", phone or "")
+    if len(digits) <= 2:
+        return "••"
+    return "•••• " + digits[-2:]
+
+
 class IdentityService:
     """User profile + birth-data + chart persistence for the identity domain."""
 
@@ -250,6 +287,16 @@ class IdentityService:
         await session.flush()
         await session.refresh(user)
         return user
+
+    async def geocode_place(self, place: str) -> tuple[float, float, str]:
+        """Resolve a free-text place to (lat, lng, IANA tz).
+
+        Public wrapper over the module's geocoder so other modules (e.g. chat,
+        charting a partner's birthplace for a porutham) can reuse the exact same
+        resolution — Google primary, free providers fallback, Kochi placeholder
+        on failure — without reaching into identity's internals (AGENTS.md).
+        """
+        return await _geocode(place)
 
     async def get_user(self, session: AsyncSession, user_id: int) -> User | None:
         return await session.get(User, user_id)
@@ -279,6 +326,38 @@ class IdentityService:
         if not verify_password(password, user.password_hash):
             return None
         return user
+
+    async def verify_identity(
+        self, session: AsyncSession, phone: str, name: str, dob: date
+    ) -> User | None:
+        """Return the user when mobile number + name + date of birth all match.
+
+        The knowledge-based check behind a forgotten-password reset (no SMS/email
+        channel exists yet): the account owner proves who they are with the birth
+        details they gave at registration. Name is matched case-/whitespace-
+        insensitively; date of birth must match exactly. None on any mismatch,
+        without saying which field was wrong.
+        """
+        user = await self.get_user_by_phone(session, phone)
+        if user is None:
+            return None
+        if _norm_name(user.name) != _norm_name(name):
+            return None
+        if user.dob != dob:
+            return None
+        return user
+
+    async def reset_password(
+        self, session: AsyncSession, user: User, new_password: str
+    ) -> None:
+        """Set a new account password and revoke every existing session.
+
+        Revoking outstanding tokens means a reset also locks out anyone who had
+        been using the old credentials — the caller mints a fresh session after.
+        """
+        user.password_hash = hash_password(new_password)
+        await session.execute(delete(Session).where(Session.user_id == user.id))
+        await session.flush()
 
     # ---- login sessions (bearer tokens) ----
 
@@ -359,3 +438,117 @@ class IdentityService:
         if user is None:
             return None
         return await self.get_chart(session, user.id)
+
+    # ---- admin analytics (read-only) ----
+    # The admin module is allowed cross-module READS for its dashboards
+    # (Tara-Project-Documentation.md §2). It reaches these numbers only through
+    # this public method — never by touching the users/charts tables directly.
+
+    async def admin_metrics(self, session: AsyncSession) -> dict[str, Any]:
+        """Aggregate user/chart/session stats for the admin dashboard.
+
+        Read-only and privacy-aware: returns counts, growth buckets and a small
+        recent-signups list with the display name and a MASKED phone — never
+        birth data (dob / time / place / coordinates), which stays out of every
+        analytics surface (GUARDRAILS.md §4).
+        """
+        now = datetime.now(UTC)
+
+        total_users = await session.scalar(select(func.count(User.id))) or 0
+        total_charts = await session.scalar(select(func.count(Chart.id))) or 0
+        users_with_chart = (
+            await session.scalar(select(func.count(func.distinct(Chart.user_id)))) or 0
+        )
+
+        # Active (unexpired) login sessions — a rough "currently reachable" gauge.
+        active_sessions = (
+            await session.scalar(
+                select(func.count(Session.id)).where(Session.expires_at > now)
+            )
+            or 0
+        )
+
+        # Signups over time: pull just the created_at column (cheap) and bucket
+        # in Python so the logic stays portable across SQLite and Postgres.
+        created_ats = list(
+            (await session.execute(select(User.created_at))).scalars().all()
+        )
+        created_ats = [_as_utc(c) for c in created_ats if c is not None]
+
+        def _since(days: int) -> int:
+            cutoff = now - timedelta(days=days)
+            return sum(1 for c in created_ats if c >= cutoff)
+
+        # Daily new-user counts for the last 14 days (oldest → newest) for a
+        # small trend chart.
+        daily: list[dict[str, Any]] = []
+        for offset in range(13, -1, -1):
+            day = (now - timedelta(days=offset)).date()
+            count = sum(1 for c in created_ats if c.date() == day)
+            daily.append({"date": day.isoformat(), "count": count})
+
+        # Classify each user's LATEST chart as real vs placeholder (mock/pending).
+        charts = list(
+            (
+                await session.execute(
+                    select(Chart.user_id, Chart.natal_json, Chart.computed_at)
+                )
+            ).all()
+        )
+        latest_by_user: dict[int, tuple[datetime, Any]] = {}
+        for user_id, natal_json, computed_at in charts:
+            when = _as_utc(computed_at) or now
+            prev = latest_by_user.get(user_id)
+            if prev is None or when >= prev[0]:
+                latest_by_user[user_id] = (when, natal_json)
+        real_charts = sum(
+            1 for _, nj in latest_by_user.values() if _is_real_chart(nj)
+        )
+        placeholder_charts = len(latest_by_user) - real_charts
+
+        # Recent signups (newest first) — name + masked phone + chart status only.
+        recent_rows = list(
+            (
+                await session.execute(
+                    select(User).order_by(User.created_at.desc()).limit(12)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        charted_user_ids = set(latest_by_user)
+        recent = [
+            {
+                "name": u.name,
+                "phone": u.phone,
+                "created_at": _as_utc(u.created_at).isoformat()
+                if u.created_at
+                else None,
+                "has_chart": u.id in charted_user_ids,
+            }
+            for u in recent_rows
+        ]
+
+        return {
+            "total_users": total_users,
+            "users_with_chart": users_with_chart,
+            "users_without_chart": max(total_users - users_with_chart, 0),
+            "total_charts": total_charts,
+            "real_charts": real_charts,
+            "placeholder_charts": placeholder_charts,
+            "active_sessions": active_sessions,
+            "new_users_24h": _since(1),
+            "new_users_7d": _since(7),
+            "new_users_30d": _since(30),
+            "signups_daily_14d": daily,
+            "recent_users": recent,
+        }
+
+    async def get_users_by_phones(self, session: AsyncSession, phones: list[str]) -> dict[str, str]:
+        """Resolve user names for a list of phone numbers (admin dashboard helper)."""
+        if not phones:
+            return {}
+        result = await session.execute(
+            select(User.phone, User.name).where(User.phone.in_(phones))
+        )
+        return {row[0]: row[1] for row in result.all()}

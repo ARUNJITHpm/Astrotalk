@@ -40,6 +40,13 @@ async def save_turn(
     messages: list[dict[str, str]],
     reply: str,
     conversation_id: str | None = None,
+    llm_provider: str | None = None,
+    llm_model: str | None = None,
+    prompt_tokens: int | None = None,
+    completion_tokens: int | None = None,
+    total_tokens: int | None = None,
+    price_inr: float | None = None,
+    price_usd: float | None = None,
 ) -> None:
     """Append one conversation turn (this turn's user message(s) + Tara's reply).
 
@@ -57,6 +64,13 @@ async def save_turn(
                 "messages": _latest_user_turn(messages),
                 "reply": reply,
                 "created_at": datetime.now(UTC),
+                "llm_provider": llm_provider,
+                "llm_model": llm_model,
+                "prompt_tokens": prompt_tokens,
+                "completion_tokens": completion_tokens,
+                "total_tokens": total_tokens,
+                "price_inr": price_inr,
+                "price_usd": price_usd,
             }
         )
     except Exception as exc:  # pragma: no cover - depends on Mongo availability

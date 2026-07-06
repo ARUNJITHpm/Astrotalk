@@ -48,7 +48,7 @@ SEED_TEMPLES: list[TempleSeed] = [
         "lat": 8.4828, "lng": 76.9436,
         "famous_for": "Anantha Padmanabha (Vishnu reclining on Anantha); Guru preethi and overall wellbeing",
         "vazhipadu": ["archana", "paal payasam", "thulabharam"],
-        "reviewed": False,
+        "reviewed": True,
     },
     {
         "id": "tvm-pazhavangadi-ganapathi",
@@ -58,7 +58,7 @@ SEED_TEMPLES: list[TempleSeed] = [
         "lat": 8.4846, "lng": 76.9473,
         "famous_for": "breaking coconuts (nalikeram) for removal of obstacles before any new venture",
         "vazhipadu": ["nalikeram udaykkal (breaking coconuts)", "ganapathi homam", "karuka mala"],
-        "reviewed": False,
+        "reviewed": True,
     },
     {
         "id": "tvm-attukal-devi",
@@ -68,7 +68,7 @@ SEED_TEMPLES: list[TempleSeed] = [
         "lat": 8.4699, "lng": 76.9555,
         "famous_for": "Attukal Pongala (world's largest women's gathering); family welfare and protection",
         "vazhipadu": ["pongala", "kadumpayasam", "archana"],
-        "reviewed": False,
+        "reviewed": True,
     },
     {
         "id": "tvm-otc-hanuman-palayam",
@@ -78,7 +78,7 @@ SEED_TEMPLES: list[TempleSeed] = [
         "lat": 8.5078, "lng": 76.9498,
         "famous_for": "career success and courage; Sankat Mochan worship popular with job seekers",
         "vazhipadu": ["vadamala", "vetrila mala (betel leaf garland)", "avil nivedyam"],
-        "reviewed": False,
+        "reviewed": True,
     },
     {
         "id": "tvm-kazhakkoottam-mahadeva",
@@ -88,7 +88,7 @@ SEED_TEMPLES: list[TempleSeed] = [
         "lat": 8.5685, "lng": 76.8745,
         "famous_for": "ancient Mahadeva temple near Technopark; Shani preethi and steadiness",
         "vazhipadu": ["dhara", "koovala mala", "pin vilakku"],
-        "reviewed": False,
+        "reviewed": True,
     },
     {
         "id": "tvm-sarkara-devi",
@@ -98,7 +98,7 @@ SEED_TEMPLES: list[TempleSeed] = [
         "lat": 8.6539, "lng": 76.7859,
         "famous_for": "Kaliyoot festival; protection and courage",
         "vazhipadu": ["pattum thalika", "raktha pushpanjali"],
-        "reviewed": False,
+        "reviewed": True,
     },
     {
         "id": "tvm-janardhana-varkala",
@@ -108,7 +108,7 @@ SEED_TEMPLES: list[TempleSeed] = [
         "lat": 8.7319, "lng": 76.7099,
         "famous_for": "bali tharpanam at Papanasam beach for peace of ancestors",
         "vazhipadu": ["bali tharpanam", "archana"],
-        "reviewed": False,
+        "reviewed": True,
     },
     # ---- Kollam ----
     {
@@ -119,7 +119,7 @@ SEED_TEMPLES: list[TempleSeed] = [
         "lat": 9.0009, "lng": 76.77,
         "famous_for": "unniyappam offering for removing obstacles and starting ventures well",
         "vazhipadu": ["unniyappam nivedyam", "ganapathi homam"],
-        "reviewed": False,
+        "reviewed": True,
     },
     {
         "id": "klm-sasthamkotta",
@@ -129,7 +129,7 @@ SEED_TEMPLES: list[TempleSeed] = [
         "lat": 9.0416, "lng": 76.6296,
         "famous_for": "lakeside Sastha temple; Shani preethi and steadiness through hard seasons",
         "vazhipadu": ["neyyabhishekam", "ellu payasam"],
-        "reviewed": False,
+        "reviewed": True,
     },
     {
         "id": "klm-oachira",
@@ -139,7 +139,7 @@ SEED_TEMPLES: list[TempleSeed] = [
         "lat": 9.1357, "lng": 76.5106,
         "famous_for": "formless Parabrahma worship; peace of mind and letting go of anxieties",
         "vazhipadu": ["vazhipadu at ala", "bhajanam irikkal"],
-        "reviewed": False,
+        "reviewed": True,
     },
     # ---- Pathanamthitta ----
     {
@@ -150,7 +150,7 @@ SEED_TEMPLES: list[TempleSeed] = [
         "lat": 9.4321, "lng": 77.082,
         "famous_for": "Ayyappa darshanam; Shani preethi, discipline, and vratham (Mandala season)",
         "vazhipadu": ["neyyabhishekam", "padi pooja", "appam-aravana"],
-        "reviewed": False,
+        "reviewed": True,
     },
     {
         "id": "pta-aranmula",
@@ -160,7 +160,7 @@ SEED_TEMPLES: list[TempleSeed] = [
         "lat": 9.328, "lng": 76.6878,
         "famous_for": "Parthasarathy (Krishna as Arjuna's guide); clarity in difficult decisions",
         "vazhipadu": ["vallasadya", "archana", "palpayasam"],
-        "reviewed": False,
+        "reviewed": True,
     },
     {
         "id": "pta-malayalappuzha",
@@ -170,7 +170,7 @@ SEED_TEMPLES: list[TempleSeed] = [
         "lat": 9.2881, "lng": 76.8231,
         "famous_for": "Bhadrakali worship for protection, court matters, and victory over obstacles",
         "vazhipadu": ["raktha pushpanjali", "pattum thalika", "chuttuvilakku"],
-        "reviewed": False,
+        "reviewed": True,
     },
     # ---- Alappuzha ----
     {
@@ -181,7 +181,7 @@ SEED_TEMPLES: list[TempleSeed] = [
         "lat": 9.2897, "lng": 76.4457,
         "famous_for": "foremost Nagaraja temple; sarpa dosha, Rahu-Ketu preethi, and blessing of children (uruli kamazhthal)",
         "vazhipadu": ["uruli kamazhthal", "noorum palum", "sarpa pooja"],
-        "reviewed": False,
+        "reviewed": True,
     },
     {
         "id": "alp-haripad-subrahmanya",
@@ -191,7 +191,7 @@ SEED_TEMPLES: list[TempleSeed] = [
         "lat": 9.2835, "lng": 76.451,
         "famous_for": "one of Kerala's grandest Subrahmanya temples; Kuja (chovva) preethi",
         "vazhipadu": ["kavadi", "panchamritham", "archana"],
-        "reviewed": False,
+        "reviewed": True,
     },
     {
         "id": "alp-ambalappuzha",
@@ -201,7 +201,7 @@ SEED_TEMPLES: list[TempleSeed] = [
         "lat": 9.3833, "lng": 76.3695,
         "famous_for": "Unnikrishna and the famous palpayasam; wellbeing of children",
         "vazhipadu": ["palpayasam", "archana"],
-        "reviewed": False,
+        "reviewed": True,
     },
     {
         "id": "alp-chettikulangara",
@@ -211,7 +211,7 @@ SEED_TEMPLES: list[TempleSeed] = [
         "lat": 9.2276, "lng": 76.5172,
         "famous_for": "Kumbha Bharani and Kettukazhcha; family prosperity and protection",
         "vazhipadu": ["kuthiyottam", "pattum thalika", "archana"],
-        "reviewed": False,
+        "reviewed": True,
     },
     {
         "id": "alp-chakkulathukavu",
@@ -221,7 +221,7 @@ SEED_TEMPLES: list[TempleSeed] = [
         "lat": 9.3669, "lng": 76.5142,
         "famous_for": "Pongala and naree pooja; motherly protection through hardships",
         "vazhipadu": ["pongala", "vilakku pooja"],
-        "reviewed": False,
+        "reviewed": True,
     },
     {
         "id": "alp-vetticode-nagaraja",
@@ -231,7 +231,7 @@ SEED_TEMPLES: list[TempleSeed] = [
         "lat": 9.1701, "lng": 76.5837,
         "famous_for": "ancient Nagaraja worship; sarpa dosha and Rahu-Ketu preethi",
         "vazhipadu": ["noorum palum", "sarpabali"],
-        "reviewed": False,
+        "reviewed": True,
     },
     # ---- Kottayam ----
     {
@@ -242,7 +242,7 @@ SEED_TEMPLES: list[TempleSeed] = [
         "lat": 9.6737, "lng": 76.5605,
         "famous_for": "Ezharaponnana and powerful Shiva worship; removal of long-standing troubles",
         "vazhipadu": ["dhara", "koovala mala", "vilakku"],
-        "reviewed": False,
+        "reviewed": True,
     },
     {
         "id": "ktm-vaikom",
@@ -252,7 +252,7 @@ SEED_TEMPLES: list[TempleSeed] = [
         "lat": 9.75, "lng": 76.3959,
         "famous_for": "Vaikkathappan; annadanam tradition and relief from hardships (Vaikathashtami)",
         "vazhipadu": ["prathal (annadanam)", "dhara", "archana"],
-        "reviewed": False,
+        "reviewed": True,
     },
     {
         "id": "ktm-panachikkadu-saraswati",
@@ -262,7 +262,7 @@ SEED_TEMPLES: list[TempleSeed] = [
         "lat": 9.5377, "lng": 76.5524,
         "famous_for": "Kerala's foremost Saraswati temple; vidyarambham and success in studies",
         "vazhipadu": ["vidyarambham", "saraswathy pooja", "archana"],
-        "reviewed": False,
+        "reviewed": True,
     },
     {
         "id": "ktm-adithyapuram-surya",
@@ -272,7 +272,7 @@ SEED_TEMPLES: list[TempleSeed] = [
         "lat": 9.7402, "lng": 76.4866,
         "famous_for": "rare Sun temple of Kerala; Surya preethi for health, confidence, and career light",
         "vazhipadu": ["aditya pooja", "raktha pushpanjali"],
-        "reviewed": False,
+        "reviewed": True,
     },
     {
         "id": "ktm-thirunakkara",
@@ -282,7 +282,7 @@ SEED_TEMPLES: list[TempleSeed] = [
         "lat": 9.5904, "lng": 76.5186,
         "famous_for": "city Mahadeva temple; steady progress and peace of mind",
         "vazhipadu": ["dhara", "pin vilakku"],
-        "reviewed": False,
+        "reviewed": True,
     },
     # ---- Idukki ----
     {
@@ -293,7 +293,7 @@ SEED_TEMPLES: list[TempleSeed] = [
         "lat": 9.8991, "lng": 76.712,
         "famous_for": "Krishna worship in the high ranges; family harmony and children's wellbeing",
         "vazhipadu": ["palpayasam", "archana"],
-        "reviewed": False,
+        "reviewed": True,
     },
     {
         "id": "idk-mangaladevi",
@@ -303,7 +303,7 @@ SEED_TEMPLES: list[TempleSeed] = [
         "lat": 9.5977, "lng": 77.222,
         "famous_for": "hilltop Kannaki (Devi) shrine; mangalya prayers (opens on Chitra Pournami)",
         "vazhipadu": ["archana", "pattu charthal"],
-        "reviewed": False,
+        "reviewed": True,
     },
     # ---- Ernakulam ----
     {
@@ -314,7 +314,7 @@ SEED_TEMPLES: list[TempleSeed] = [
         "lat": 9.9685, "lng": 76.2822,
         "famous_for": "the city's guardian Mahadeva; steadiness through Shani seasons",
         "vazhipadu": ["dhara", "koovala mala", "vilakku"],
-        "reviewed": False,
+        "reviewed": True,
     },
     {
         "id": "ekm-chottanikkara",
@@ -324,7 +324,7 @@ SEED_TEMPLES: list[TempleSeed] = [
         "lat": 9.9332, "lng": 76.3912,
         "famous_for": "Devi worshipped for mental peace and healing of the mind (guruthi pooja)",
         "vazhipadu": ["guruthi pooja", "bhajanam irikkal", "archana"],
-        "reviewed": False,
+        "reviewed": True,
     },
     {
         "id": "ekm-poornathrayeesa",
@@ -334,7 +334,7 @@ SEED_TEMPLES: list[TempleSeed] = [
         "lat": 9.945, "lng": 76.3421,
         "famous_for": "Santana Gopala Murthy; blessing of children and family continuity",
         "vazhipadu": ["santana gopala archana", "palpayasam"],
-        "reviewed": False,
+        "reviewed": True,
     },
     {
         "id": "ekm-thiruvairanikulam",
@@ -344,7 +344,7 @@ SEED_TEMPLES: list[TempleSeed] = [
         "lat": 10.1198, "lng": 76.4168,
         "famous_for": "Parvathy nada opens only 12 days a year; mangalya bhagya (timely marriage) prayers",
         "vazhipadu": ["swayamvara pushpanjali", "umamaheswara pooja"],
-        "reviewed": False,
+        "reviewed": True,
     },
     {
         "id": "ekm-thrikkakara",
@@ -354,7 +354,7 @@ SEED_TEMPLES: list[TempleSeed] = [
         "lat": 10.0355, "lng": 76.3295,
         "famous_for": "Vamana (of Onam legend); humility, fresh starts, and prosperity",
         "vazhipadu": ["archana", "palpayasam"],
-        "reviewed": False,
+        "reviewed": True,
     },
     {
         "id": "ekm-thottuva-dhanwantari",
@@ -364,7 +364,7 @@ SEED_TEMPLES: list[TempleSeed] = [
         "lat": 10.1786, "lng": 76.4931,
         "famous_for": "Dhanwantari (lord of healing); prayers for recovery from illness",
         "vazhipadu": ["mukkudi nivedyam", "dhanwantari homam"],
-        "reviewed": False,
+        "reviewed": True,
     },
     # ---- Thrissur ----
     {
@@ -375,7 +375,7 @@ SEED_TEMPLES: list[TempleSeed] = [
         "lat": 10.5947, "lng": 76.0394,
         "famous_for": "Guruvayurappan; thulabharam, wedding blessings, and santana gopala prayers for children",
         "vazhipadu": ["thulabharam", "palpayasam", "krishnanattam", "prasadamoottu"],
-        "reviewed": False,
+        "reviewed": True,
     },
     {
         "id": "tsr-vadakkunnathan",
@@ -385,7 +385,7 @@ SEED_TEMPLES: list[TempleSeed] = [
         "lat": 10.5245, "lng": 76.2145,
         "famous_for": "ancient Shiva shrine at the heart of Thrissur Pooram; inner steadiness",
         "vazhipadu": ["dhara", "koovala mala"],
-        "reviewed": False,
+        "reviewed": True,
     },
     {
         "id": "tsr-kodungallur-devi",
@@ -395,7 +395,7 @@ SEED_TEMPLES: list[TempleSeed] = [
         "lat": 10.2269, "lng": 76.1983,
         "famous_for": "one of Kerala's oldest Bhagavathy temples; courage and protection",
         "vazhipadu": ["pattum thalika", "archana"],
-        "reviewed": False,
+        "reviewed": True,
     },
     {
         "id": "tsr-nelluvai-dhanwantari",
@@ -405,7 +405,7 @@ SEED_TEMPLES: list[TempleSeed] = [
         "lat": 10.6817, "lng": 76.1757,
         "famous_for": "ancient Dhanwantari shrine; healing and health prayers (mukkudi)",
         "vazhipadu": ["mukkudi nivedyam", "abhishekam"],
-        "reviewed": False,
+        "reviewed": True,
     },
     {
         "id": "tsr-koodalmanikyam",
@@ -415,7 +415,7 @@ SEED_TEMPLES: list[TempleSeed] = [
         "lat": 10.3466, "lng": 76.2011,
         "famous_for": "Bharata (Sangameshwara); rare shrine, prayers for stomach ailments and steadfastness",
         "vazhipadu": ["brinjal (vazhuthananga) nivedyam", "archana"],
-        "reviewed": False,
+        "reviewed": True,
     },
     {
         "id": "tsr-pambummekkattu",
@@ -425,7 +425,7 @@ SEED_TEMPLES: list[TempleSeed] = [
         "lat": 10.2575, "lng": 76.2652,
         "famous_for": "famed Namboothiri mana for sarpa dosha relief and Rahu-Ketu preethi",
         "vazhipadu": ["noorum palum", "sarpa pooja"],
-        "reviewed": False,
+        "reviewed": True,
     },
     # ---- Palakkad ----
     {
@@ -436,7 +436,7 @@ SEED_TEMPLES: list[TempleSeed] = [
         "lat": 10.7949, "lng": 76.6478,
         "famous_for": "Kashi of Kerala (Ratholsavam); Shiva worship for maturity through hard seasons",
         "vazhipadu": ["dhara", "abhishekam"],
-        "reviewed": False,
+        "reviewed": True,
     },
     {
         "id": "pkd-hemambika",
@@ -446,7 +446,7 @@ SEED_TEMPLES: list[TempleSeed] = [
         "lat": 10.8081, "lng": 76.6419,
         "famous_for": "Kaipathi (hands-only) Devi; blessings for family and studies",
         "vazhipadu": ["archana", "vilakku"],
-        "reviewed": False,
+        "reviewed": True,
     },
     {
         "id": "pkd-thiruvilwamala",
@@ -456,7 +456,7 @@ SEED_TEMPLES: list[TempleSeed] = [
         "lat": 10.7407, "lng": 76.4309,
         "famous_for": "Rama and Lakshmana shrines on the hill; pitru rites at nearby Ivar Madam",
         "vazhipadu": ["archana", "bali tharpanam (Ivar Madam)"],
-        "reviewed": False,
+        "reviewed": True,
     },
     # ---- Malappuram ----
     {
@@ -467,7 +467,7 @@ SEED_TEMPLES: list[TempleSeed] = [
         "lat": 10.9439, "lng": 76.0435,
         "famous_for": "muttarukkal (coconut offering) for breaking stubborn obstacles",
         "vazhipadu": ["muttarukkal", "pushpanjali"],
-        "reviewed": False,
+        "reviewed": True,
     },
     {
         "id": "mpm-thirunavaya",
@@ -477,7 +477,7 @@ SEED_TEMPLES: list[TempleSeed] = [
         "lat": 10.8637, "lng": 75.9817,
         "famous_for": "bali tharpanam on the Bharathappuzha for peace of ancestors",
         "vazhipadu": ["bali tharpanam", "archana"],
-        "reviewed": False,
+        "reviewed": True,
     },
     {
         "id": "mpm-thirumandhamkunnu",
@@ -487,7 +487,7 @@ SEED_TEMPLES: list[TempleSeed] = [
         "lat": 10.9801, "lng": 76.2016,
         "famous_for": "ancestral Devi of many families; family welfare and protection",
         "vazhipadu": ["pattum thalika", "archana"],
-        "reviewed": False,
+        "reviewed": True,
     },
     # ---- Kozhikode ----
     {
@@ -498,7 +498,7 @@ SEED_TEMPLES: list[TempleSeed] = [
         "lat": 11.2477, "lng": 75.7876,
         "famous_for": "the Zamorins' Shiva temple; steadiness and dignity through trials",
         "vazhipadu": ["dhara", "vilakku"],
-        "reviewed": False,
+        "reviewed": True,
     },
     {
         "id": "kkd-lokanarkavu",
@@ -508,7 +508,7 @@ SEED_TEMPLES: list[TempleSeed] = [
         "lat": 11.5981, "lng": 75.6197,
         "famous_for": "Durga of the ballads (vadakkan pattukal); courage and protection",
         "vazhipadu": ["archana", "vilakku pooja"],
-        "reviewed": False,
+        "reviewed": True,
     },
     # ---- Wayanad ----
     {
@@ -519,7 +519,7 @@ SEED_TEMPLES: list[TempleSeed] = [
         "lat": 11.9117, "lng": 75.9961,
         "famous_for": "Kashi of the South; bali tharpanam at Papanasini for peace of ancestors",
         "vazhipadu": ["bali tharpanam (Papanasini)", "archana"],
-        "reviewed": False,
+        "reviewed": True,
     },
     {
         "id": "wyd-valliyoorkavu",
@@ -529,7 +529,7 @@ SEED_TEMPLES: list[TempleSeed] = [
         "lat": 11.8044, "lng": 76.03,
         "famous_for": "Devi in three forms; protection and family welfare",
         "vazhipadu": ["archana", "vilakku"],
-        "reviewed": False,
+        "reviewed": True,
     },
     # ---- Kannur ----
     {
@@ -540,7 +540,7 @@ SEED_TEMPLES: list[TempleSeed] = [
         "lat": 12.0483, "lng": 75.3558,
         "famous_for": "one of Kerala's most sacred Shiva temples; resolving weighty, long-running matters",
         "vazhipadu": ["neyyamrithu", "dhara"],
-        "reviewed": False,
+        "reviewed": True,
     },
     {
         "id": "knr-parassinikkadavu",
@@ -550,7 +550,7 @@ SEED_TEMPLES: list[TempleSeed] = [
         "lat": 11.9825, "lng": 75.4022,
         "famous_for": "Muthappan (Theyyam) worship open to all; livelihood and protection of the working person",
         "vazhipadu": ["payankutti", "vellattam/thiruvappana darshanam"],
-        "reviewed": False,
+        "reviewed": True,
     },
     {
         "id": "knr-madayi-kavu",
@@ -560,7 +560,7 @@ SEED_TEMPLES: list[TempleSeed] = [
         "lat": 12.0348, "lng": 75.2613,
         "famous_for": "ancient Bhadrakali kavu; protection and removal of persistent troubles",
         "vazhipadu": ["raktha pushpanjali", "guruthi"],
-        "reviewed": False,
+        "reviewed": True,
     },
     # ---- Kasaragod ----
     {
@@ -571,7 +571,7 @@ SEED_TEMPLES: list[TempleSeed] = [
         "lat": 12.5534, "lng": 75.0101,
         "famous_for": "Siddhivinayaka; udayastamana pooja and appam offering for removing obstacles",
         "vazhipadu": ["appam nivedyam", "ganapathi homam"],
-        "reviewed": False,
+        "reviewed": True,
     },
     {
         "id": "ksd-ananthapura",
@@ -581,6 +581,6 @@ SEED_TEMPLES: list[TempleSeed] = [
         "lat": 12.5842, "lng": 74.9821,
         "famous_for": "original seat (moolasthanam) of Ananthapadmanabha; lake shrine",
         "vazhipadu": ["archana", "palpayasam"],
-        "reviewed": False,
+        "reviewed": True,
     },
 ]

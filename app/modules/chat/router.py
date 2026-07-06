@@ -70,7 +70,8 @@ async def send_message(
     debug = payload.debug and get_settings().app_env != "production"
     result = await _service.handle_message(
         user.phone, messages, session,
-        debug=debug, prashnam=payload.prashnam, provider=payload.provider,
+        debug=debug, prashnam=payload.prashnam, porutham=payload.porutham,
+        provider=payload.provider,
     )
 
     # Persist history + schedule durable-memory extraction only on the normal
@@ -83,6 +84,13 @@ async def send_message(
             messages,
             result.reply,
             payload.conversation_id,
+            llm_provider=result.llm_provider,
+            llm_model=result.llm_model,
+            prompt_tokens=result.prompt_tokens,
+            completion_tokens=result.completion_tokens,
+            total_tokens=result.total_tokens,
+            price_inr=result.price_inr,
+            price_usd=result.price_usd,
         )
         background_tasks.add_task(memory.extract_memory, user.phone, messages)
 

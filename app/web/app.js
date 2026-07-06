@@ -122,6 +122,7 @@
     // shows in the sidebar via loadHistory().
     conversationId = newConversationId();
     messages = [];
+    activePorutham = null; // partner context belongs to the old conversation
     document.querySelectorAll(".history-item.active").forEach((el) =>
       el.classList.remove("active")
     );
@@ -182,8 +183,31 @@
     return row.querySelector(".bubble");
   }
 
-  function scrollToBottom() {
+  // Stick-to-bottom: while the reply types out, follow it only if the user is
+  // already at the bottom — scrolling up to read must not be fought.
+  let stickToBottom = true;
+  messagesEl.addEventListener("scroll", () => {
+    stickToBottom =
+      messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < 80;
+  });
+
+  function scrollToBottom(force = false) {
+    if (!force && !stickToBottom) return;
     messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  // ChatGPT-style reading position: pin the QUESTION to the top of the view
+  // when the reply starts; the answer grows downward without moving the view.
+  function anchorToLatestUser() {
+    const rows = messagesEl.querySelectorAll(".row");
+    let row = null;
+    for (const r of rows) if (r.querySelector(".avatar.user")) row = r;
+    if (!row) return;
+    const top =
+      row.getBoundingClientRect().top -
+      messagesEl.getBoundingClientRect().top +
+      messagesEl.scrollTop;
+    messagesEl.scrollTop = Math.max(0, top - 12);
   }
 
   // --- Persisted history (MongoDB, via GET /chat/history/{user_id}) ---
@@ -280,17 +304,23 @@
     if (!conv) return;
     // Rebuild the full transcript from every turn, in order.
     messages = [];
+    activePorutham = null; // partner context is not persisted across reloads
     conv.turns.forEach((t) => {
       (t.messages || []).forEach((m) => messages.push({ role: m.role, content: m.content }));
       messages.push({ role: "assistant", content: t.reply });
     });
     conversationId = cid; // keep chatting appends to this same conversation
     messagesEl.innerHTML = "";
-    messages.forEach((m) => addRow(m.role, m.content));
+    messages.forEach((m, i) => {
+      const bubble = addRow(m.role, m.content);
+      if (m.role === "assistant")
+        addActions(bubble.closest(".row"), m.content, i, i === messages.length - 1);
+    });
     document.querySelectorAll(".history-item.active").forEach((el) =>
       el.classList.remove("active")
     );
-    scrollToBottom();
+    stickToBottom = true;
+    scrollToBottom(true);
     input.focus();
     loadHistory(); // re-mark the active item
   }
@@ -333,6 +363,8 @@
 
   // Reveal text with a lightweight typewriter effect. The API returns the full
   // reply at once (JSON), so we animate it here to keep the live-typing feel.
+  // No scrolling in here — the view is anchored at the question when the
+  // reply starts and must not chase the growing text.
   function typeOut(bubble, cursor, text) {
     return new Promise((resolve) => {
       let i = 0;
@@ -340,7 +372,6 @@
         i = Math.min(text.length, i + 2); // ~2 chars per tick
         bubble.textContent = text.slice(0, i);
         bubble.appendChild(cursor);
-        scrollToBottom();
         if (i < text.length) setTimeout(step, 12);
         else resolve();
       };
@@ -386,16 +417,137 @@
     scrollToBottom();
   }
 
-  async function send(text, prashnam = null) {
+  // --- message actions: copy / retry / feedback (Claude-desktop style) ---
+  // Feedback lives client-side (localStorage), keyed by conversation + message
+  // index, so thumbs survive reloads of the same conversation.
+  const FB_KEY = "tara_feedback";
+  const fbLoad = () => {
+    try { return JSON.parse(localStorage.getItem(FB_KEY)) || {}; } catch (_) { return {}; }
+  };
+  const fbGet = (cid, idx) => fbLoad()[`${cid}|${idx}`] || null;
+  const fbSet = (cid, idx, val) => {
+    const m = fbLoad();
+    if (val) m[`${cid}|${idx}`] = val;
+    else delete m[`${cid}|${idx}`];
+    localStorage.setItem(FB_KEY, JSON.stringify(m));
+  };
+
+  async function copyText(text) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch (_) {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      let ok = false;
+      try { ok = document.execCommand("copy"); } catch (_) {}
+      ta.remove();
+      return ok;
+    }
+  }
+
+  function mkAct(cls, icon, title, onClick) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = `msg-act ${cls}`;
+    b.textContent = icon;
+    b.title = title;
+    b.setAttribute("aria-label", title);
+    b.addEventListener("click", onClick);
+    return b;
+  }
+
+  // Attach copy/retry/feedback under an assistant row. Retry only makes sense
+  // on the newest reply, so a canRetry bar strips retry from older bars first.
+  function addActions(row, text, idx, canRetry) {
+    if (!row) return;
+    const old = row.querySelector(".msg-actions");
+    if (old) old.remove();
+    if (canRetry)
+      document.querySelectorAll(".msg-act.retry").forEach((b) => b.remove());
+
+    const bar = document.createElement("div");
+    bar.className = "msg-actions";
+
+    const copyBtn = mkAct("copy", "📋", "പകർത്തൂ", async () => {
+      const ok = await copyText(text);
+      copyBtn.textContent = ok ? "✓" : "📋";
+      copyBtn.classList.toggle("done", ok);
+      setTimeout(() => {
+        copyBtn.textContent = "📋";
+        copyBtn.classList.remove("done");
+      }, 1400);
+    });
+    bar.appendChild(copyBtn);
+
+    if (canRetry) bar.appendChild(mkAct("retry", "🔄", "വീണ്ടും ശ്രമിക്കൂ", retryLast));
+
+    const up = mkAct("fb-up", "👍", "നല്ല മറുപടി", () => setFb("up"));
+    const down = mkAct("fb-down", "👎", "മെച്ചപ്പെടുത്തണം", () => setFb("down"));
+    const saved = fbGet(conversationId, idx);
+    if (saved === "up") up.classList.add("active");
+    if (saved === "down") down.classList.add("active");
+    function setFb(val) {
+      const already = (val === "up" ? up : down).classList.contains("active");
+      up.classList.toggle("active", !already && val === "up");
+      down.classList.toggle("active", !already && val === "down");
+      fbSet(conversationId, idx, already ? null : val);
+      const prev = bar.querySelector(".msg-act-note");
+      if (prev) prev.remove();
+      if (!already) {
+        const note = document.createElement("span");
+        note.className = "msg-act-note";
+        note.textContent = "നന്ദി 🙏";
+        bar.appendChild(note);
+        setTimeout(() => note.remove(), 1600);
+      }
+    }
+    bar.appendChild(up);
+    bar.appendChild(down);
+
+    row.querySelector(".content").appendChild(bar);
+  }
+
+  // Re-ask the last question: drop the newest reply, resend the same turn.
+  function retryLast() {
+    if (streaming) return;
+    if (messages.length && messages[messages.length - 1].role === "assistant") {
+      messages.pop();
+      const rows = messagesEl.querySelectorAll(".row");
+      for (let i = rows.length - 1; i >= 0; i--) {
+        if (rows[i].querySelector(".avatar.assistant")) { rows[i].remove(); break; }
+      }
+    }
+    if (!messages.length || messages[messages.length - 1].role !== "user") return;
+    send(null, null, null, true);
+  }
+
+  // The partner from the last 💑 form stays attached for the REST of the
+  // conversation, so follow-up questions ("what are our stars?") keep the
+  // engine's computed porutham facts in the prompt — the LLM can't reliably
+  // dig them out of chat history on its own. Cleared on new chat / switch.
+  let activePorutham = null;
+
+  async function send(text, prashnam = null, porutham = null, resend = false) {
+    if (porutham) activePorutham = porutham;
+    else porutham = activePorutham;
     // Retire the previous turn's follow-up chips — stale ones pile up fast.
     document.querySelectorAll(".followups").forEach((el) => el.remove());
-    messages.push({ role: "user", content: text });
-    addRow("user", text);
+    if (!resend) {
+      messages.push({ role: "user", content: text });
+      addRow("user", text);
+    }
 
     const bubble = addRow("assistant", "");
     const cursor = document.createElement("span");
     cursor.className = "cursor";
     bubble.appendChild(cursor);
+    // Pin the question to the top — the reply streams downward from here.
+    anchorToLatestUser();
 
     streaming = true;
     sendBtn.disabled = true;
@@ -410,6 +562,7 @@
           conversation_id: conversationId,
           messages,
           prashnam,
+          porutham,
           provider: modelProvider,
           debug: debugMode,
         }),
@@ -442,6 +595,8 @@
       streaming = false;
       sendBtn.disabled = false;
       messages.push({ role: "assistant", content: reply });
+      // copy / retry / feedback bar — retry lives only on this newest reply
+      addActions(bubble.closest(".row"), reply, messages.length - 1, true);
       input.focus();
       loadHistory(); // refresh sidebar with the just-persisted turn
       loadMemory(); // reflect any newly-distilled facts
@@ -631,6 +786,46 @@
   }
 
   // --- Profile card: the logged-in user's details ---
+  // Fixed astro identity on the profile card (nakshatram / rasi / lagnam /
+  // running dasha) — fetched once from the user's stored chart and cached.
+  let natalCache = null;
+  const LORD_ML = {
+    surya: "സൂര്യൻ", chandra: "ചന്ദ്രൻ", chevvai: "ചൊവ്വ", budhan: "ബുധൻ",
+    guru: "വ്യാഴം", shukran: "ശുക്രൻ", shani: "ശനി", rahu: "രാഹു", ketu: "കേതു",
+  };
+  // One fetch of the stored natal chart serves both the profile card's astro
+  // rows and the എന്റെ ജാതകം drawer. Throws so callers can show a fallback.
+  async function fetchNatal() {
+    if (natalCache) return natalCache;
+    const uid = profile && profile.id;
+    if (!uid) throw new Error("no uid");
+    const res = await fetch(`/identity/users/${uid}/chart`, { headers: authHeaders() });
+    if (res.status === 401) { sessionExpired(); throw new Error("401"); }
+    if (!res.ok) throw new Error("no chart");
+    natalCache = (await res.json()).natal_json;
+    return natalCache;
+  }
+  async function fillProfileAstro() {
+    const set = (id, v) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = v || "—";
+    };
+    let n;
+    try {
+      n = (await fetchNatal()) || {};
+    } catch (_) {
+      return ["pf-star", "pf-rasi", "pf-lagnam", "pf-dasha"].forEach((i) => set(i));
+    }
+    set("pf-star", (n.nakshatram || "—") +
+      (n.nakshatra_pada ? ` · പാദം ${n.nakshatra_pada}` : ""));
+    set("pf-rasi", n.rasi);
+    set("pf-lagnam", n.lagnam);
+    const cur = n.dasha && n.dasha.current;
+    const maha = cur && (cur.mahadasha || cur);
+    const lord = maha && (maha.lord_ml || LORD_ML[maha.lord] || maha.lord);
+    set("pf-dasha", lord ? lord + " ദശ" : "—");
+  }
+
   function openProfile() {
     const p = profile || {};
     const name = userName || p.name || "";
@@ -640,6 +835,7 @@
     document.getElementById("pf-dob").textContent = p.dob || "—";
     document.getElementById("pf-time").textContent = p.birth_time || "അറിയില്ല";
     document.getElementById("pf-place").textContent = p.birth_place || "—";
+    fillProfileAstro(); // async — rows show "…" until the chart arrives
     profileModal.hidden = false;
   }
   function closeProfile() {
@@ -655,6 +851,41 @@
 
   logoutBtn.addEventListener("click", logout);
   changeNumberBtn.addEventListener("click", logout);
+
+  // --- എന്റെ ജാതകം drawer: the user's natal chart, rendered by chart.js ---
+  const chartDrawer = document.getElementById("chart-drawer");
+  const chartBackdrop = document.getElementById("chart-backdrop");
+  const chartBody = document.getElementById("chart-body");
+  let chartRendered = false;
+  async function openChart() {
+    chartBackdrop.hidden = false;
+    chartDrawer.classList.add("open");
+    if (chartRendered) return;
+    if (!(profile && profile.id)) {
+      chartBody.innerHTML =
+        '<div class="muted" style="text-align:center;padding:40px 12px">ജാതകം കാണാൻ ഒരിക്കൽ ലോഗ്ഔട്ട് ചെയ്ത് വീണ്ടും ലോഗിൻ ചെയ്യൂ 🙏</div>';
+      return;
+    }
+    try {
+      const natal = await fetchNatal();
+      chartBody.innerHTML = TaraChart.render(natal, profile);
+      TaraChart.bind(chartBody, natal, profile);
+      chartRendered = true;
+    } catch (_) {
+      chartBody.innerHTML =
+        '<div class="muted" style="text-align:center;padding:40px 12px">ജാതകം ലഭ്യമല്ല — അല്പസമയത്തിനു ശേഷം ശ്രമിക്കൂ 🙏</div>';
+    }
+  }
+  function closeChart() {
+    chartDrawer.classList.remove("open");
+    chartBackdrop.hidden = true;
+  }
+  document.getElementById("chart-open").addEventListener("click", openChart);
+  document.getElementById("chart-close").addEventListener("click", closeChart);
+  chartBackdrop.addEventListener("click", closeChart);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeChart();
+  });
 
   // --- Prashnam (Kerala horary): thamboola count / swarna arudha pick ---
   // The pick is sent as a structured `prashnam` field; the SERVER computes the
@@ -777,6 +1008,76 @@
   prashnamClose.addEventListener("click", closePrashnam);
   prashnamModal.addEventListener("click", (e) => {
     if (e.target === prashnamModal) closePrashnam();
+  });
+
+  // --- Porutham (ദശപൊരുത്തം): partner's birth details, matched server-side ---
+  // The form collects only the partner's details; the SERVER computes the
+  // partner's chart and grades the ten Kerala poruthams against the logged-in
+  // user's own chart. `gender` is the PARTNER's — the user is the opposite side.
+  const poruthamModal = document.getElementById("porutham-modal");
+  const poruthamOpen = document.getElementById("porutham-open");
+  const poruthamClose = document.getElementById("porutham-close");
+  const poruthamName = document.getElementById("porutham-name");
+  const poruthamDob = document.getElementById("porutham-dob");
+  const poruthamTime = document.getElementById("porutham-time");
+  const poruthamPlace = document.getElementById("porutham-place");
+  const poruthamSend = document.getElementById("porutham-send");
+  const poruthamError = document.getElementById("porutham-error");
+  let partnerGender = "female";
+
+  function openPorutham() {
+    if (streaming) return;
+    poruthamError.hidden = true;
+    poruthamModal.hidden = false;
+    poruthamName.focus();
+  }
+  function closePorutham() {
+    poruthamModal.hidden = true;
+  }
+  function poruthamFail(msg) {
+    poruthamError.textContent = msg;
+    poruthamError.hidden = false;
+  }
+
+  poruthamModal.querySelectorAll(".porutham-sex").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      partnerGender = btn.dataset.gender;
+      poruthamModal
+        .querySelectorAll(".porutham-sex")
+        .forEach((b) => b.classList.toggle("active", b === btn));
+    });
+  });
+
+  function submitPorutham() {
+    if (streaming) return;
+    const name = poruthamName.value.trim();
+    const dob = poruthamDob.value; // YYYY-MM-DD from <input type=date>
+    const time = poruthamTime.value; // HH:MM or ""
+    const place = poruthamPlace.value.trim();
+    if (!dob) return poruthamFail("പങ്കാളിയുടെ ജനന തീയതി നൽകൂ.");
+    if (!place) return poruthamFail("പങ്കാളിയുടെ ജനന സ്ഥലം നൽകൂ.");
+    const porutham = {
+      name,
+      gender: partnerGender,
+      dob,
+      birth_time: time || null,
+      birth_place: place,
+    };
+    closePorutham();
+    // Reset for next time.
+    poruthamName.value = "";
+    poruthamDob.value = "";
+    poruthamTime.value = "";
+    poruthamPlace.value = "";
+    const who = name || "പങ്കാളി";
+    send(`💑 ${who}യുമായുള്ള പൊരുത്തം നോക്കാമോ?`, null, porutham);
+  }
+
+  poruthamSend.addEventListener("click", submitPorutham);
+  poruthamOpen.addEventListener("click", openPorutham);
+  poruthamClose.addEventListener("click", closePorutham);
+  poruthamModal.addEventListener("click", (e) => {
+    if (e.target === poruthamModal) closePorutham();
   });
 
   // Fill in the display name for sessions that logged in before the name was
