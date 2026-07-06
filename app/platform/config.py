@@ -91,6 +91,10 @@ class Settings(BaseSettings):
     # ---- Payments (Razorpay) ----
     razorpay_key_id: str = ""
     razorpay_key_secret: str = ""
+    # Secret Razorpay signs webhook bodies with (dashboard → webhooks). With
+    # mock_razorpay on and this empty, webhook signatures are skipped (dev);
+    # in live mode an empty secret rejects every webhook (fail closed).
+    razorpay_webhook_secret: str = ""
 
     # ---- Object storage (Cloudflare R2, S3-compatible) ----
     # Generated media (share cards, report PDFs, logos) can't live on the

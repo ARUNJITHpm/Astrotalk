@@ -535,6 +535,18 @@ class IdentityService:
         code_row.reward_granted_at = datetime.now(UTC)
         await session.flush()
         metrics.increment("identity.referral_rewards_granted")
+        # The durable unlock: a premium-report entitlement in commerce (5a).
+        # Local import — commerce also mounts identity's auth dependency, and a
+        # module-level import here would make that cycle load-order sensitive.
+        from app.modules.commerce.service import CommerceService
+
+        await CommerceService().grant_entitlement(
+            session,
+            user_id=code_row.user_id,
+            product_key="premium_report",
+            granted_by="referral",
+            source=code_row.code,
+        )
         logger.info(
             "identity: referral reward unlocked for user %s (%s activations)",
             code_row.user_id, activated,
