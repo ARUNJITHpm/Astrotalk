@@ -77,6 +77,13 @@ def _load_font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
         return ImageFont.load_default()
 
 
+def load_font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
+    """Public: the app's Malayalam-capable font at ``size`` (same resolution
+    order as the cards). Other renderers (PDF reports) reuse it so every
+    generated artifact shares one typeface and one shaping path."""
+    return _load_font(size)
+
+
 def _wrap(draw: ImageDraw.ImageDraw, text: str, font, max_width: int) -> list[str]:
     """Word-wrap by rendered pixel width (Malayalam word-spaces wrap fine)."""
     lines: list[str] = []

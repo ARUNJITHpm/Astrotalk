@@ -278,3 +278,52 @@ class CommerceService:
                 )
             ).scalars().all()
         )
+
+    # ---- premium report (Part 5b) ----
+
+    class NotEntitled(PermissionError):
+        """The user has no premium_report entitlement — 402 at the boundary."""
+
+    class NoChart(LookupError):
+        """The user has no computed chart to report on."""
+
+    async def generate_premium_report(
+        self, session: AsyncSession, user: Any
+    ) -> str:
+        """Render (or reuse today's) premium PDF for an ENTITLED user.
+
+        Returns the storage key; the router turns it into a download URL.
+        ``user`` is identity's User row (the router already resolved it from
+        the bearer token — birth data never crosses in a URL).
+        """
+        if not await self.has_entitlement(session, user.id, "premium_report"):
+            raise self.NotEntitled()
+
+        # Chart via identity's PUBLIC service (AGENTS.md). Local import: identity
+        # imports this module for referral rewards, so top-level would cycle.
+        from app.modules.identity.service import IdentityService
+
+        chart_row = await IdentityService().get_chart(session, user.id)
+        chart = chart_row.natal_json if chart_row else None
+        if not isinstance(chart, dict) or chart.get("status") == "pending":
+            raise self.NoChart()
+
+        from anyio import to_thread
+
+        from app.modules.commerce.reports import build_premium_report
+        from app.platform.storage import get_storage
+
+        key = f"reports/{user.id}/premium-{datetime.now(UTC).date().isoformat()}.pdf"
+        storage = get_storage()
+        if storage.get(key) is None:  # one render per user per day is plenty
+            pdf = await to_thread.run_sync(
+                lambda: build_premium_report(
+                    name=user.name,
+                    dob=user.dob.isoformat(),
+                    birth_place=user.birth_place,
+                    chart=chart,
+                )
+            )
+            storage.put(key, pdf, "application/pdf")
+            metrics.increment("commerce.reports_generated")
+        return key

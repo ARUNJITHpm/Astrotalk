@@ -70,6 +70,28 @@ async def my_entitlements(user: CurrentUser, session: SessionDep) -> list[Entitl
 
 
 @router.post(
+    "/reports/premium",
+    summary="Generate the premium ജാതക PDF (requires the entitlement)",
+)
+async def premium_report(user: CurrentUser, session: SessionDep) -> dict:
+    """402 without an entitlement (buy or earn via referrals); otherwise the
+    PDF is rendered (once per day) and returned as a download URL."""
+    from app.platform.storage import get_storage
+
+    try:
+        key = await _service.generate_premium_report(session, user)
+    except CommerceService.NotEntitled:
+        raise HTTPException(
+            status.HTTP_402_PAYMENT_REQUIRED,
+            detail="Premium report is locked — purchase it or earn it by inviting friends",
+        )
+    except CommerceService.NoChart:
+        raise HTTPException(status.HTTP_409_CONFLICT, detail="No chart computed yet")
+    await session.commit()
+    return {"download_url": get_storage().url(key)}
+
+
+@router.post(
     "/orders/{order_id}/mock-pay",
     summary="Simulate a capture (mock mode only — 404 when live)",
 )

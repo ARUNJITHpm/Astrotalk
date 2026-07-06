@@ -24,16 +24,22 @@ from app.modules.identity.schemas import UserCreate
 from app.modules.identity.service import IdentityService
 from app.platform.config import get_settings
 from app.platform.db import Base, get_session
+from app.platform.storage import reset_storage
 
 
 @pytest.fixture(autouse=True)
-def _hermetic(monkeypatch):
+def _hermetic(tmp_path, monkeypatch):
     monkeypatch.setenv("MOCK_LLM", "1")
     monkeypatch.setattr(get_settings(), "mock_ephemeris", True)
     monkeypatch.setattr(get_settings(), "mock_geocoding", True)
     monkeypatch.setattr(get_settings(), "mock_razorpay", True)
     monkeypatch.setattr(get_settings(), "razorpay_webhook_secret", "")
     monkeypatch.setattr(get_settings(), "referral_reward_threshold", 1)
+    monkeypatch.setattr(get_settings(), "mock_storage", True)
+    monkeypatch.setattr(get_settings(), "storage_dir", str(tmp_path))
+    reset_storage()
+    yield
+    reset_storage()
 
 
 @pytest_asyncio.fixture
@@ -173,5 +179,44 @@ async def test_commerce_http_flow(session):
             )
             assert resp.status_code == 200
             assert resp.json()["status"] == "unknown-order"
+    finally:
+        main_app.dependency_overrides.pop(get_session, None)
+
+
+@pytest.mark.asyncio
+async def test_premium_report_gated_then_delivered(session):
+    """Part 5b: 402 until entitled, then a real multi-page PDF via /media."""
+    main_app.dependency_overrides[get_session] = lambda: session
+    try:
+        transport = ASGITransport(app=main_app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            reg = await client.post("/identity/users", json={
+                "phone": "+914444444444", "password": "p", "name": "Reader",
+                "dob": "1993-03-03", "birth_time": None, "birth_place": "Kochi",
+            })
+            auth = {"Authorization": f"Bearer {reg.json()['token']}"}
+
+            locked = await client.post("/commerce/reports/premium", headers=auth)
+            assert locked.status_code == 402
+
+            order = (await client.post(
+                "/commerce/orders", json={"product": "premium_report"}, headers=auth
+            )).json()
+            await client.post(f"/commerce/orders/{order['order_id']}/mock-pay", headers=auth)
+
+            report = await client.post("/commerce/reports/premium", headers=auth)
+            assert report.status_code == 200
+            url = report.json()["download_url"]
+            assert url.endswith(".pdf")
+
+            pdf = await client.get(url)
+            assert pdf.status_code == 200
+            assert pdf.headers["content-type"] == "application/pdf"
+            assert pdf.content.startswith(b"%PDF")
+            assert pdf.content.count(b"/Type /Page") >= 4  # 4 rendered pages
+
+            # Second request the same day reuses the stored render.
+            again = await client.post("/commerce/reports/premium", headers=auth)
+            assert again.json()["download_url"] == url
     finally:
         main_app.dependency_overrides.pop(get_session, None)
