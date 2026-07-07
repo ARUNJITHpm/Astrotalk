@@ -9,7 +9,7 @@ to identity; no cross-module FK).
 
 from datetime import UTC, datetime
 
-from sqlalchemy import Text
+from sqlalchemy import Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.platform.db import Base
@@ -38,4 +38,45 @@ class Org(Base):
     plan: Mapped[str] = mapped_column(default="starter")  # one of PLANS
     owner_user_id: Mapped[int | None] = mapped_column(nullable=True, index=True)
     active: Mapped[bool] = mapped_column(default=True)
+    created_at: Mapped[datetime] = mapped_column(default=_utcnow)
+
+
+BOOKING_STATUSES = ("pending", "confirmed", "completed", "cancelled")
+
+
+class AvailabilitySlot(Base):
+    """A weekly recurring consultation window (Part 4b).
+
+    ``start_min``/``end_min`` are minutes from midnight in the org's local
+    time (IST for the Kerala audience); the window is sliced into
+    ``duration_min`` appointments when availability is computed.
+    """
+
+    __tablename__ = "availability_slots"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    org_id: Mapped[int] = mapped_column(index=True)
+    weekday: Mapped[int]  # 0=Monday … 6=Sunday (Python convention)
+    start_min: Mapped[int]
+    end_min: Mapped[int]
+    duration_min: Mapped[int] = mapped_column(default=30)
+    price_paise: Mapped[int] = mapped_column(default=0)  # 0 = free consult
+    active: Mapped[bool] = mapped_column(default=True)
+    created_at: Mapped[datetime] = mapped_column(default=_utcnow)
+
+
+class Booking(Base):
+    __tablename__ = "bookings"
+    # One appointment per org per start time — double-booking is impossible.
+    __table_args__ = (UniqueConstraint("org_id", "starts_at", name="uq_booking_org_start"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    org_id: Mapped[int] = mapped_column(index=True)
+    user_id: Mapped[int] = mapped_column(index=True)
+    starts_at: Mapped[datetime]
+    duration_min: Mapped[int]
+    price_paise: Mapped[int]
+    status: Mapped[str] = mapped_column(default="pending")  # one of BOOKING_STATUSES
+    # The commerce order funding this booking (None for free consults).
+    razorpay_order_id: Mapped[str | None] = mapped_column(nullable=True, default=None)
     created_at: Mapped[datetime] = mapped_column(default=_utcnow)

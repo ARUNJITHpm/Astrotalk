@@ -98,6 +98,53 @@ class CommerceService:
             "mock": _mock_mode(),
         }
 
+    async def create_custom_order(
+        self,
+        session: AsyncSession,
+        *,
+        user_id: int,
+        product: str,
+        amount_paise: int,
+        org_id: int | None = None,
+    ) -> dict[str, Any]:
+        """An order whose price is NOT in the catalog — org-priced things
+        (consultation bookings, Part 4b). The caller (a trusted module, never
+        the client) supplies the amount."""
+        if amount_paise <= 0:
+            raise UnknownProduct("custom orders need a positive amount")
+        if _mock_mode():
+            order_id = f"order_mock_{secrets.token_hex(8)}"
+        else:
+            order_id = await self._razorpay_create_order(amount_paise, product)
+        payment = Payment(
+            user_id=user_id,
+            org_id=org_id,
+            product=product,
+            amount_paise=amount_paise,
+            razorpay_order_id=order_id,
+        )
+        session.add(payment)
+        await session.flush()
+        metrics.increment("commerce.orders_created")
+        return {
+            "order_id": order_id,
+            "product": product,
+            "amount_paise": amount_paise,
+            "currency": "INR",
+            "razorpay_key_id": "" if _mock_mode() else get_settings().razorpay_key_id,
+            "mock": _mock_mode(),
+        }
+
+    async def get_payment_status(
+        self, session: AsyncSession, order_id: str
+    ) -> str | None:
+        """Payment status for one order id (bookings reconcile against this)."""
+        return (
+            await session.execute(
+                select(Payment.status).where(Payment.razorpay_order_id == order_id)
+            )
+        ).scalars().first()
+
     async def _razorpay_create_order(self, amount_paise: int, product: str) -> str:
         import httpx
 

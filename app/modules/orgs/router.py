@@ -11,14 +11,27 @@ API stay identical for every tenant.
 """
 
 import json
+from datetime import date
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import HTMLResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.orgs.schemas import OrgCreate, OrgOut, OrgPublic
+from app.modules.identity.auth import CurrentUser
+from app.modules.orgs import booking as booking_svc
+from app.modules.orgs.models import Org
+from app.modules.orgs.schemas import (
+    BookingCreate,
+    BookingCreated,
+    BookingOut,
+    OrgCreate,
+    OrgOut,
+    OrgPublic,
+    SlotCreate,
+    SlotOut,
+)
 from app.modules.orgs.service import OrgError, OrgsService
 from app.platform.admin_auth import AdminGuard
 from app.platform.db import get_session
@@ -78,6 +91,135 @@ async def org_public(handle: str, session: SessionDep) -> OrgPublic:
     if org is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Org not found")
     return OrgPublic(**_service.public_branding(org))
+
+
+# ---- Booking (Part 4b) ----
+
+
+async def _org_or_404(session: AsyncSession, handle: str) -> Org:
+    org = await _service.get_by_handle(session, handle)
+    if org is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Org not found")
+    return org
+
+
+def _require_owner(org: Org, user) -> None:
+    if org.owner_user_id is None or user.id != org.owner_user_id:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Org owner only")
+
+
+@router.post(
+    "/{handle}/booking/slots",
+    response_model=SlotOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Add a weekly availability window (org owner)",
+)
+async def add_slot(
+    handle: str, payload: SlotCreate, user: CurrentUser, session: SessionDep
+) -> SlotOut:
+    org = await _org_or_404(session, handle)
+    _require_owner(org, user)
+    try:
+        slot = await booking_svc.add_slot(
+            session,
+            org_id=org.id,
+            weekday=payload.weekday,
+            start=payload.start,
+            end=payload.end,
+            duration_min=payload.duration_min,
+            price_paise=payload.price_paise,
+        )
+    except booking_svc.BookingError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
+    await session.commit()
+    return SlotOut.model_validate(slot)
+
+
+@router.get(
+    "/{handle}/booking/availability",
+    summary="Open appointment times for one day (public)",
+)
+async def availability(
+    handle: str,
+    session: SessionDep,
+    day: Annotated[date, Query()],
+) -> list[dict]:
+    org = await _org_or_404(session, handle)
+    return await booking_svc.availability(session, org.id, day)
+
+
+@router.post(
+    "/{handle}/booking",
+    response_model=BookingCreated,
+    status_code=status.HTTP_201_CREATED,
+    summary="Book an open time (paid slots return a checkout order)",
+)
+async def create_booking(
+    handle: str, payload: BookingCreate, user: CurrentUser, session: SessionDep
+) -> BookingCreated:
+    org = await _org_or_404(session, handle)
+    try:
+        booking, order = await booking_svc.book(
+            session, org=org, user_id=user.id, starts_at=payload.starts_at
+        )
+    except booking_svc.BookingError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, detail=str(exc))
+    await session.commit()
+    return BookingCreated(booking=BookingOut.model_validate(booking), order=order)
+
+
+@router.get(
+    "/{handle}/booking/mine",
+    response_model=list[BookingOut],
+    summary="The logged-in user's bookings with this org",
+)
+async def my_bookings(
+    handle: str, user: CurrentUser, session: SessionDep
+) -> list[BookingOut]:
+    org = await _org_or_404(session, handle)
+    rows = await booking_svc.bookings_for_user(session, org.id, user.id)
+    out = [await booking_svc.reconcile(session, org, b) for b in rows]
+    await session.commit()
+    return [BookingOut.model_validate(b) for b in out]
+
+
+@router.get(
+    "/{handle}/booking/bookings",
+    response_model=list[BookingOut],
+    summary="Every booking at this org (owner)",
+)
+async def org_bookings(
+    handle: str, user: CurrentUser, session: SessionDep
+) -> list[BookingOut]:
+    org = await _org_or_404(session, handle)
+    _require_owner(org, user)
+    rows = await booking_svc.bookings_for_org(session, org.id)
+    out = [await booking_svc.reconcile(session, org, b) for b in rows]
+    await session.commit()
+    return [BookingOut.model_validate(b) for b in out]
+
+
+@router.post(
+    "/{handle}/booking/{booking_id}/cancel",
+    response_model=BookingOut,
+    summary="Cancel a booking (its user or the org owner)",
+)
+async def cancel_booking(
+    handle: str, booking_id: int, user: CurrentUser, session: SessionDep
+) -> BookingOut:
+    org = await _org_or_404(session, handle)
+    booking = await booking_svc.get_booking(session, org.id, booking_id)
+    if booking is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Booking not found")
+    is_owner = org.owner_user_id is not None and user.id == org.owner_user_id
+    if booking.user_id != user.id and not is_owner:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Not your booking")
+    try:
+        await booking_svc.cancel(session, booking)
+    except booking_svc.BookingError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, detail=str(exc))
+    await session.commit()
+    return BookingOut.model_validate(booking)
 
 
 # ---- White-label pages ----

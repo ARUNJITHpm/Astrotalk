@@ -37,3 +37,50 @@ class OrgPublic(BaseModel):
     logo_url: str | None
     theme_primary: str
     theme_bg: str
+
+
+class SlotCreate(BaseModel):
+    """A weekly consultation window (org owner only)."""
+
+    weekday: int  # 0=Mon … 6=Sun
+    start: str  # "HH:MM" org-local
+    end: str
+    duration_min: int = 30
+    price_paise: int = 0
+
+
+class SlotOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    weekday: int
+    start_min: int
+    end_min: int
+    duration_min: int
+    price_paise: int
+    active: bool
+
+
+class BookingCreate(BaseModel):
+    """Book one open time (echo a starts_at from the availability list)."""
+
+    starts_at: datetime
+
+
+class BookingOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    starts_at: datetime
+    duration_min: int
+    price_paise: int
+    status: str
+    razorpay_order_id: str | None
+    created_at: datetime
+
+
+class BookingCreated(BaseModel):
+    """The reservation plus (for paid slots) the checkout order."""
+
+    booking: BookingOut
+    order: dict | None = None
