@@ -222,6 +222,130 @@ async def cancel_booking(
     return BookingOut.model_validate(booking)
 
 
+# ---- CRM-lite (Part 4c) — org-owner surfaces ----
+
+
+@router.get("/{handle}/crm/customers", summary="This org's customer list (owner)")
+async def crm_customers(handle: str, user: CurrentUser, session: SessionDep) -> list[dict]:
+    org = await _org_or_404(session, handle)
+    _require_owner(org, user)
+    from app.modules.identity.service import IdentityService
+
+    return await IdentityService().list_users_by_org(session, org.id)
+
+
+async def _crm_customer(session: AsyncSession, handle: str, user, customer_id: int):
+    """(org, customer) after owner + membership checks — the CRM guard."""
+    org = await _org_or_404(session, handle)
+    _require_owner(org, user)
+    from app.modules.identity.service import IdentityService
+
+    customer = await IdentityService().user_belongs_to_org(session, customer_id, org.id)
+    if customer is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Not your customer")
+    return org, customer
+
+
+@router.get(
+    "/{handle}/crm/customers/{customer_id}/chart",
+    summary="The customer's computed chart — the astrologer's prep work (owner)",
+)
+async def crm_customer_chart(
+    handle: str, customer_id: int, user: CurrentUser, session: SessionDep
+) -> dict:
+    _org, customer = await _crm_customer(session, handle, user, customer_id)
+    from app.modules.identity.service import IdentityService
+
+    chart = await IdentityService().get_chart(session, customer.id)
+    if chart is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="No chart yet")
+    return {"user_id": customer.id, "natal_json": chart.natal_json,
+            "computed_at": chart.computed_at.isoformat()}
+
+
+@router.get(
+    "/{handle}/crm/customers/{customer_id}/bookings",
+    response_model=list[BookingOut],
+    summary="The customer's booking history at this org (owner)",
+)
+async def crm_customer_bookings(
+    handle: str, customer_id: int, user: CurrentUser, session: SessionDep
+) -> list[BookingOut]:
+    org, customer = await _crm_customer(session, handle, user, customer_id)
+    rows = await booking_svc.bookings_for_user(session, org.id, customer.id)
+    return [BookingOut.model_validate(b) for b in rows]
+
+
+@router.post(
+    "/{handle}/crm/customers/{customer_id}/notes",
+    status_code=status.HTTP_201_CREATED,
+    summary="Add a private note on a customer (owner)",
+)
+async def crm_add_note(
+    handle: str, customer_id: int, payload: dict, user: CurrentUser, session: SessionDep
+) -> dict:
+    org, customer = await _crm_customer(session, handle, user, customer_id)
+    text = str(payload.get("note", "")).strip()
+    if not text:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Empty note")
+    from app.modules.orgs.models import CustomerNote
+
+    note = CustomerNote(
+        org_id=org.id, customer_user_id=customer.id, author_user_id=user.id,
+        note=text[:4000],
+    )
+    session.add(note)
+    await session.commit()
+    return {"id": note.id, "note": note.note, "created_at": note.created_at.isoformat()}
+
+
+@router.get(
+    "/{handle}/crm/customers/{customer_id}/notes",
+    summary="Private notes on a customer, newest first (owner)",
+)
+async def crm_list_notes(
+    handle: str, customer_id: int, user: CurrentUser, session: SessionDep
+) -> list[dict]:
+    org, customer = await _crm_customer(session, handle, user, customer_id)
+    from sqlalchemy import select as sa_select
+
+    from app.modules.orgs.models import CustomerNote
+
+    rows = (
+        await session.execute(
+            sa_select(CustomerNote)
+            .where(
+                CustomerNote.org_id == org.id,
+                CustomerNote.customer_user_id == customer.id,
+            )
+            .order_by(CustomerNote.created_at.desc())
+        )
+    ).scalars().all()
+    return [
+        {"id": n.id, "note": n.note, "created_at": n.created_at.isoformat()} for n in rows
+    ]
+
+
+@router.get(
+    "/{handle}/crm/customers/{customer_id}/transcript",
+    summary="Chat transcript — ONLY with the customer's explicit consent (owner)",
+)
+async def crm_customer_transcript(
+    handle: str, customer_id: int, user: CurrentUser, session: SessionDep
+) -> list[dict]:
+    """403 until the CUSTOMER flips /identity/transcript-consent — the
+    astrologer can never grant themselves access (plan §4c rule)."""
+    _org, customer = await _crm_customer(session, handle, user, customer_id)
+    if not customer.transcript_consent:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            detail="The customer has not shared their chat transcripts",
+        )
+    from app.modules.chat.service import ChatService
+
+    return await ChatService().get_user_chat_history(customer.phone, limit=200)
+
+
 # ---- White-label pages ----
 
 _BRAND_SNIPPET = """<script>
@@ -268,3 +392,13 @@ async def whitelabel_login(handle: str, session: SessionDep) -> HTMLResponse:
     if org is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Org not found")
     return _inject("ui/login.html", _service.public_branding(org))
+
+
+@whitelabel_router.get("/a/{handle}/dashboard", include_in_schema=False)
+async def whitelabel_dashboard(handle: str, session: SessionDep) -> HTMLResponse:
+    """The astrologer's CRM dashboard (Part 4c). The page loads for anyone;
+    every data call behind it is org-owner-gated at the API."""
+    org = await _service.get_by_handle(session, handle)
+    if org is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Org not found")
+    return _inject("ui/org-dashboard.html", _service.public_branding(org))

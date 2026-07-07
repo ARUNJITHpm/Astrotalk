@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="ml">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard · Tara</title>
+<style>
+  :root { --accent: #e8b64c; --bg: #0b0f2a; --ink: #f5f1e8; --muted: #9aa3c4; }
+  body { margin:0; background:var(--bg); color:var(--ink); font-family:system-ui,sans-serif; }
+  .wrap { max-width:1080px; margin:0 auto; padding:24px 20px 60px; }
+  h1 { font-size:22px; margin:0 0 4px; } .sub { color:var(--muted); font-size:13px; margin-bottom:22px; }
+  .grid { display:grid; grid-template-columns: 320px 1fr; gap:18px; }
+  @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+  .card { background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.1);
+          border-radius:14px; padding:16px; }
+  .card h2 { font-size:14px; color:var(--accent); margin:0 0 12px; }
+  .cust { padding:10px 12px; border-radius:10px; cursor:pointer; font-size:14px; }
+  .cust:hover, .cust.sel { background:rgba(255,255,255,.08); }
+  .cust .m { color:var(--muted); font-size:12px; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th { text-align:left; color:var(--muted); font-weight:600; padding:6px 8px; }
+  td { padding:6px 8px; border-top:1px solid rgba(255,255,255,.08); }
+  .pill { display:inline-block; padding:2px 10px; border-radius:999px; font-size:11px;
+          font-weight:700; text-transform:uppercase; }
+  .pill.confirmed { background:rgba(76,175,130,.18); color:#4caf82; }
+  .pill.pending { background:rgba(232,182,76,.16); color:var(--accent); }
+  .pill.cancelled, .pill.completed { background:rgba(255,255,255,.08); color:var(--muted); }
+  textarea { width:100%; box-sizing:border-box; background:rgba(255,255,255,.06);
+             border:1px solid rgba(255,255,255,.14); color:var(--ink); border-radius:10px;
+             padding:10px; font-size:13px; font-family:inherit; min-height:64px; }
+  button { background:transparent; border:1px solid var(--accent); color:var(--accent);
+           padding:8px 16px; border-radius:999px; font-size:13px; cursor:pointer; margin-top:8px; }
+  .note { font-size:13px; padding:8px 10px; border-left:2px solid var(--accent);
+          margin:8px 0; background:rgba(255,255,255,.03); }
+  .note .m { color:var(--muted); font-size:11px; }
+  .muted { color:var(--muted); font-size:13px; }
+  .chartline { font-size:13px; padding:3px 0; display:flex; justify-content:space-between; }
+  #gate { text-align:center; padding:80px 20px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div id="gate" class="hidden" style="display:none;">
+    <h1>ലോഗിൻ ആവശ്യമാണ്</h1>
+    <p class="muted">ഈ dashboard org ഉടമയ്ക്ക് മാത്രം. <a id="loginLink" href="#" style="color:var(--accent);">ലോഗിൻ ചെയ്യൂ →</a></p>
+  </div>
+  <div id="app" style="display:none;">
+    <h1 id="orgName">Dashboard</h1>
+    <div class="sub">customers · bookings · notes — powered by Tara</div>
+    <div class="grid">
+      <div class="card">
+        <h2>Customers</h2>
+        <div id="customers"><div class="muted">Loading…</div></div>
+      </div>
+      <div>
+        <div class="card" id="detail" style="display:none;">
+          <h2 id="custName"></h2>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+            <div>
+              <h2>ജാതകം (prep)</h2>
+              <div id="chart" class="muted">—</div>
+            </div>
+            <div>
+              <h2>Bookings</h2>
+              <div id="bookings" class="muted">—</div>
+            </div>
+          </div>
+          <h2 style="margin-top:18px;">Private notes</h2>
+          <div id="notes"></div>
+          <textarea id="noteText" placeholder="കുറിപ്പ് എഴുതൂ (customer കാണില്ല)…"></textarea>
+          <button onclick="addNote()">Save note</button>
+          <h2 style="margin-top:18px;">Chat transcript</h2>
+          <div id="transcript" class="muted">—</div>
+        </div>
+        <div class="card muted" id="hint">ഒരു customer തിരഞ്ഞെടുക്കൂ ←</div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+(function () {
+  const handle = location.pathname.split("/")[2];
+  const token = localStorage.getItem("tara_token");
+  const $ = (id) => document.getElementById(id);
+  const H = { "Authorization": "Bearer " + token, "Content-Type": "application/json" };
+  const org = window.TARA_ORG || { name: "Tara" };
+  let selected = null;
+
+  if (!token) { showGate(); return; }
+  $("app").style.display = "";
+  $("orgName").textContent = org.name + " — Dashboard";
+
+  function showGate() {
+    $("gate").style.display = "";
+    $("loginLink").href = "/a/" + handle + "/login";
+  }
+
+  async function api(path) {
+    const res = await fetch("/orgs/" + handle + path, { headers: H });
+    if (res.status === 401 || res.status === 403) throw { gate: res.status === 401, status: res.status };
+    if (!res.ok) throw { status: res.status };
+    return res.json();
+  }
+
+  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g,
+    (c) => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+
+  async function load() {
+    try {
+      const customers = await api("/crm/customers");
+      $("customers").innerHTML = customers.length
+        ? customers.map((c) => `<div class="cust" data-id="${c.user_id}" onclick="pick(${c.user_id}, this)">
+            ${esc(c.name)}<div class="m">${esc(c.phone)} · joined ${esc((c.joined || "").slice(0, 10))}</div>
+          </div>`).join("")
+        : '<div class="muted">No customers yet — share /a/' + esc(handle) + '/login</div>';
+    } catch (e) {
+      if (e.gate) return showGate();
+      $("customers").innerHTML = '<div class="muted">' +
+        (e.status === 403 ? "ഈ അക്കൗണ്ട് org ഉടമയല്ല." : "Load failed.") + "</div>";
+    }
+  }
+
+  window.pick = async function (id, el) {
+    selected = id;
+    document.querySelectorAll(".cust").forEach((c) => c.classList.remove("sel"));
+    if (el) el.classList.add("sel");
+    $("hint").style.display = "none";
+    $("detail").style.display = "";
+    $("custName").textContent = el ? el.firstChild.textContent.trim() : "Customer";
+
+    api(`/crm/customers/${id}/chart`).then((c) => {
+      const n = c.natal_json || {};
+      $("chart").innerHTML = [
+        ["ജന്മ രാശി", n.rasi], ["നക്ഷത്രം", n.nakshatram], ["ലഗ്നം", n.lagnam],
+        ["ദശ", ((n.dasha || {}).current || {}).lord],
+      ].filter((r) => r[1]).map((r) =>
+        `<div class="chartline"><span class="m" style="color:var(--muted)">${r[0]}</span><span>${esc(r[1])}</span></div>`
+      ).join("") || '<span class="muted">chart pending</span>';
+    }).catch(() => { $("chart").textContent = "chart pending"; });
+
+    api(`/crm/customers/${id}/bookings`).then((rows) => {
+      $("bookings").innerHTML = rows.length
+        ? rows.map((b) => `<div class="chartline"><span>${esc(b.starts_at).slice(0, 16).replace("T", " ")}</span>
+            <span class="pill ${esc(b.status)}">${esc(b.status)}</span></div>`).join("")
+        : '<span class="muted">none yet</span>';
+    }).catch(() => {});
+
+    loadNotes();
+
+    api(`/crm/customers/${id}/transcript`).then((msgs) => {
+      $("transcript").innerHTML = msgs.length
+        ? msgs.slice(-30).map((m) => `<div class="note"><div class="m">${esc(m.role || "")}</div>${esc(m.content || m.text || "")}</div>`).join("")
+        : '<span class="muted">no messages</span>';
+    }).catch((e) => {
+      $("transcript").innerHTML = '<span class="muted">' +
+        (e.status === 403 ? "🔒 customer സമ്മതം നൽകിയിട്ടില്ല — അവരുടെ app-ലെ settings-ൽ അനുവദിക്കാം." : "unavailable") +
+        "</span>";
+    });
+  };
+
+  async function loadNotes() {
+    const rows = await api(`/crm/customers/${selected}/notes`).catch(() => []);
+    $("notes").innerHTML = rows.map((n) =>
+      `<div class="note"><div class="m">${esc((n.created_at || "").slice(0, 16).replace("T", " "))}</div>${esc(n.note)}</div>`
+    ).join("") || '<div class="muted">no notes yet</div>';
+  }
+
+  window.addNote = async function () {
+    const text = $("noteText").value.trim();
+    if (!text || !selected) return;
+    await fetch(`/orgs/${handle}/crm/customers/${selected}/notes`, {
+      method: "POST", headers: H, body: JSON.stringify({ note: text }),
+    });
+    $("noteText").value = "";
+    loadNotes();
+  };
+
+  load();
+})();
+</script>
+</body>
+</html>

@@ -712,6 +712,43 @@ class IdentityService:
             "recent_users": recent,
         }
 
+    # ---- org CRM reads (Part 4c) ----
+    # The org owner's dashboard sees THEIR customers only, through these
+    # methods — never the tables. Birth data (dob/time/place/coords) stays out.
+
+    async def list_users_by_org(self, session: AsyncSession, org_id: int) -> list[dict]:
+        """The org's customer list: display fields only, newest first."""
+        rows = (
+            await session.execute(
+                select(User).where(User.org_id == org_id).order_by(User.created_at.desc())
+            )
+        ).scalars().all()
+        return [
+            {
+                "user_id": u.id,
+                "name": u.name,
+                "phone": u.phone,
+                "transcript_consent": u.transcript_consent,
+                "joined": _as_utc(u.created_at).isoformat() if u.created_at else None,
+            }
+            for u in rows
+        ]
+
+    async def user_belongs_to_org(
+        self, session: AsyncSession, user_id: int, org_id: int
+    ) -> User | None:
+        """The user row IF they are this org's customer, else None."""
+        user = await session.get(User, user_id)
+        if user is None or user.org_id != org_id:
+            return None
+        return user
+
+    async def set_transcript_consent(
+        self, session: AsyncSession, user: User, allow: bool
+    ) -> None:
+        user.transcript_consent = bool(allow)
+        await session.flush()
+
     async def get_users_by_phones(self, session: AsyncSession, phones: list[str]) -> dict[str, str]:
         """Resolve user names for a list of phone numbers (admin dashboard helper)."""
         if not phones:

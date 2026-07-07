@@ -211,6 +211,16 @@ async def me(user: CurrentUser) -> User:
     return user
 
 
+@router.post("/transcript-consent", status_code=status.HTTP_204_NO_CONTENT)
+async def transcript_consent(
+    payload: dict, user: CurrentUser, session: SessionDep
+) -> None:
+    """The customer's explicit switch letting their org's astrologer read
+    their chat transcripts (Part 4c). Only the account itself can flip it."""
+    await _service.set_transcript_consent(session, user, bool(payload.get("allow")))
+    await session.commit()
+
+
 @router.get("/referral", response_model=ReferralSummary)
 async def my_referral(user: CurrentUser, session: SessionDep) -> ReferralSummary:
     """The logged-in user's referral panel: code, link, progress, reward.

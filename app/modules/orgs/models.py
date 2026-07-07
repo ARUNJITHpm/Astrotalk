@@ -80,3 +80,20 @@ class Booking(Base):
     # The commerce order funding this booking (None for free consults).
     razorpay_order_id: Mapped[str | None] = mapped_column(nullable=True, default=None)
     created_at: Mapped[datetime] = mapped_column(default=_utcnow)
+
+
+class CustomerNote(Base):
+    """The astrologer's private note on one customer (Part 4c CRM).
+
+    Visible only to the org owner; never to the customer, never to other
+    orgs. Plain-int user ids (identity owns users).
+    """
+
+    __tablename__ = "customer_notes"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    org_id: Mapped[int] = mapped_column(index=True)
+    customer_user_id: Mapped[int] = mapped_column(index=True)
+    author_user_id: Mapped[int]
+    note: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(default=_utcnow)
