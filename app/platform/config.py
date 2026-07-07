@@ -95,6 +95,9 @@ class Settings(BaseSettings):
     # mock_razorpay on and this empty, webhook signatures are skipped (dev);
     # in live mode an empty secret rejects every webhook (fail closed).
     razorpay_webhook_secret: str = ""
+    # Razorpay Subscription plan ids for the white-label SaaS tiers (Part 5c).
+    razorpay_plan_id_starter: str = ""
+    razorpay_plan_id_pro: str = ""
 
     # ---- Object storage (Cloudflare R2, S3-compatible) ----
     # Generated media (share cards, report PDFs, logos) can't live on the

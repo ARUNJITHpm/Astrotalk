@@ -222,6 +222,53 @@ async def cancel_booking(
     return BookingOut.model_validate(booking)
 
 
+# ---- Billing (Part 5c) — org-owner surfaces ----
+
+
+@router.get("/{handle}/billing", summary="Plan + billing status (owner)")
+async def billing_status(handle: str, user: CurrentUser, session: SessionDep) -> dict:
+    org = await _org_or_404(session, handle)
+    _require_owner(org, user)
+    return _service.billing_summary(org)
+
+
+@router.post(
+    "/{handle}/billing/subscribe",
+    summary="Start (or switch) the org's plan subscription (owner)",
+)
+async def subscribe(
+    handle: str, payload: dict, user: CurrentUser, session: SessionDep
+) -> dict:
+    org = await _org_or_404(session, handle)
+    _require_owner(org, user)
+    try:
+        summary = await _service.start_subscription(
+            session, org, str(payload.get("plan", "starter"))
+        )
+    except OrgError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
+    await session.commit()
+    return summary
+
+
+@router.post(
+    "/{handle}/plan",
+    dependencies=[AdminGuard],
+    summary="Ops lever: set an org's plan/billing state manually (admin)",
+)
+async def set_plan(handle: str, payload: dict, session: SessionDep) -> dict:
+    org = await _org_or_404(session, handle)
+    plan = str(payload.get("plan", org.plan))
+    if plan not in ("starter", "pro"):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Unknown plan")
+    org.plan = plan
+    billing = payload.get("billing_status")
+    if billing in ("trial", "active", "past_due"):
+        org.billing_status = billing
+    await session.commit()
+    return _service.billing_summary(org)
+
+
 # ---- CRM-lite (Part 4c) — org-owner surfaces ----
 
 

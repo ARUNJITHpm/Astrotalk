@@ -284,7 +284,14 @@ class IdentityService:
             # Local import — orgs' router pulls identity back for owner lookup.
             from app.modules.orgs.service import OrgsService
 
-            org_id = await OrgsService().resolve_handle(session, data.org)
+            orgs = OrgsService()
+            org = await orgs.get_by_handle(session, data.org)
+            if org is not None and await orgs.accepting_customers(session, org):
+                org_id = org.id
+            elif org is not None:
+                # Cap reached or billing past_due: the person still gets a
+                # (Tara-direct) account — signups never bounce (Part 5c gate).
+                logger.info("identity: org %s not accepting customers; direct signup.", org.id)
         user = User(
             phone=normalize_phone(data.phone),
             password_hash=hash_password(data.password),

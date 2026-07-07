@@ -188,11 +188,20 @@ class CommerceService:
         self.verify_webhook_signature(body, signature)
         event = json.loads(body.decode("utf-8"))
         kind = event.get("event", "")
-        entity = (
-            event.get("payload", {}).get("payment", {}).get("entity", {})
-            if isinstance(event.get("payload"), dict)
-            else {}
-        )
+        payload = event.get("payload", {}) if isinstance(event.get("payload"), dict) else {}
+
+        # Subscription lifecycle events belong to the orgs module (Part 5c) —
+        # routed through its PUBLIC service. Local import: orgs pulls commerce
+        # for order creation, so top-level would cycle.
+        if kind.startswith("subscription."):
+            sub_id = payload.get("subscription", {}).get("entity", {}).get("id", "")
+            if sub_id:
+                from app.modules.orgs.service import OrgsService
+
+                await OrgsService().apply_subscription_event(session, sub_id, kind)
+            return {"status": "ok"}
+
+        entity = payload.get("payment", {}).get("entity", {})
         order_id = entity.get("order_id", "")
         if kind not in ("payment.captured", "payment.failed") or not order_id:
             return {"status": "ignored"}

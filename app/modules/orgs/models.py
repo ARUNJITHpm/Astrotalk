@@ -15,6 +15,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.platform.db import Base
 
 PLANS = ("starter", "pro")
+BILLING_STATUSES = ("trial", "active", "past_due")
 
 
 def _utcnow() -> datetime:
@@ -38,6 +39,14 @@ class Org(Base):
     plan: Mapped[str] = mapped_column(default="starter")  # one of PLANS
     owner_user_id: Mapped[int | None] = mapped_column(nullable=True, index=True)
     active: Mapped[bool] = mapped_column(default=True)
+    # ---- Billing (Part 5c). trial = full features while evaluating;
+    # active = paying; past_due = renewal failed → features soft-lock,
+    # data NEVER deleted (dunning rule).
+    billing_status: Mapped[str] = mapped_column(default="trial")  # one of BILLING_STATUSES
+    razorpay_subscription_id: Mapped[str | None] = mapped_column(
+        nullable=True, unique=True, default=None
+    )
+    billing_updated_at: Mapped[datetime | None] = mapped_column(nullable=True, default=None)
     created_at: Mapped[datetime] = mapped_column(default=_utcnow)
 
 

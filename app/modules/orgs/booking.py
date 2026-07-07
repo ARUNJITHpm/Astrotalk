@@ -119,6 +119,10 @@ async def book(
     Paid slots come back ``pending`` with a commerce order for the client
     checkout; free slots confirm instantly.
     """
+    from app.modules.orgs.service import OrgsService
+
+    if not OrgsService().booking_allowed(org):
+        raise BookingError("booking is unavailable for this org right now")
     if starts_at.tzinfo is not None:  # normalize to the naive local convention
         starts_at = starts_at.astimezone(UTC).replace(tzinfo=None)
     day_open = await availability(session, org.id, starts_at.date())
@@ -126,15 +130,36 @@ async def book(
     if match is None:
         raise BookingError("that time is not available")
 
+    # A cancelled booking still owns the (org, starts_at) unique row — revive
+    # it instead of inserting, so freed times are genuinely re-bookable.
+    booking = (
+        await session.execute(
+            select(Booking).where(
+                Booking.org_id == org.id, Booking.starts_at == starts_at
+            )
+        )
+    ).scalars().first()
+    if booking is not None and booking.status != "cancelled":
+        raise BookingError("that time is not available")
+
     order = None
-    booking = Booking(
-        org_id=org.id,
-        user_id=user_id,
-        starts_at=starts_at,
-        duration_min=match["duration_min"],
-        price_paise=match["price_paise"],
-        status="confirmed" if match["price_paise"] == 0 else "pending",
-    )
+    status = "confirmed" if match["price_paise"] == 0 else "pending"
+    if booking is None:
+        booking = Booking(
+            org_id=org.id,
+            user_id=user_id,
+            starts_at=starts_at,
+            duration_min=match["duration_min"],
+            price_paise=match["price_paise"],
+            status=status,
+        )
+        session.add(booking)
+    else:
+        booking.user_id = user_id
+        booking.duration_min = match["duration_min"]
+        booking.price_paise = match["price_paise"]
+        booking.status = status
+        booking.razorpay_order_id = None
     if match["price_paise"] > 0:
         from app.modules.commerce.service import CommerceService
 
@@ -146,7 +171,6 @@ async def book(
             org_id=org.id,
         )
         booking.razorpay_order_id = order["order_id"]
-    session.add(booking)
     await session.flush()
     metrics.increment("orgs.bookings_created")
     if booking.status == "confirmed":
