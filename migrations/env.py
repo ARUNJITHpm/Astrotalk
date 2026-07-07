@@ -27,6 +27,7 @@ from app.modules.content import models as _content_models  # noqa: F401
 from app.modules.identity import models as _identity_models  # noqa: F401
 from app.modules.knowledge import models as _knowledge_models  # noqa: F401
 from app.modules.notifications import models as _notifications_models  # noqa: F401
+from app.modules.orgs import models as _orgs_models  # noqa: F401
 from app.modules.temples import models as _temples_models  # noqa: F401
 from app.modules.tone_safety import models as _tone_models  # noqa: F401
 from app.modules.whatsapp import consent as _whatsapp_consent  # noqa: F401

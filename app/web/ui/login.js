@@ -139,6 +139,7 @@
       const data = await postJson("/identity/users", {
         name, phone, password, dob, birth_time, birth_place,
         ref: sessionStorage.getItem("tara_ref") || null,
+        org: sessionStorage.getItem("tara_org") || null,  // white-label signup
       });
       sessionStorage.removeItem("tara_ref");
       completeAuth(data);

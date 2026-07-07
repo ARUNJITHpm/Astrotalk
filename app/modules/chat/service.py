@@ -271,6 +271,13 @@ class ChatService:
             retrieved=notes,
             memory=memory,
         )
+        # --- Step 4b: white-label persona overlay (Part 4a). Appended AFTER
+        # the safety persona and pre-wrapped by orgs with an immutable-
+        # guardrails preamble — flavor only, rules always win.
+        org_overlay = await self._org_overlay(session, user_id)
+        if org_overlay:
+            system_prompt = f"{system_prompt}\n\n{org_overlay}"
+            grounded_in.append("org")
         _mark("build_prompt", s, tool="tone_safety.build_system_prompt", chars=len(system_prompt))
 
         # --- Step 5: LLM ---
@@ -386,6 +393,28 @@ class ChatService:
             logger.warning("chat: chart lookup unavailable (%s); continuing.", exc)
             return None
         return chart.natal_json if chart is not None else None
+
+    async def _org_overlay(
+        self, session: AsyncSession | None, user_id: str
+    ) -> str | None:
+        """The white-label persona overlay for this user's org, if any.
+
+        Resolved user (phone) → users.org_id → orgs.persona_overlay_for, all
+        through public services. Degrades to None on any failure — a broken
+        tenant lookup must never take chat down.
+        """
+        if session is None or not any(ch.isdigit() for ch in user_id):
+            return None
+        try:
+            user = await self._identity.get_user_by_phone(session, user_id)
+            if user is None or user.org_id is None:
+                return None
+            from app.modules.orgs.service import OrgsService
+
+            return await OrgsService().persona_overlay_for(session, user.org_id)
+        except Exception as exc:  # pragma: no cover - depends on DB availability
+            logger.warning("chat: org overlay unavailable (%s); continuing.", exc)
+            return None
 
     async def _load_memory(self, user_id: str) -> tuple[str | None, str | None]:
         """Load the user's durable memory profile: (prompt block, current district).

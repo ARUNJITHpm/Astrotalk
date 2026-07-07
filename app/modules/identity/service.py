@@ -278,6 +278,13 @@ class IdentityService:
 
     async def create_user(self, session: AsyncSession, data: UserCreate) -> User:
         lat, lng, tz = await _geocode(data.birth_place)
+        org_id = None
+        if data.org:
+            # Best-effort like ref: unknown handle → Tara-direct account.
+            # Local import — orgs' router pulls identity back for owner lookup.
+            from app.modules.orgs.service import OrgsService
+
+            org_id = await OrgsService().resolve_handle(session, data.org)
         user = User(
             phone=normalize_phone(data.phone),
             password_hash=hash_password(data.password),
@@ -288,6 +295,7 @@ class IdentityService:
             lat=lat,
             lng=lng,
             tz=tz,
+            org_id=org_id,
         )
         session.add(user)
         await session.flush()

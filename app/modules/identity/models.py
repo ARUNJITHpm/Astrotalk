@@ -42,6 +42,9 @@ class User(Base):
     lat: Mapped[float]
     lng: Mapped[float]
     tz: Mapped[str]
+    # White-label tenant this account belongs to (orgs module, Part 4a).
+    # Null = Tara-direct user. Plain int — orgs owns its own table.
+    org_id: Mapped[int | None] = mapped_column(nullable=True, index=True, default=None)
     created_at: Mapped[datetime] = mapped_column(default=_utcnow)
 
     # Right-to-delete (GUARDRAILS.md §4): deleting a user cascades to charts.

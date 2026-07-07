@@ -23,6 +23,9 @@ class UserCreate(BaseModel):
     # Referral code the signup arrived with (?ref= on the login page). Optional
     # and best-effort — a stale/unknown code never fails registration.
     ref: str | None = None
+    # White-label org handle when registering from /a/{handle}/login (Part 4a).
+    # Best-effort like ref: an unknown handle registers a Tara-direct account.
+    org: str | None = None
 
 
 class ReferralSummary(BaseModel):

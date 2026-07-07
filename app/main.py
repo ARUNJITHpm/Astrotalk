@@ -44,6 +44,8 @@ from app.modules.content.router import share_router as content_share_router
 from app.modules.identity.router import router as identity_router
 from app.modules.knowledge.router import router as knowledge_router
 from app.modules.notifications.router import router as notifications_router
+from app.modules.orgs.router import router as orgs_router
+from app.modules.orgs.router import whitelabel_router as orgs_whitelabel_router
 from app.modules.temples.router import router as temples_router
 from app.modules.temples.router import site_router as temples_site_router
 from app.modules.tone_safety.router import router as tone_safety_router
@@ -84,6 +86,8 @@ for router in (
     community_router,
     commerce_router,
     notifications_router,
+    orgs_router,
+    orgs_whitelabel_router,
     admin_router,
 ):
     app.include_router(router)
