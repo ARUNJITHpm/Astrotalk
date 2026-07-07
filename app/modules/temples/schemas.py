@@ -1,6 +1,52 @@
 """Pydantic schemas (DTOs) for the temples module's public boundary."""
 
-from pydantic import BaseModel
+from datetime import date, datetime
+
+from pydantic import BaseModel, ConfigDict
+
+
+class PartnerCreate(BaseModel):
+    """Register a directory temple as a distribution partner (admin console)."""
+
+    temple_id: str
+    slug: str
+    contact_name: str = ""
+    contact_phone: str = ""
+    tier: str = "free"
+
+
+class PartnerOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    temple_id: str
+    slug: str
+    contact_name: str
+    tier: str
+    active: bool
+    created_at: datetime
+
+
+class FestivalCreate(BaseModel):
+    name: str
+    name_ml: str = ""
+    day: date
+
+
+class FestivalOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    temple_id: str
+    name: str
+    name_ml: str
+    day: date
+
+
+class SubscribePayload(BaseModel):
+    """The microsite's subscribe action — an explicit WhatsApp opt-in."""
+
+    phone: str
 
 
 class TempleSuggestion(BaseModel):

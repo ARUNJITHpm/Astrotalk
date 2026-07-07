@@ -41,6 +41,37 @@ class TemplesService:
     def __init__(self) -> None:
         self._temples = SEED_TEMPLES
 
+    def get_temple(self, temple_id: str) -> dict | None:
+        """One seed-directory temple by id (public — Part 3 surfaces use it)."""
+        for temple in self._temples:
+            if temple["id"] == temple_id:
+                return dict(temple)
+        return None
+
+    # ---- partnership data, exposed for the notifications module (Part 3).
+    # Plain dicts/strs out — other modules never touch this module's tables.
+
+    async def partner_festivals_on(self, session, day) -> list[dict]:
+        """Partner-temple festivals falling exactly on ``day``."""
+        from app.modules.temples.partners import festivals_on
+
+        return [
+            {
+                "id": f.id,
+                "temple_id": f.temple_id,
+                "name": f.name,
+                "name_ml": f.name_ml,
+                "day": f.day,
+            }
+            for f in await festivals_on(session, day)
+        ]
+
+    async def subscriber_phones(self, session, temple_id: str) -> list[str]:
+        """WhatsApp subscriber phone numbers for one temple."""
+        from app.modules.temples.partners import subscribers_for
+
+        return await subscribers_for(session, temple_id)
+
     # ---- detection helpers (used by chat on the raw message) ----
 
     @staticmethod

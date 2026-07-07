@@ -57,6 +57,34 @@ class WhatsappService:
         count = await consent.sends_in_last_24h(session, phone)
         return count >= MAX_WA_MESSAGES_PER_DAY
 
+    async def send_template(
+        self, session: AsyncSession, phone: str, message: str
+    ) -> bool:
+        """One business-initiated 1:1 template send, guardrails enforced HERE:
+
+          1. opt-in required (consent ledger) — else silently skipped;
+          2. 24h cap respected — else silently skipped;
+          3. AI disclosure + opt-out footer appended in code;
+          4. the send is logged so the cap keeps counting.
+
+        Returns True only when the message was actually sent (or mock-sent).
+        Callers (festival notifications, booking confirmations) NEVER bypass
+        this path (GUARDRAILS.md §3).
+        """
+        if not await consent.is_opted_in(session, phone):
+            logger.info("whatsapp: skipped 1:1 send — no opt-in.")
+            return False
+        if await self.should_throttle(session, phone):
+            logger.info("whatsapp: skipped 1:1 send — 24h cap reached.")
+            return False
+        composed = _with_footer(message)
+        if get_settings().mock_whatsapp:
+            logger.info("whatsapp(mock): would send 1:1 template:\n%s", composed)
+        else:  # pragma: no cover - needs live BSP + human approval
+            await self._send_via_bsp(composed)
+        await consent.record_send(session, phone)
+        return True
+
     async def _send_via_bsp(self, composed: str) -> str:  # pragma: no cover
         raise NotImplementedError(
             "Live WhatsApp send not wired. Set MOCK_WHATSAPP=false and implement "
