@@ -27,6 +27,7 @@ dnspython==2.8.0
 durationpy==0.10
 fastapi==0.139.0
 filelock==3.29.4
+fpdf2==2.8.7
 flatbuffers==25.12.19
 frozenlist==1.8.0
 fsspec==2026.6.0
