@@ -28,12 +28,13 @@ from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from app.platform.config import get_settings
-from app.platform.db import _resolve_async_url
+from app.platform.db import _resolve_async_url, connect_args_for
 
 
 async def _table_names() -> set[str]:
-    url = _resolve_async_url(get_settings().database_url)
-    connect_args = {"ssl": True} if url.startswith("postgresql+asyncpg://") else {}
+    raw = get_settings().database_url
+    url = _resolve_async_url(raw)
+    connect_args = connect_args_for(raw, url)
     engine = create_async_engine(url, connect_args=connect_args)
     try:
         async with engine.connect() as conn:

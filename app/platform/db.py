@@ -6,9 +6,10 @@ this module only wires the engine/session — it does not create or alter tables
 """
 
 from collections.abc import AsyncIterator
-from urllib.parse import urlencode, urlsplit, urlunsplit, parse_qsl
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
-from sqlalchemy import Connection, inspect as sa_inspect
+from sqlalchemy import Connection
+from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -59,17 +60,35 @@ def _resolve_async_url(raw_url: str) -> str:
     return urlunsplit(parts._replace(query=urlencode(kept)))
 
 
+def connect_args_for(raw_url: str, resolved_url: str) -> dict:
+    """asyncpg/aiosqlite ``connect_args`` for a (raw, resolved) URL pair.
+
+    TLS decision for Postgres: managed hosts (Neon/Supabase) require it; a
+    local/in-container Postgres doesn't offer it, so forcing ``ssl=True`` there
+    refuses the connection. We honor an explicit ``sslmode`` in the original
+    URL, else infer from the host — ``localhost`` and bare single-label Docker
+    hostnames (e.g. compose's ``postgres``) are local (no TLS); an FQDN with a
+    dot (``ep-x.neon.tech``) is a managed host (TLS on).
+    """
+    if resolved_url.startswith("sqlite"):
+        return {"check_same_thread": False}
+    if not resolved_url.startswith("postgresql+asyncpg://"):
+        return {}
+    sslmode = dict(parse_qsl(urlsplit(raw_url).query)).get("sslmode")
+    if sslmode in {"disable", "allow"}:
+        return {}
+    if sslmode in {"prefer", "require", "verify-ca", "verify-full"}:
+        return {"ssl": True}
+    host = urlsplit(resolved_url).hostname or ""
+    if host in {"localhost", "127.0.0.1", "::1"} or "." not in host:
+        return {}
+    return {"ssl": True}
+
+
 def _build_engine() -> AsyncEngine:
     settings = get_settings()
     url = _resolve_async_url(settings.database_url)
-    if url.startswith("sqlite"):
-        connect_args = {"check_same_thread": False}
-    elif url.startswith("postgresql+asyncpg://"):
-        # Managed Postgres (Neon/Supabase) requires TLS. asyncpg wants SSL via
-        # connect_args, not the stripped-out ?sslmode= URL param.
-        connect_args = {"ssl": True}
-    else:
-        connect_args = {}
+    connect_args = connect_args_for(settings.database_url, url)
     return create_async_engine(url, future=True, connect_args=connect_args)
 
 
