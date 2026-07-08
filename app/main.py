@@ -31,7 +31,7 @@ if str(_ROOT) not in sys.path:
 import mimetypes
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from app.modules.admin.router import router as admin_router
@@ -126,7 +126,7 @@ async def _no_store_web_assets(request, call_next):
     response = await call_next(request)
     path = request.url.path
     if path.startswith("/static") or path in (
-        "/", "/auth", "/wa", "/ui", "/ui/login", "/admin",
+        "/", "/auth", "/wa", "/whatsapp", "/ui", "/ui/login", "/admin",
     ):
         response.headers["Cache-Control"] = "no-store"
     return response
@@ -164,9 +164,15 @@ async def ui_login() -> FileResponse:
 # WhatsApp-style skin over the SAME chat brain (POST /chat/message). This is a
 # demo surface only — the real whatsapp module stays compliance-locked and does
 # NOT expose open-ended AI chat (GUARDRAILS.md §3).
-@app.get("/wa", include_in_schema=False)
+@app.get("/whatsapp", include_in_schema=False)
 async def whatsapp_ui() -> FileResponse:
     return FileResponse(_WEB_DIR / "whatsapp.html")
+
+
+# Back-compat: the skin used to live at /wa. Keep old links/bookmarks working.
+@app.get("/wa", include_in_schema=False)
+async def whatsapp_ui_legacy() -> RedirectResponse:
+    return RedirectResponse(url="/whatsapp")
 
 
 # Admin analytics dashboard (project overview: users, charts, chat, tokens).
@@ -195,7 +201,7 @@ if __name__ == "__main__":
     print(
         f"Tara running -  website http://localhost:{port}/"
         f"   |   new UI http://localhost:{port}/ui"
-        f"   |   WhatsApp http://localhost:{port}/wa"
+        f"   |   WhatsApp http://localhost:{port}/whatsapp"
         f"   |   admin http://localhost:{port}/admin"
     )
     uvicorn.run("app.main:app", host="127.0.0.1", port=port, reload=True)

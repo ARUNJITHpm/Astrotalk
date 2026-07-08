@@ -2,7 +2,7 @@
 <html lang="ml">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Tara · WhatsApp</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link
@@ -33,11 +33,16 @@
       color: var(--wa-ink);
       -webkit-font-smoothing: antialiased;
       display: flex; align-items: center; justify-content: center;
+      min-height: 100vh;
+      min-height: 100dvh; /* dynamic vh: excludes mobile URL bar / keyboard */
     }
 
-    /* Phone frame — centers the chat on desktop, full-screen on mobile. */
+    /* Phone frame — centers the chat on desktop, full-screen on mobile.
+       Uses dvh so the composer stays visible when the mobile browser chrome
+       or on-screen keyboard appears (100vh would hide it behind them). */
     .phone {
-      width: 100%; max-width: 460px; height: 100vh; max-height: 900px;
+      width: 100%; max-width: 460px;
+      height: 100vh; height: 100dvh; max-height: 900px;
       display: flex; flex-direction: column;
       background: var(--wa-bg);
       box-shadow: 0 6px 40px rgba(0,0,0,0.18);
@@ -130,7 +135,9 @@
 
     /* ---------- Composer ---------- */
     .wa-composer {
-      flex-shrink: 0; padding: 8px 10px;
+      flex-shrink: 0;
+      padding: 8px 10px;
+      padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
       display: flex; align-items: flex-end; gap: 8px;
       background: transparent;
     }

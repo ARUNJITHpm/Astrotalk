@@ -21,6 +21,24 @@
   const debugBody = document.getElementById("debug-body");
   const debugClose = document.getElementById("debug-close");
   const appEl = document.querySelector(".app");
+  const sidebarToggle = document.getElementById("sidebar-toggle");
+  const sidebarBackdrop = document.getElementById("sidebar-backdrop");
+
+  // Mobile: the sidebar is an off-canvas drawer. Toggle it from the header
+  // hamburger; a backdrop tap closes it. No-ops on desktop where it's static.
+  function setSidebar(open) {
+    appEl.classList.toggle("sidebar-open", open);
+    sidebarBackdrop.hidden = !open;
+    if (sidebarToggle) sidebarToggle.setAttribute("aria-expanded", String(open));
+  }
+  if (sidebarToggle) {
+    sidebarToggle.addEventListener("click", () =>
+      setSidebar(!appEl.classList.contains("sidebar-open"))
+    );
+  }
+  if (sidebarBackdrop) {
+    sidebarBackdrop.addEventListener("click", () => setSidebar(false));
+  }
 
   /** Conversation state: [{role, content}]. Sent in full each request (API is stateless). */
   let messages = [];
@@ -127,6 +145,7 @@
       el.classList.remove("active")
     );
     renderWelcome();
+    setSidebar(false);
     input.focus();
   });
 
@@ -321,6 +340,7 @@
     );
     stickToBottom = true;
     scrollToBottom(true);
+    setSidebar(false);
     input.focus();
     loadHistory(); // re-mark the active item
   }

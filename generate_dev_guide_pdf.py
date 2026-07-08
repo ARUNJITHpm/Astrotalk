@@ -856,7 +856,7 @@ def build() -> None:
         "  python main.py                  # or: uvicorn app.main:app --reload --port 3000",
         "",
         "  Website chat UI    ->  http://localhost:3000/",
-        "  WhatsApp demo skin ->  http://localhost:3000/wa   (same brain, other CSS)",
+        "  WhatsApp demo skin ->  http://localhost:3000/whatsapp   (same brain, other CSS)",
         "  Admin dashboard    ->  http://localhost:3000/admin",
         "  API docs (Swagger) ->  http://localhost:3000/docs",
         "",

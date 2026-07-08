@@ -24,7 +24,7 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-.app { display: flex; height: 100vh; overflow: hidden; }
+.app { display: flex; height: 100vh; height: 100dvh; overflow: hidden; }
 
 /* ---------- Sidebar ---------- */
 .sidebar {
@@ -179,9 +179,24 @@ button.memory-title[aria-expanded="true"] .memory-caret { transform: rotate(90de
   justify-content: space-between;
   gap: 12px;
 }
+.chat-head-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .chat-title { font-family: var(--font-display); font-size: 19px; font-weight: 600; }
 .chat-sub { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
 .chat-head-right { display: flex; align-items: center; gap: 10px; }
+
+/* Hamburger to open the sidebar drawer — mobile only (hidden on desktop). */
+.sidebar-toggle {
+  display: none;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink);
+  border-radius: 10px;
+  font-size: 18px; line-height: 1;
+  padding: 7px 10px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.sidebar-toggle:hover { border-color: var(--accent); color: var(--accent); }
 .user-badge {
   font-size: 13px; color: var(--ink);
   background: var(--accent-soft);
@@ -448,8 +463,44 @@ details.debug-sec[open] > summary { margin-bottom: 7px; }
 
 /* Login / register now live on a dedicated page (auth.html + auth.js). */
 
+/* Backdrop behind the slide-in sidebar (mobile only) */
+.sidebar-backdrop {
+  position: fixed; inset: 0; z-index: 190;
+  background: rgba(30, 26, 22, 0.45);
+  backdrop-filter: blur(2px);
+}
+.sidebar-backdrop[hidden] { display: none; }
+
 @media (max-width: 720px) {
-  .sidebar { display: none; }
+  /* Sidebar becomes an off-canvas drawer opened by the header hamburger. */
+  .sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0; z-index: 200;
+    width: min(280px, 84vw);
+    transform: translateX(-100%);
+    transition: transform 0.28s ease;
+    box-shadow: 6px 0 30px rgba(0,0,0,0.28);
+  }
+  .app.sidebar-open .sidebar { transform: none; }
+
+  .sidebar-toggle { display: inline-flex; align-items: center; justify-content: center; }
+
+  /* Tighten the header and let the controls wrap so none fall off-screen. */
+  .chat-head { padding: 10px 12px; gap: 8px; flex-wrap: wrap; }
+  .chat-head-right { gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+  .chat-sub { display: none; }
+  .debug-toggle { display: none; }        /* developer-only; drop on small screens */
+  .model-select { max-width: 42vw; font-size: 12.5px; padding: 6px 8px; }
+  .chart-btn, .logout-btn { font-size: 12px; padding: 6px 10px; }
+  .user-badge { max-width: 34vw; }
+
+  /* Composer: trim padding so the input + action buttons fit comfortably. */
+  .composer { padding: 12px 12px calc(16px + env(safe-area-inset-bottom, 0px)); }
+  .messages-inner, .welcome, .row { padding: 0 16px; }
+  .composer-form { padding: 6px 6px 6px 12px; }
+}
+
+@media (min-width: 721px) {
+  .sidebar-backdrop { display: none !important; }
 }
 
 /* --- Prashnam (Kerala horary): composer button + pick modal --- */

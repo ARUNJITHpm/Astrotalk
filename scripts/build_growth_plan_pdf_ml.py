@@ -78,7 +78,7 @@ SECTIONS: list[tuple[str, list[tuple[str, str]]]] = [
                 "- ചാറ്റിലേക്ക് ലോഗിൻ ചെയ്യാൻ:\n"
                 f"  {BASE}/ui/login\n"
                 "- വാട്സ്ആപ്പ് രൂപത്തിലുള്ള ഡെമോ പേജ്:\n"
-                f"  {BASE}/wa\n"
+                f"  {BASE}/whatsapp\n"
                 "- അഡ്മിൻ പാനൽ (രഹസ്യ പാസ്‌വേഡ് വേണം):\n"
                 f"  {BASE}/admin"
             ),

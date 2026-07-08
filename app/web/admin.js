@@ -32,6 +32,10 @@
   let activeSessionId = null; // Currently selected conversation id
   let activeUserSessions = {}; // {conversation_id: [turns newest-first]}
   let sortedSessionIds = []; // Session ids, most recent first
+  // Whether chat history is actually available (MongoDB on). Set from the
+  // overview payload so the explorer can explain an empty state instead of
+  // silently showing "no chats" when the store is simply disabled.
+  let chatAvailable = true;
 
   function authHeaders() {
     const t = localStorage.getItem(TOKEN_KEY);
@@ -278,6 +282,7 @@
   }
 
   function renderChatTrend(c) {
+    chatAvailable = !!(c && c.available);
     if (!c || !c.available) {
       $("chatTrendWrap").classList.add("hidden");
       const e = $("chatTrendEmpty");
@@ -448,8 +453,16 @@
     });
 
     if (!filtered.length) {
-      const msg = query ? `No users match “${escapeHtml(query)}”` : "No users with chat history yet.";
-      listEl.innerHTML = `<div class="pane-placeholder"><span class="icon">🔎</span><span>${msg}</span></div>`;
+      let msg, icon = "🔎";
+      if (query) {
+        msg = `No users match “${escapeHtml(query)}”`;
+      } else if (!chatAvailable) {
+        icon = "🗄️";
+        msg = "Chat history is stored in MongoDB, which is disabled (MOCK_MONGO). Enable it to browse user chats.";
+      } else {
+        msg = "No users with chat history yet.";
+      }
+      listEl.innerHTML = `<div class="pane-placeholder"><span class="icon">${icon}</span><span>${msg}</span></div>`;
       return;
     }
 
