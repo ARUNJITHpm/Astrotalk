@@ -64,7 +64,7 @@ class AdminService:
     async def overview(self, session: AsyncSession) -> dict[str, Any]:
         """Assemble the whole dashboard payload from the module reads."""
         users = await self._identity.admin_metrics(session)
-        chat = await self._chat_service().admin_stats()
+        chat = await self._chat_service().admin_stats(session)
         return {
             "generated_at": datetime.now(UTC),
             "system": self._system_status(),
@@ -75,21 +75,25 @@ class AdminService:
 
     async def get_users_chats(self, session: AsyncSession) -> list[dict]:
         """Fetch all unique users who have chat history, resolved with display names."""
-        chat_users = await self._chat_service().get_chat_users()
+        chat_users = await self._chat_service().get_chat_users(session)
         phones = [u["phone"] for u in chat_users]
         names = await self._identity.get_users_by_phones(session, phones)
 
         result = []
         for u in chat_users:
             phone = u["phone"]
-            result.append({
-                "phone": phone,
-                "name": names.get(phone, "Unknown User"),
-                "turns": u["turns"],
-                "last_active": u["last_active"].isoformat() if u["last_active"] else None
-            })
+            result.append(
+                {
+                    "phone": phone,
+                    "name": names.get(phone, "Unknown User"),
+                    "turns": u["turns"],
+                    "last_active": (
+                        u["last_active"].isoformat() if u["last_active"] else None
+                    ),
+                }
+            )
         return result
 
-    async def get_user_chat(self, phone: str) -> list[dict]:
+    async def get_user_chat(self, session: AsyncSession, phone: str) -> list[dict]:
         """Fetch raw chat history for a specific user."""
-        return await self._chat_service().get_user_chat_history(phone)
+        return await self._chat_service().get_user_chat_history(session, phone)

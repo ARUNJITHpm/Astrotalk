@@ -10,23 +10,57 @@ real mongod), so history/memory behaviour is deterministic on any machine.
 
 import httpx
 import pytest
+import pytest_asyncio
 from httpx import ASGITransport
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.pool import StaticPool
 
 from app.main import app
+from app.modules.chat import history
+from app.modules.chat.models import ChatTurn  # noqa: F401
+from app.platform.db import Base, get_session
 
 # Astrology terms that must NEVER appear in a crisis safety response (GUARDRAILS §2).
 _ASTROLOGY_TERMS = ("ജാതക", "നക്ഷത്ര", "രാശി", "ഗ്രഹ", "dosha", "horoscope", "transit")
+
+
+@pytest_asyncio.fixture(autouse=True)
+async def test_db(monkeypatch):
+    """In-memory SQLite DB for tests.
+
+    Overrides DB session dependencies & background session factory.
+    """
+    engine = create_async_engine(
+        "sqlite+aiosqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+
+    monkeypatch.setattr(history, "async_session_factory", factory)
+
+    async def _override():
+        async with factory() as s:
+            yield s
+
+    app.dependency_overrides[get_session] = _override
+    try:
+        yield factory
+    finally:
+        app.dependency_overrides.pop(get_session, None)
+        await engine.dispose()
 
 
 @pytest.fixture(autouse=True)
 def _no_mongo(monkeypatch):
     """Pin the document store off so tests don't depend on a local mongod / .env.
 
-    history.py and user_memory.py each do `from app.platform.mongo import get_db`,
-    so we patch their bound names to return None — exactly the "Mongo unavailable"
-    path the code already degrades through.
+    user_memory.py does `from app.platform.mongo import get_db`, so we patch
+    its bound name to return None — exactly the "Mongo unavailable" path the
+    code already degrades through. Chat history now persists in Postgres.
     """
-    monkeypatch.setattr("app.modules.chat.history.get_db", lambda: None)
     monkeypatch.setattr("app.modules.chat.user_memory.get_db", lambda: None)
     # Pin the LLM to the mock regardless of the local .env (which points at
     # real providers) — pytest must never spend API money; evals/ is the only
@@ -111,13 +145,13 @@ def test_select_varga_maps_topics_to_divisional_charts():
     from app.modules.chat.service import ChatService
 
     pick = ChatService._select_varga
-    assert pick("എനിക്ക് ജോലി മാറ്റം വരുമോ?") == "D10"        # career → dashamsa
+    assert pick("എനിക്ക് ജോലി മാറ്റം വരുമോ?") == "D10"  # career → dashamsa
     assert pick("When will I get a promotion at work?") == "D10"
-    assert pick("വിവാഹം എപ്പോൾ നടക്കും?") == "D9"             # marriage → navamsa
+    assert pick("വിവാഹം എപ്പോൾ നടക്കും?") == "D9"  # marriage → navamsa
     assert pick("Is my relationship going to last?") == "D9"
-    assert pick("കുട്ടികൾ ഉണ്ടാകുമോ?") == "D7"                 # children → saptamsa
-    assert pick("എന്റെ അമ്മയുടെ ആരോഗ്യം?") == "D12"           # parents → dwadasamsa
-    assert pick("hello, how are you?") is None                  # no topic → D1 only
+    assert pick("കുട്ടികൾ ഉണ്ടാകുമോ?") == "D7"  # children → saptamsa
+    assert pick("എന്റെ അമ്മയുടെ ആരോഗ്യം?") == "D12"  # parents → dwadasamsa
+    assert pick("hello, how are you?") is None  # no topic → D1 only
     # Manglish (romanized Malayalam) forms pick the same vargas.
     assert pick("ente joli sheriyakumo?") == "D10"
     assert pick("kalyanam eppol nadakkum?") == "D9"
@@ -180,7 +214,9 @@ async def test_temple_question_grounds_reply_in_a_temple(client):
     body = resp.json()
     assert body["is_safety_response"] is False
     temple_refs = [g for g in body["grounded_in"] if g.startswith("temple:")]
-    assert temple_refs, f"expected a temple:<id> in grounded_in, got {body['grounded_in']}"
+    assert (
+        temple_refs
+    ), f"expected a temple:<id> in grounded_in, got {body['grounded_in']}"
 
 
 async def test_plain_question_suggests_no_temple(client):
@@ -191,9 +227,7 @@ async def test_plain_question_suggests_no_temple(client):
             "/chat/message",
             json={
                 "user_id": "demo",
-                "messages": [
-                    {"role": "user", "content": "ഇന്ന് എന്റെ ദിവസം എങ്ങനെ?"}
-                ],
+                "messages": [{"role": "user", "content": "ഇന്ന് എന്റെ ദിവസം എങ്ങനെ?"}],
             },
         )
     assert resp.status_code == 200, resp.text
@@ -327,13 +361,14 @@ def test_reply_screen_lexicons():
 
     assert svc.screen_reply("സൂക്ഷിക്കണം, നിങ്ങൾക്ക് വലിയ ആപത്ത് വരും!") == ["fear"]
     assert svc.screen_reply("You are cursed and doomed.") == ["fear"]
-    assert svc.screen_reply(
-        "ഈ പൂജ ചെയ്യാൻ ₹5000 അടയ്ക്കണം, എങ്കിലേ ദോഷം മാറൂ."
-    ) == ["payment_remedy"]
+    assert svc.screen_reply("ഈ പൂജ ചെയ്യാൻ ₹5000 അടയ്ക്കണം, എങ്കിലേ ദോഷം മാറൂ.") == [
+        "payment_remedy"
+    ]
     assert svc.screen_reply("You must pay a fee for this homam.") == ["payment_remedy"]
-    assert svc.screen_reply(
-        "ഉടനെ വഴിപാട് ചെയ്തില്ലെങ്കിൽ വലിയ നഷ്ടം ഉണ്ടാകും."
-    ) == ["payment_remedy", "urgency"]
+    assert svc.screen_reply("ഉടനെ വഴിപാട് ചെയ്തില്ലെങ്കിൽ വലിയ നഷ്ടം ഉണ്ടാകും.") == [
+        "payment_remedy",
+        "urgency",
+    ]
     assert svc.screen_reply("") == []
 
 

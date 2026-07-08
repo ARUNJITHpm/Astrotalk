@@ -69,8 +69,12 @@ async def send_message(
     # production, even if a client asks for it.
     debug = payload.debug and get_settings().app_env != "production"
     result = await _service.handle_message(
-        user.phone, messages, session,
-        debug=debug, prashnam=payload.prashnam, porutham=payload.porutham,
+        user.phone,
+        messages,
+        session,
+        debug=debug,
+        prashnam=payload.prashnam,
+        porutham=payload.porutham,
         provider=payload.provider,
     )
 
@@ -98,16 +102,16 @@ async def send_message(
 
 
 @router.get("/history/{user_id}", response_model=list[ChatHistoryEntry])
-async def get_chat_history(user_id: str, user: CurrentUser, limit: int = 20) -> list[dict]:
+async def get_chat_history(
+    user_id: str, user: CurrentUser, session: SessionDep, limit: int = 20
+) -> list[dict]:
     """Return the LOGGED-IN user's stored conversation turns, newest first.
 
-    403 unless the path user_id is the caller's own. Empty when MongoDB is
-    disabled (MOCK_MONGO) or unavailable — the store degrades to a no-op
-    rather than erroring.
+    403 unless the path user_id is the caller's own.
     """
     if user_id != user.phone:
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Not your history")
-    return await history.get_history(user_id, limit=limit)
+    return await history.get_history(session, user_id, limit=limit)
 
 
 @router.get("/memory/{user_id}", response_model=UserMemoryProfile)

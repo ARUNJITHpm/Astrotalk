@@ -287,7 +287,7 @@
       $("chatTrendWrap").classList.add("hidden");
       const e = $("chatTrendEmpty");
       e.classList.remove("hidden");
-      e.textContent = "Chat history is stored in MongoDB, which is disabled (MOCK_MONGO). Enable it to see chat trends.";
+      e.textContent = "Chat metrics are currently unavailable.";
       return;
     }
     $("chatTrendWrap").classList.remove("hidden");
@@ -458,7 +458,7 @@
         msg = `No users match “${escapeHtml(query)}”`;
       } else if (!chatAvailable) {
         icon = "🗄️";
-        msg = "Chat history is stored in MongoDB, which is disabled (MOCK_MONGO). Enable it to browse user chats.";
+        msg = "Chat metrics are currently unavailable.";
       } else {
         msg = "No users with chat history yet.";
       }

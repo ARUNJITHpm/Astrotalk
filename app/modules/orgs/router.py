@@ -49,7 +49,10 @@ _WEB_DIR = Path(__file__).resolve().parents[2] / "web"
 
 
 @router.post(
-    "", response_model=OrgOut, status_code=status.HTTP_201_CREATED, dependencies=[AdminGuard]
+    "",
+    response_model=OrgOut,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[AdminGuard],
 )
 async def create_org(payload: OrgCreate, session: SessionDep) -> OrgOut:
     owner_user_id = None
@@ -60,7 +63,8 @@ async def create_org(payload: OrgCreate, session: SessionDep) -> OrgOut:
         owner = await IdentityService().get_user_by_phone(session, payload.owner_phone)
         if owner is None:
             raise HTTPException(
-                status.HTTP_404_NOT_FOUND, detail="Owner account not found — register first"
+                status.HTTP_404_NOT_FOUND,
+                detail="Owner account not found — register first",
             )
         owner_user_id = owner.id
     try:
@@ -273,7 +277,9 @@ async def set_plan(handle: str, payload: dict, session: SessionDep) -> dict:
 
 
 @router.get("/{handle}/crm/customers", summary="This org's customer list (owner)")
-async def crm_customers(handle: str, user: CurrentUser, session: SessionDep) -> list[dict]:
+async def crm_customers(
+    handle: str, user: CurrentUser, session: SessionDep
+) -> list[dict]:
     org = await _org_or_404(session, handle)
     _require_owner(org, user)
     from app.modules.identity.service import IdentityService
@@ -306,8 +312,11 @@ async def crm_customer_chart(
     chart = await IdentityService().get_chart(session, customer.id)
     if chart is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="No chart yet")
-    return {"user_id": customer.id, "natal_json": chart.natal_json,
-            "computed_at": chart.computed_at.isoformat()}
+    return {
+        "user_id": customer.id,
+        "natal_json": chart.natal_json,
+        "computed_at": chart.computed_at.isoformat(),
+    }
 
 
 @router.get(
@@ -338,7 +347,9 @@ async def crm_add_note(
     from app.modules.orgs.models import CustomerNote
 
     note = CustomerNote(
-        org_id=org.id, customer_user_id=customer.id, author_user_id=user.id,
+        org_id=org.id,
+        customer_user_id=customer.id,
+        author_user_id=user.id,
         note=text[:4000],
     )
     session.add(note)
@@ -359,17 +370,22 @@ async def crm_list_notes(
     from app.modules.orgs.models import CustomerNote
 
     rows = (
-        await session.execute(
-            sa_select(CustomerNote)
-            .where(
-                CustomerNote.org_id == org.id,
-                CustomerNote.customer_user_id == customer.id,
+        (
+            await session.execute(
+                sa_select(CustomerNote)
+                .where(
+                    CustomerNote.org_id == org.id,
+                    CustomerNote.customer_user_id == customer.id,
+                )
+                .order_by(CustomerNote.created_at.desc())
             )
-            .order_by(CustomerNote.created_at.desc())
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return [
-        {"id": n.id, "note": n.note, "created_at": n.created_at.isoformat()} for n in rows
+        {"id": n.id, "note": n.note, "created_at": n.created_at.isoformat()}
+        for n in rows
     ]
 
 
@@ -390,7 +406,7 @@ async def crm_customer_transcript(
         )
     from app.modules.chat.service import ChatService
 
-    return await ChatService().get_user_chat_history(customer.phone, limit=200)
+    return await ChatService().get_user_chat_history(session, customer.phone, limit=200)
 
 
 # ---- White-label pages ----
@@ -417,7 +433,9 @@ window.TARA_ORG = {branding};
 
 def _inject(page_file: str, branding: dict) -> HTMLResponse:
     html = (_WEB_DIR / page_file).read_text(encoding="utf-8")
-    snippet = _BRAND_SNIPPET.replace("{branding}", json.dumps(branding, ensure_ascii=False))
+    snippet = _BRAND_SNIPPET.replace(
+        "{branding}", json.dumps(branding, ensure_ascii=False)
+    )
     if "</head>" in html:
         html = html.replace("</head>", snippet + "\n</head>", 1)
     else:  # defensive: prepend

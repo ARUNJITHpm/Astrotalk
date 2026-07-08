@@ -37,14 +37,22 @@ async def admin_login_endpoint(payload: LoginPayload) -> dict:
     )
 
 
-@router.get("/users-chats", dependencies=[AdminGuard], summary="Fetch all users who have chat logs")
+@router.get(
+    "/users-chats",
+    dependencies=[AdminGuard],
+    summary="Fetch all users who have chat logs",
+)
 async def get_users_chats(session: SessionDep) -> list[dict]:
     return await _service.get_users_chats(session)
 
 
-@router.get("/user-chat/{phone}", dependencies=[AdminGuard], summary="Fetch raw chat log for a specific user")
-async def get_user_chat(phone: str) -> list[dict]:
-    return await _service.get_user_chat(phone)
+@router.get(
+    "/user-chat/{phone}",
+    dependencies=[AdminGuard],
+    summary="Fetch raw chat log for a specific user",
+)
+async def get_user_chat(phone: str, session: SessionDep) -> list[dict]:
+    return await _service.get_user_chat(session, phone)
 
 
 @router.get("/config", summary="Whether the dashboard needs a token")

@@ -34,33 +34,141 @@ logger = get_logger(__name__)
 # message; the first hit picks which varga is grafted into the prompt alongside
 # the fixed D1 chart. Keywords cover Malayalam + English phrasings.
 _VARGA_TOPICS: list[tuple[str, tuple[str, ...]]] = [
-    ("D10", ("career", "job", "work", "business", "promotion", "profession",
-             "ജോലി", "തൊഴിൽ", "ബിസിനസ", "കരിയർ", "ഉദ്യോഗ", "പ്രമോഷൻ",
-             # Manglish (romanized) — users often type Malayalam in Latin script
-             "joli", "jolik", "thozhil", "udyogam", "velakku")),
-    ("D9", ("marriage", "relationship", "love", "spouse", "partner", "wedding",
-            "divorce", "പൊരുത്തം", "വിവാഹ", "കല്യാണ", "പ്രണയ", "ഭർത്താ", "ഭാര്യ",
-            "ദാമ്പത്യ", "വിവാഹമോചന",
-            "kalyanam", "vivaham", "porutham", "pranayam", "bharthavu",
-            "bharya", "dambatyam")),
-    ("D7", ("child", "children", "baby", "pregnan", "കുട്ടി", "കുഞ്ഞ", "സന്താന",
-            "ഗർഭ", "kutti", "kunju", "santhanam", "garbham")),
-    ("D12", ("parent", "mother", "father", "അമ്മ", "അച്ഛ", "മാതാപിതാ",
-             "achan", "achhan", "mathapithak")),
-    ("D3", ("sibling", "brother", "sister", "സഹോദര", "sahodaran", "sahodari",
-            "chettan", "aniyan", "chechi", "aniyathi")),
+    (
+        "D10",
+        (
+            "career",
+            "job",
+            "work",
+            "business",
+            "promotion",
+            "profession",
+            "ജോലി",
+            "തൊഴിൽ",
+            "ബിസിനസ",
+            "കരിയർ",
+            "ഉദ്യോഗ",
+            "പ്രമോഷൻ",
+            # Manglish (romanized) — users often type Malayalam in Latin script
+            "joli",
+            "jolik",
+            "thozhil",
+            "udyogam",
+            "velakku",
+        ),
+    ),
+    (
+        "D9",
+        (
+            "marriage",
+            "relationship",
+            "love",
+            "spouse",
+            "partner",
+            "wedding",
+            "divorce",
+            "പൊരുത്തം",
+            "വിവാഹ",
+            "കല്യാണ",
+            "പ്രണയ",
+            "ഭർത്താ",
+            "ഭാര്യ",
+            "ദാമ്പത്യ",
+            "വിവാഹമോചന",
+            "kalyanam",
+            "vivaham",
+            "porutham",
+            "pranayam",
+            "bharthavu",
+            "bharya",
+            "dambatyam",
+        ),
+    ),
+    (
+        "D7",
+        (
+            "child",
+            "children",
+            "baby",
+            "pregnan",
+            "കുട്ടി",
+            "കുഞ്ഞ",
+            "സന്താന",
+            "ഗർഭ",
+            "kutti",
+            "kunju",
+            "santhanam",
+            "garbham",
+        ),
+    ),
+    (
+        "D12",
+        (
+            "parent",
+            "mother",
+            "father",
+            "അമ്മ",
+            "അച്ഛ",
+            "മാതാപിതാ",
+            "achan",
+            "achhan",
+            "mathapithak",
+        ),
+    ),
+    (
+        "D3",
+        (
+            "sibling",
+            "brother",
+            "sister",
+            "സഹോദര",
+            "sahodaran",
+            "sahodari",
+            "chettan",
+            "aniyan",
+            "chechi",
+            "aniyathi",
+        ),
+    ),
 ]
 
 # Explicit remedy/temple intent — the user is ASKING for devotional guidance.
 # (Careful with short Malayalam stems: "തൊഴ" would also match "തൊഴിൽ"/job.)
 _REMEDY_INTENT = (
-    "temple", "remedy", "remedies", "pariharam", "pooja", "puja", "vazhipadu",
-    "prayer", "pray", "worship", "mantra", "offering", "darshan",
-    "ക്ഷേത്ര", "അമ്പല", "വഴിപാട", "പരിഹാര", "പ്രാർത്ഥ", "പൂജ", "മന്ത്ര",
-    "ദർശന", "തൊഴണ", "തൊഴാൻ",
+    "temple",
+    "remedy",
+    "remedies",
+    "pariharam",
+    "pooja",
+    "puja",
+    "vazhipadu",
+    "prayer",
+    "pray",
+    "worship",
+    "mantra",
+    "offering",
+    "darshan",
+    "ക്ഷേത്ര",
+    "അമ്പല",
+    "വഴിപാട",
+    "പരിഹാര",
+    "പ്രാർത്ഥ",
+    "പൂജ",
+    "മന്ത്ര",
+    "ദർശന",
+    "തൊഴണ",
+    "തൊഴാൻ",
     # Manglish (romanized) forms
-    "kshethram", "kshetram", "ambalam", "vazhipad", "prarthana",
-    "mantram", "darshanam", "homam", "archana", "pushpanjali",
+    "kshethram",
+    "kshetram",
+    "ambalam",
+    "vazhipad",
+    "prarthana",
+    "mantram",
+    "darshanam",
+    "homam",
+    "archana",
+    "pushpanjali",
 )
 
 # Concern+dosha pairs where a temple suggestion is traditional even without the
@@ -89,14 +197,14 @@ class ChatService:
         self._llm = llm or LLMClient()
         self._temples = temples or TemplesService()
 
-    async def admin_stats(self) -> dict:
+    async def admin_stats(self, session: AsyncSession) -> dict:
         """Chat-volume metrics for the admin dashboard (read-only).
 
         Exposes the chat module's own history aggregation as its public surface
         so the admin module never touches ``chat_history`` directly. Degrades to
-        ``{"available": False}`` when the document store is off/unavailable.
+        ``{"available": False}`` only if the aggregation errors.
         """
-        return await analytics.chat_metrics()
+        return await analytics.chat_metrics(session)
 
     async def handle_message(
         self,
@@ -118,7 +226,11 @@ class ChatService:
         def _mark(step: str, start: float, **detail) -> None:
             if debug:
                 steps.append(
-                    {"step": step, "ms": round((time.perf_counter() - start) * 1000, 1), **detail}
+                    {
+                        "step": step,
+                        "ms": round((time.perf_counter() - start) * 1000, 1),
+                        **detail,
+                    }
                 )
 
         latest = messages[-1]["content"] if messages else ""
@@ -134,11 +246,24 @@ class ChatService:
                 reply=self._tone_safety.crisis_reply(),
                 is_safety_response=True,
                 grounded_in=[],
-                debug=self._build_trace(
-                    user_id, messages, steps, t0,
-                    crisis=True, chart=None, transits=None, query=None,
-                    retrieved=[], memory=None, system_prompt=None, reply=None,
-                ) if debug else None,
+                debug=(
+                    self._build_trace(
+                        user_id,
+                        messages,
+                        steps,
+                        t0,
+                        crisis=True,
+                        chart=None,
+                        transits=None,
+                        query=None,
+                        retrieved=[],
+                        memory=None,
+                        system_prompt=None,
+                        reply=None,
+                    )
+                    if debug
+                    else None
+                ),
             )
 
         grounded_in: list[str] = []
@@ -148,7 +273,12 @@ class ChatService:
         chart = await self._load_chart(session, user_id)
         if chart is not None:
             grounded_in.append("chart")
-        _mark("load_chart", s, loaded=chart is not None, tool="identity.get_chart_by_phone")
+        _mark(
+            "load_chart",
+            s,
+            loaded=chart is not None,
+            tool="identity.get_chart_by_phone",
+        )
         s = time.perf_counter()
         transits = await self._astrology.get_transits(chart=chart)
         grounded_in.append("transits")
@@ -162,7 +292,9 @@ class ChatService:
         if prashnam is not None:
             s = time.perf_counter()
             lat, lng = await self._load_user_location(session, user_id)
-            loc = {"lat": lat, "lng": lng} if lat is not None and lng is not None else {}
+            loc = (
+                {"lat": lat, "lng": lng} if lat is not None and lng is not None else {}
+            )
             reading = await self._astrology.get_prashnam_reading(
                 prashnam.mode,
                 leaf_count=prashnam.leaf_count,
@@ -174,8 +306,11 @@ class ChatService:
             prashnam_note = self._prashnam_note(reading)
             grounded_in.append(f"prashnam:{prashnam.mode}")
             _mark(
-                "prashnam_reading", s, tool="astrology_engine.get_prashnam_reading",
-                mode=prashnam.mode, cues=prashnam_cues,
+                "prashnam_reading",
+                s,
+                tool="astrology_engine.get_prashnam_reading",
+                mode=prashnam.mode,
+                cues=prashnam_cues,
             )
 
         # --- Step 2c: porutham (compatibility) when a partner is attached ---
@@ -193,7 +328,9 @@ class ChatService:
             if porutham_result is not None:
                 grounded_in.append("porutham")
             _mark(
-                "porutham", s, tool="astrology_engine.compute_porutham",
+                "porutham",
+                s,
+                tool="astrology_engine.compute_porutham",
                 computed=porutham_result is not None,
                 score=(porutham_result or {}).get("score"),
             )
@@ -212,7 +349,14 @@ class ChatService:
             query = self._retrieval_query(latest, transits, chart)
         retrieved = self._knowledge.retrieve(query, k=4)
         grounded_in.extend(f"knowledge:{chunk.id}" for chunk in retrieved)
-        _mark("rag_retrieve", s, tool="knowledge.retrieve", k=4, hits=len(retrieved), query=query)
+        _mark(
+            "rag_retrieve",
+            s,
+            tool="knowledge.retrieve",
+            k=4,
+            hits=len(retrieved),
+            query=query,
+        )
 
         # --- Step 3a2: pick the topical divisional chart (varga) ---
         # The D1 chart is fixed; vargas answer specific domains (D9 marriage,
@@ -229,10 +373,15 @@ class ChatService:
                 grounded_in.append(f"varga:{varga_key}")
                 varga_used = True
         if debug:
-            steps.append({
-                "step": "select_varga", "ms": 0.0, "tool": "chat.service._select_varga",
-                "topic_varga": varga_key, "used": varga_used,
-            })
+            steps.append(
+                {
+                    "step": "select_varga",
+                    "ms": 0.0,
+                    "tool": "chat.service._select_varga",
+                    "topic_varga": varga_key,
+                    "used": varga_used,
+                }
+            )
 
         # --- Step 3b: durable user memory (cross-session profile) ---
         s = time.perf_counter()
@@ -252,7 +401,9 @@ class ChatService:
         )
         grounded_in.extend(f"temple:{tid}" for tid in temple_ids)
         _mark(
-            "temple_guidance", s, tool="temples.suggest",
+            "temple_guidance",
+            s,
+            tool="temples.suggest",
             suggested=temple_ids or None,
         )
 
@@ -278,7 +429,12 @@ class ChatService:
         if org_overlay:
             system_prompt = f"{system_prompt}\n\n{org_overlay}"
             grounded_in.append("org")
-        _mark("build_prompt", s, tool="tone_safety.build_system_prompt", chars=len(system_prompt))
+        _mark(
+            "build_prompt",
+            s,
+            tool="tone_safety.build_system_prompt",
+            chars=len(system_prompt),
+        )
 
         # --- Step 5: LLM ---
         s = time.perf_counter()
@@ -307,7 +463,9 @@ class ChatService:
                 )
                 reply = self._tone_safety.safe_reply()
         _mark(
-            "reply_screen", s, tool="tone_safety.screen_reply",
+            "reply_screen",
+            s,
+            tool="tone_safety.screen_reply",
             violations=violations or None,
         )
 
@@ -320,7 +478,10 @@ class ChatService:
         total_tokens = usage.get("total_tokens") or (prompt_tokens + completion_tokens)
 
         from app.platform.metrics import estimate_price
-        price_inr, price_usd = estimate_price(provider_name, model_name, prompt_tokens, completion_tokens)
+
+        price_inr, price_usd = estimate_price(
+            provider_name, model_name, prompt_tokens, completion_tokens
+        )
 
         return ChatResponse(
             reply=reply,
@@ -333,16 +494,41 @@ class ChatService:
             total_tokens=total_tokens,
             price_inr=price_inr,
             price_usd=price_usd,
-            debug=self._build_trace(
-                user_id, messages, steps, t0,
-                crisis=False, chart=chart, transits=transits, query=query,
-                retrieved=retrieved, memory=memory, system_prompt=system_prompt, reply=reply,
-            ) if debug else None,
+            debug=(
+                self._build_trace(
+                    user_id,
+                    messages,
+                    steps,
+                    t0,
+                    crisis=False,
+                    chart=chart,
+                    transits=transits,
+                    query=query,
+                    retrieved=retrieved,
+                    memory=memory,
+                    system_prompt=system_prompt,
+                    reply=reply,
+                )
+                if debug
+                else None
+            ),
         )
 
     def _build_trace(
-        self, user_id, messages, steps, t0, *,
-        crisis, chart, transits, query, retrieved, memory, system_prompt, reply,
+        self,
+        user_id,
+        messages,
+        steps,
+        t0,
+        *,
+        crisis,
+        chart,
+        transits,
+        query,
+        retrieved,
+        memory,
+        system_prompt,
+        reply,
     ) -> dict:
         """Assemble the developer trace returned when debug is on."""
         return {
@@ -358,8 +544,12 @@ class ChatService:
             "rag": {
                 "query": query,
                 "hits": [
-                    {"id": c.id, "topic": getattr(c, "topic", None),
-                     "text": c.text[:280], "chars": len(c.text)}
+                    {
+                        "id": c.id,
+                        "topic": getattr(c, "topic", None),
+                        "text": c.text[:280],
+                        "chars": len(c.text),
+                    }
                     for c in retrieved
                 ],
             },
@@ -455,22 +645,23 @@ class ChatService:
         if isinstance(chart, dict):
             chart_doshas = chart.get("doshas") or {}
             doshas = [
-                name for name, d in chart_doshas.items()
+                name
+                for name, d in chart_doshas.items()
                 if isinstance(d, dict) and d.get("present")
             ]
         if transits.get("sade_sati", {}).get("active"):
             doshas.append("sade_sati")
 
         asked = any(kw in lower for kw in _REMEDY_INTENT)
-        traditional = any(
-            (concern, dosha) in _AUTO_SUGGEST_PAIRS for dosha in doshas
-        )
+        traditional = any((concern, dosha) in _AUTO_SUGGEST_PAIRS for dosha in doshas)
         if not asked and not traditional:
             return None, []
 
         grahas: list[str] = []
         if isinstance(chart, dict):
-            maha = ((chart.get("dasha") or {}).get("current") or {}).get("mahadasha") or {}
+            maha = ((chart.get("dasha") or {}).get("current") or {}).get(
+                "mahadasha"
+            ) or {}
             if maha.get("lord"):
                 grahas.append(maha["lord"])
 
@@ -482,8 +673,13 @@ class ChatService:
         # k=1 on purpose: gpt-4o-mini narrates everything it is given, so the
         # "at most one temple" guardrail is enforced here, not by instruction.
         suggestions = self._temples.suggest(
-            concern=concern, doshas=doshas, grahas=grahas,
-            district=district, lat=lat, lng=lng, k=1,
+            concern=concern,
+            doshas=doshas,
+            grahas=grahas,
+            district=district,
+            lat=lat,
+            lng=lng,
+            k=1,
         )
         if not suggestions:
             return None, []
@@ -616,8 +812,10 @@ class ChatService:
 
         try:
             result = await self._astrology.compute_porutham(
-                female_chart, male_chart,
-                female_name=female_name, male_name=male_name,
+                female_chart,
+                male_chart,
+                female_name=female_name,
+                male_name=male_name,
             )
         except ValueError as exc:
             logger.warning("chat: porutham not computable (%s); degrading.", exc)
@@ -750,7 +948,9 @@ class ChatService:
         return None
 
     @staticmethod
-    def _retrieval_query(question: str, transits: dict, chart: dict | None = None) -> str:
+    def _retrieval_query(
+        question: str, transits: dict, chart: dict | None = None
+    ) -> str:
         """Build the RAG query from the question plus computed chart/transit facts.
 
         Facts are computed (astrology_engine), knowledge is retrieved (this
@@ -788,40 +988,42 @@ class ChatService:
 
         return " ".join([question, *cues]).strip()
 
-    async def get_chat_users(self) -> list[dict]:
+    async def get_chat_users(self, session: AsyncSession) -> list[dict]:
         """Fetch all unique users who have chat history, with turn counts and last active times.
 
-        Admin Dashboard use case. Returns empty if MongoDB is disabled/unavailable.
+        Admin Dashboard use case. Returns empty on error.
         """
-        from app.platform.mongo import get_db
-        db = get_db()
-        if db is None:
-            return []
+        from sqlalchemy import func, select
+
+        from app.modules.chat.models import ChatTurn
+
         try:
-            cursor = await db["chat_history"].aggregate([
-                {"$group": {
-                    "_id": "$user_id",
-                    "turns": {"$sum": 1},
-                    "last_active": {"$max": "$created_at"}
-                }},
-                {"$sort": {"last_active": -1}}
-            ])
+            rows = (
+                await session.execute(
+                    select(
+                        ChatTurn.user_id,
+                        func.count().label("turns"),
+                        func.max(ChatTurn.created_at).label("last_active"),
+                    )
+                    .group_by(ChatTurn.user_id)
+                    .order_by(func.max(ChatTurn.created_at).desc())
+                )
+            ).all()
             return [
-                {
-                    "phone": row["_id"],
-                    "turns": row["turns"],
-                    "last_active": row["last_active"]
-                }
-                async for row in cursor
+                {"phone": uid, "turns": turns, "last_active": last_active}
+                for uid, turns, last_active in rows
             ]
         except Exception as exc:
             logger.warning("chat.service: get_chat_users failed (%s)", exc)
             return []
 
-    async def get_user_chat_history(self, phone: str, limit: int = 100) -> list[dict]:
+    async def get_user_chat_history(
+        self, session: AsyncSession, phone: str, limit: int = 100
+    ) -> list[dict]:
         """Fetch raw chat history for a specific user.
 
-        Admin Dashboard use case. Returns empty if MongoDB is disabled/unavailable.
+        Admin Dashboard / CRM use case. Returns empty on error.
         """
         from app.modules.chat import history
-        return await history.get_history(phone, limit=limit)
+
+        return await history.get_history(session, phone, limit=limit)
