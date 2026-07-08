@@ -14,13 +14,8 @@ WORKDIR /app
 # libfribidi0: lets Pillow's bundled libraqm shape complex text — required for
 # correct Malayalam conjuncts on rendered cards (platform/cards.py). The
 # Malayalam font itself ships in the repo (assets/fonts/).
-# postgresql + sudo: the HF Space runs its own PostgreSQL inside this container
-# (see scripts/start.sh), so the database lives on the Space instead of an
-# external managed host. sudo lets the root entrypoint drop to the 'postgres'
-# user, which the server requires. Not used by docker-compose (external PG).
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-        build-essential libfribidi0 postgresql sudo \
+    && apt-get install -y --no-install-recommends build-essential libfribidi0 \
     && rm -rf /var/lib/apt/lists/*
 
 # Install deps first for better layer caching.
@@ -32,8 +27,10 @@ COPY . .
 
 EXPOSE 3000
 
-# Default command (HF Space): boot the in-container Postgres, then migrate +
-# serve. scripts/start.sh handles the data dir (HF /data persistent storage),
-# cluster init, role/db creation, and sets DATABASE_URL to the local server.
-# docker-compose overrides `command:` per service, so this is HF-only.
-CMD ["bash", "scripts/start.sh"]
+# Default command runs the API; worker/beat services override this.
+# Shell form so ${PORT} expands: HF/Render (and most PaaS) inject the port to
+# bind to via $PORT; fall back to 3000 for local `docker run`.
+# Migrations run first (scripts/migrate.py: stamp-or-upgrade, see its docstring)
+# so the schema is current before the app takes traffic. DATABASE_URL points at
+# the external managed Postgres (Neon), set as a Space secret.
+CMD python scripts/migrate.py && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-3000}
