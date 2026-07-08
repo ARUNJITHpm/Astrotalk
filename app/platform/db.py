@@ -65,10 +65,12 @@ def connect_args_for(raw_url: str, resolved_url: str) -> dict:
 
     TLS decision for Postgres: managed hosts (Neon/Supabase) require it; a
     local/in-container Postgres doesn't offer it, so forcing ``ssl=True`` there
-    refuses the connection. We honor an explicit ``sslmode`` in the original
-    URL, else infer from the host — ``localhost`` and bare single-label Docker
-    hostnames (e.g. compose's ``postgres``) are local (no TLS); an FQDN with a
-    dot (``ep-x.neon.tech``) is a managed host (TLS on).
+    makes asyncpg reject the connection ("rejected SSL upgrade"). We pass an
+    explicit ``ssl=False`` for local so asyncpg never even attempts the upgrade.
+    We honor an explicit ``sslmode`` in the original URL, else infer from the
+    host — ``localhost`` and bare single-label Docker hostnames (e.g. compose's
+    ``postgres``) are local (no TLS); an FQDN with a dot (``ep-x.neon.tech``) is
+    a managed host (TLS on).
     """
     if resolved_url.startswith("sqlite"):
         return {"check_same_thread": False}
@@ -76,12 +78,12 @@ def connect_args_for(raw_url: str, resolved_url: str) -> dict:
         return {}
     sslmode = dict(parse_qsl(urlsplit(raw_url).query)).get("sslmode")
     if sslmode in {"disable", "allow"}:
-        return {}
+        return {"ssl": False}
     if sslmode in {"prefer", "require", "verify-ca", "verify-full"}:
         return {"ssl": True}
     host = urlsplit(resolved_url).hostname or ""
     if host in {"localhost", "127.0.0.1", "::1"} or "." not in host:
-        return {}
+        return {"ssl": False}
     return {"ssl": True}
 
 

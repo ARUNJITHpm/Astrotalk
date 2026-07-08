@@ -15,7 +15,7 @@ from alembic import context
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from app.platform.config import get_settings
-from app.platform.db import Base, _resolve_async_url
+from app.platform.db import Base, _resolve_async_url, connect_args_for
 
 # Import ALL module models so autogenerate sees the full schema.
 from app.modules.admin import models as _admin_models  # noqa: F401
@@ -64,12 +64,11 @@ def _run_sync_migrations(connection) -> None:
 
 
 async def _run_async_migrations() -> None:
-    url = _database_url()
-    if url.startswith("postgresql+asyncpg://"):
-        connect_args = {"ssl": True}  # managed Postgres (Neon) requires TLS
-    else:
-        connect_args = {}
-    engine = create_async_engine(url, connect_args=connect_args)
+    raw = get_settings().database_url
+    url = _resolve_async_url(raw)
+    # Same TLS decision the app uses: managed hosts (Neon) get ssl=True, a local
+    # in-container Postgres gets ssl=False (it doesn't offer TLS).
+    engine = create_async_engine(url, connect_args=connect_args_for(raw, url))
     async with engine.connect() as connection:
         await connection.run_sync(_run_sync_migrations)
         await connection.commit()
