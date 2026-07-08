@@ -1,14 +1,23 @@
 """Run schema migrations at boot — the Docker entrypoint calls this before uvicorn.
 
-Three database states, three actions:
+Database states and actions:
 
   1. ``alembic_version`` table present   → ``alembic upgrade head`` (normal path).
-  2. No ``alembic_version`` but ``users``
-     exists (the pre-Alembic Neon DB,
-     created by ``create_all``)          → ``alembic stamp head``: adopt the
-                                           live schema as the baseline without
-                                           re-running CREATEs that would fail.
-  3. Fresh/empty database               → ``alembic upgrade head`` builds all.
+  2. Fresh/empty database               → ``alembic upgrade head`` builds all.
+  3. Tables present but NO
+     ``alembic_version`` (un-versioned
+     schema of unknown provenance)       → ABORT loudly. See below.
+
+Why (3) aborts instead of auto-stamping: the old behavior here was
+``alembic stamp head`` — "adopt whatever's live as fully migrated". That is
+silently WRONG whenever the live schema is *stale* (e.g. a database first
+built by ``create_all`` at an early point, before ``users.org_id`` existed):
+stamping head marks every migration as applied, so the columns the code needs
+are never created, and the app 500s on every query with a schema mismatch that
+looks nothing like a migration problem. An un-versioned schema's true revision
+is unknowable, so we refuse to guess. To recover, reset the schema
+(``DROP SCHEMA public CASCADE; CREATE SCHEMA public;``) and let migrations
+rebuild it from empty, or ``alembic stamp <rev>`` to the known-correct revision.
 
 Exits non-zero on failure so the container stops instead of serving an app
 against a half-migrated schema. Run manually any time: ``python scripts/migrate.py``.
@@ -47,11 +56,17 @@ def main() -> None:
     tables = asyncio.run(_table_names())
     config = Config(str(_ROOT / "alembic.ini"))
 
-    if "alembic_version" not in tables and "users" in tables:
-        # Pre-Alembic database (schema came from create_all): mark the baseline
-        # as already applied, then upgrade applies only what came after it.
-        print("migrate: existing pre-Alembic schema detected -> stamping baseline")
-        command.stamp(config, "head")
+    if "alembic_version" not in tables and tables:
+        # Tables exist but nothing records which migration they're at. We can't
+        # know their true revision, and guessing (the old `stamp head`) silently
+        # skips real migrations and serves a broken schema. Fail loudly instead.
+        raise SystemExit(
+            "migrate: refusing to auto-adopt an un-versioned schema. The database "
+            f"has tables ({', '.join(sorted(tables))}) but no alembic_version, so "
+            "its true revision is unknown. Reset it to rebuild from empty "
+            "(DROP SCHEMA public CASCADE; CREATE SCHEMA public;), or run "
+            "`alembic stamp <rev>` to the revision that matches the live schema."
+        )
     print("migrate: upgrading to head")
     command.upgrade(config, "head")
     print("migrate: done")
