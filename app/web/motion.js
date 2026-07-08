@@ -85,7 +85,7 @@
   function intro() {
     const tl = gsap.timeline({ defaults: { ease: "power3.out" } });
     if (sidebar) {
-      tl.from(sidebar, { x: -48, autoAlpha: 0, duration: 0.6 });
+      tl.from(sidebar, { x: -48, autoAlpha: 0, duration: 0.6, clearProps: "all" });
       tl.from(
         sidebar.querySelectorAll(".brand, .new-chat, .side-section-title, .sidebar-foot"),
         { x: -18, autoAlpha: 0, duration: 0.45, stagger: 0.06 },
