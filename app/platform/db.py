@@ -6,9 +6,10 @@ this module only wires the engine/session — it does not create or alter tables
 """
 
 from collections.abc import AsyncIterator
+from datetime import datetime
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
-from sqlalchemy import Connection
+from sqlalchemy import Connection, DateTime
 from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -25,7 +26,17 @@ _DEFAULT_SQLITE_URL = "sqlite+aiosqlite:///./tara.db"
 
 
 class Base(DeclarativeBase):
-    """Declarative base for all module ORM models."""
+    """Declarative base for all module ORM models.
+
+    Every model timestamp is written as a timezone-aware UTC value
+    (``datetime.now(UTC)``). Map bare ``Mapped[datetime]`` columns to a
+    timezone-AWARE type so Postgres gets ``TIMESTAMP WITH TIME ZONE``: the
+    asyncpg driver rejects an aware datetime into a naive ``timestamp`` column
+    ("can't subtract offset-naive and offset-aware datetimes"), which 500s
+    every insert. SQLite ignores the flag (no tz storage), so dev is unaffected.
+    """
+
+    type_annotation_map = {datetime: DateTime(timezone=True)}
 
 
 # libpq/psycopg connection options that the asyncpg driver does NOT accept as
