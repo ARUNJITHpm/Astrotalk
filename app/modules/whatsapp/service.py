@@ -203,6 +203,14 @@ class WhatsappService:
 
         if ob.is_greeting(text) or wa.chat_context is None:
             # Greeting or very first contact → warm welcome, no details asked.
+            # The full feature showcase is shown once; repeat greetings get the
+            # short variant so the menu doesn't spam every "hi".
+            data = wa.onboarding_data or {}
+            if data.get("welcomed"):
+                return ob.WELCOME_BACK_MSG
+            data["welcomed"] = True
+            wa.onboarding_data = data
+            await session.flush()
             return ob.WELCOME_MSG
 
         # General chit-chat or general astrology → answer with no chart needed.

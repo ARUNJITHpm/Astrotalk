@@ -10,8 +10,9 @@
     rel="stylesheet"
   />
   <style>
-    /* WhatsApp-style skin for the SAME chatbot backend (/chat/message).
-       Self-contained so it stays isolated from the main web UI's styles.css. */
+    /* WhatsApp simulator: same brain as real WhatsApp (/whatsapp/simulate →
+       onboarding FSM + chat). Self-contained so it stays isolated from the
+       main web UI's styles.css. */
     :root {
       --wa-green: #075e54;      /* header */
       --wa-teal: #128c7e;
@@ -206,7 +207,8 @@
     <div class="wa-chat" id="wa-chat">
       <div class="wa-day">ഇന്ന്</div>
       <div class="wa-note">
-        🔒 ഇത് WhatsApp ശൈലിയിലുള്ള ഒരു ഡെമോ ആണ്. താരയുടെ അതേ AI ആണ് ഇവിടെയും മറുപടി നൽകുന്നത്.<br />
+        🔒 ഇത് യഥാർത്ഥ WhatsApp ഫ്ലോയുടെ ഒരു സിമുലേറ്റർ ആണ് — onboarding അടക്കം
+        അതേ brain ആണ് മറുപടി നൽകുന്നത്. നമ്പർ മാറ്റാൻ മുകളിലെ ⋮ അമർത്തൂ.<br />
         Tara ഒരു AI ആണ് · മാർഗനിർദേശത്തിന് മാത്രം · അടിയന്തരം: Tele-MANAS 14416
       </div>
     </div>
@@ -218,14 +220,16 @@
       <button id="wa-send" class="wa-send" aria-label="Send">➤</button>
     </div>
 
-    <!-- Number gate: WhatsApp identity IS the mobile number. -->
+    <!-- Number gate: WhatsApp identity IS the mobile number. The simulator
+         routes through the real WhatsApp brain, so any number = that "sender". -->
     <div class="gate" id="gate" hidden>
       <div class="gate-card">
         <div style="font-size:30px;color:var(--wa-light-green)">✦</div>
         <h2>നമസ്കാരം 🙏</h2>
-        <p>WhatsApp-ൽ താരയുമായി ചാറ്റ് ചെയ്യാൻ നിങ്ങളുടെ മൊബൈൽ നമ്പർ നൽകൂ.</p>
+        <p>ഏത് നമ്പറിൽ നിന്നാണ് മെസ്സേജ് അയക്കുന്നത്? (WhatsApp സിമുലേറ്റർ — പുതിയ നമ്പർ = പുതിയ ഉപയോക്താവ്)</p>
         <div class="gate-err" id="gate-err"></div>
         <input id="gate-phone" type="tel" placeholder="+91 98765 43210" />
+        <input id="gate-token" type="password" placeholder="Admin token" autocomplete="off" />
         <button id="gate-go">തുടങ്ങൂ</button>
       </div>
     </div>
@@ -239,25 +243,17 @@
       const statusEl = document.getElementById("wa-status");
       const gate = document.getElementById("gate");
       const gatePhone = document.getElementById("gate-phone");
+      const gateToken = document.getElementById("gate-token");
       const gateGo = document.getElementById("gate-go");
       const gateErr = document.getElementById("gate-err");
 
-      // Conversation state — sent in full each request (the API is stateless),
-      // exactly like the main web UI. Same [{role, content}] shape.
-      let messages = [];
+      // WhatsApp simulator: every message routes through POST /whatsapp/simulate,
+      // the SAME brain as the real WAHA webhook (onboarding FSM + chat). The
+      // server keeps all conversation state per phone in wa_sessions — nothing
+      // to accumulate client-side. The phone you enter IS the "sender".
       let busy = false;
-      // One /wa session = ONE conversation in the shared history. Without this
-      // every turn was saved standalone and flooded the website's sidebar.
-      const conversationId =
-        (crypto.randomUUID && crypto.randomUUID()) ||
-        "wa-" + Date.now() + "-" + Math.random().toString(16).slice(2);
-      // Shared identity with the website: same account, same bearer session
-      // token from the /auth login page. The server derives the user from the
-      // token — typing an arbitrary number no longer works (by design).
-      let userId = localStorage.getItem("tara_phone") || null;
-      const authToken = localStorage.getItem("tara_token") || null;
-      const authHeaders = (extra = {}) =>
-        authToken ? { ...extra, Authorization: `Bearer ${authToken}` } : extra;
+      let phone = localStorage.getItem("wa_sim_phone") || null;
+      let adminToken = localStorage.getItem("wa_sim_token") || "";
 
       // Mirror identity.service.normalize_phone (leading + kept, digits only).
       const normalizePhone = (raw) => {
@@ -307,29 +303,39 @@
       }
 
       async function send(text) {
-        messages.push({ role: "user", content: text });
         addBubble("out", text);
         busy = true; sendBtn.disabled = true;
 
         const typing = showTyping();
         let reply = "";
         try {
-          const res = await fetch("/chat/message", {
+          const res = await fetch("/whatsapp/simulate", {
             method: "POST",
-            headers: authHeaders({ "Content-Type": "application/json" }),
-            body: JSON.stringify({ user_id: userId, conversation_id: conversationId, messages }),
+            headers: {
+              "Content-Type": "application/json",
+              "X-Admin-Token": adminToken,
+            },
+            body: JSON.stringify({ phone, text }),
           });
-          if (res.status === 401) { window.location.href = "/auth"; return; }
+          if (res.status === 401) {
+            // Bad/expired admin token → back to the gate.
+            typing.remove();
+            statusEl.textContent = "online";
+            busy = false; sendBtn.disabled = false;
+            gateErr.textContent = "Admin token തെറ്റാണ്.";
+            gate.hidden = false;
+            return;
+          }
           if (!res.ok) throw new Error("network");
-          const data = await res.json();          // ChatResponse: {reply, ...}
+          const data = await res.json();          // SimulateResponse: {reply}
           reply = data.reply || "…";
         } catch (err) {
           reply = "ക്ഷമിക്കണം, ഒരു പിശക് സംഭവിച്ചു. വീണ്ടും ശ്രമിക്കൂ.";
         } finally {
+          if (!busy) return;                       // 401 path already handled
           typing.remove();
           statusEl.textContent = "online";
           addBubble("in", reply);
-          messages.push({ role: "assistant", content: reply });
           busy = false; sendBtn.disabled = false;
           input.focus();
         }
@@ -337,9 +343,7 @@
 
       function trySend() {
         if (busy) return;
-        // No login session → the real /auth page (the old number-only gate
-        // can't authenticate against the token-protected API).
-        if (!userId || !authToken) { window.location.href = "/auth"; return; }
+        if (!phone || !adminToken) { gate.hidden = false; return; }
         const text = input.value.trim();
         if (!text) return;
         input.value = "";
@@ -358,24 +362,51 @@
 
       // --- Number gate ---
       function acceptNumber() {
-        const phone = normalizePhone(gatePhone.value);
-        if (!phone || phone.replace(/\D/g, "").length < 8) {
+        const p = normalizePhone(gatePhone.value);
+        if (!p || p.replace(/\D/g, "").length < 8) {
           gateErr.textContent = "സാധുവായ നമ്പർ നൽകൂ.";
           return;
         }
-        userId = phone;
-        localStorage.setItem("tara_phone", phone);
+        const t = gateToken.value.trim();
+        if (!t) {
+          gateErr.textContent = "Admin token നൽകൂ.";
+          return;
+        }
+        const changed = phone && phone !== p;
+        phone = p;
+        adminToken = t;
+        localStorage.setItem("wa_sim_phone", p);
+        localStorage.setItem("wa_sim_token", t);
+        gateErr.textContent = "";
         gate.hidden = true;
         statusEl.textContent = "online";
+        if (changed) {
+          // New sender → visually fresh chat (server state is per-phone anyway).
+          chat.querySelectorAll(".bubble").forEach((b) => b.remove());
+        }
         input.focus();
       }
       gateGo.addEventListener("click", acceptNumber);
-      gatePhone.addEventListener("keydown", (e) => {
-        if (e.key === "Enter") { e.preventDefault(); acceptNumber(); }
+      [gatePhone, gateToken].forEach((el) =>
+        el.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") { e.preventDefault(); acceptNumber(); }
+        })
+      );
+
+      // ⋮ menu = change the simulated sender number.
+      document.querySelector(".wa-icons").addEventListener("click", () => {
+        gatePhone.value = phone || "";
+        gateToken.value = adminToken || "";
+        gate.hidden = false;
+        gatePhone.focus();
       });
 
       // Gate the chat behind a number if we don't have one yet.
-      if (!userId) gate.hidden = false;
+      if (!phone || !adminToken) {
+        gatePhone.value = phone || "";
+        gateToken.value = adminToken || "";
+        gate.hidden = false;
+      }
     })();
   </script>
 </body>

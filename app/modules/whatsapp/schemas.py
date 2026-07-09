@@ -46,3 +46,17 @@ class WAHAMessagePayload(BaseModel):
     timestamp: int | None = None
     is_group: bool = False
 
+
+# ---- WhatsApp simulator (the /whatsapp demo page) ----
+
+
+class SimulateRequest(BaseModel):
+    """One inbound message from the simulator page, acting as ``phone``."""
+
+    phone: str
+    text: str
+
+
+class SimulateResponse(BaseModel):
+    reply: str
+

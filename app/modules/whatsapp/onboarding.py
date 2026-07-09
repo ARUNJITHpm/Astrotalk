@@ -27,11 +27,29 @@ logger = get_logger(__name__)
 
 # ---- Malayalam prompts for each onboarding step ----
 
+# First-ever contact: showcase what Tara can actually do (features below are the
+# real surface of astrology_engine + temples — don't advertise anything mocked).
 WELCOME_MSG = (
     "🙏 നമസ്കാരം! ഞാൻ *താര* — നിങ്ങളുടെ AI ജ്യോതിഷ സഹായി 🌟\n\n"
-    "ജോലി, വിവാഹം, ആരോഗ്യം, ഭാവി — എന്തും എന്നോട് ചോദിക്കാം. "
-    "വെറുതെ ഒന്ന് സംസാരിക്കാനും ഞാൻ ഉണ്ട് 😊\n\n"
-    "എന്താണ് അറിയാൻ ആഗ്രഹിക്കുന്നത്?"
+    "എനിക്ക് സഹായിക്കാൻ കഴിയുന്നവ:\n"
+    "⭐ ജാതകം & ദശാഫലം (രാശി, നക്ഷത്രം, ലഗ്നം)\n"
+    "💍 വിവാഹം & പൊരുത്തം\n"
+    "💼 ജോലി, ധനം, ആരോഗ്യം, വിദ്യാഭ്യാസം\n"
+    "🛕 ദോഷം & പരിഹാരം — ക്ഷേത്രം, വഴിപാട് നിർദ്ദേശങ്ങൾ\n"
+    "🍃 പ്രശ്നം (താംബൂലം / സംഖ്യ)\n"
+    "📅 പഞ്ചാംഗം & ഇന്നത്തെ ഫലം\n\n"
+    "ഉദാഹരണം:\n"
+    "• _എന്റെ വിവാഹം എപ്പോൾ നടക്കും?_\n"
+    "• _ജോലിയിൽ ഉയർച്ച ഉണ്ടാകുമോ?_\n"
+    "• _ഇന്നത്തെ പഞ്ചാംഗം പറയൂ_\n\n"
+    "Malayalam, Manglish, English — എങ്ങനെ വേണമെങ്കിലും ചോദിക്കാം 😊\n"
+    "എന്താണ് അറിയേണ്ടത്?"
+)
+
+# Repeat greeting from a still-unregistered user: short and warm, no menu spam.
+WELCOME_BACK_MSG = (
+    "🙏 വീണ്ടും സ്വാഗതം! ഞാൻ താര 🌟\n"
+    "ജാതകം, വിവാഹം, ജോലി, ദോഷം-പരിഹാരം... എന്തും ചോദിക്കാം 😊"
 )
 
 # Shown the moment a personal, chart-based question arrives from someone we don't
@@ -73,8 +91,8 @@ REGISTRATION_SUCCESS_MSG = (
 
 EXISTING_USER_MSG = (
     "🙏 തിരികെ വരവ് സ്വാഗതം, *{name}*!\n\n"
-    "നിങ്ങളുടെ അക്കൗണ്ട് ഇതിനകം ഉണ്ട്. "
-    "എന്തും ചോദിക്കാം — ഞാൻ തയ്യാറാണ് 🌟"
+    "നിങ്ങളുടെ അക്കൗണ്ട് ഇതിനകം ഉണ്ട്. എന്തും ചോദിക്കാം — "
+    "ജാതകം, ദശാഫലം, പൊരുത്തം, ദോഷം-പരിഹാരം, പഞ്ചാംഗം... ഞാൻ തയ്യാറാണ് 🌟"
 )
 
 INVALID_DOB_MSG = (

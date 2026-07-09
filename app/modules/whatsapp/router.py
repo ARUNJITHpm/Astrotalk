@@ -20,10 +20,13 @@ from app.modules.whatsapp.models import (
 from app.modules.whatsapp.schemas import (
     ConsentRequest,
     ConsentResponse,
+    SimulateRequest,
+    SimulateResponse,
     WAHAWebhookEvent,
 )
 from app.modules.whatsapp.service import WhatsappService
-from app.modules.whatsapp.waha_client import WAHAClient, _chat_id_to_phone
+from app.modules.whatsapp.waha_client import WAHAClient, _chat_id_to_phone, _with_disclosure
+from app.platform.admin_auth import AdminGuard
 from app.platform.config import get_settings
 from app.platform.db import get_session
 from app.platform.logging_config import get_logger
@@ -208,6 +211,33 @@ async def waha_webhook(request: Request, session: SessionDep) -> dict[str, str]:
         except Exception:
             pass
         return {"status": "error"}
+
+
+# ---- WhatsApp simulator (the /whatsapp demo page) ----
+
+
+@router.post("/simulate", response_model=SimulateResponse, dependencies=[AdminGuard])
+async def simulate_message(
+    payload: SimulateRequest, session: SessionDep
+) -> SimulateResponse:
+    """Route a message through the SAME brain as real WhatsApp — onboarding FSM,
+    registration, chat — for an arbitrary phone, and return the reply instead of
+    sending it via WAHA. Used by the /whatsapp demo page to test the exact flow
+    a real WhatsApp user would get.
+
+    Admin-gated (X-Admin-Token): the caller can act as ANY phone number, which
+    would otherwise expose other users' personalised readings.
+    """
+    from app.modules.identity.service import normalize_phone
+
+    phone = normalize_phone(payload.phone.strip())
+    if not phone or len(phone.lstrip("+")) < 8:
+        return SimulateResponse(reply="❌ Invalid phone number.")
+
+    reply = await _service.handle_inbound_message(session, phone, payload.text)
+    await session.commit()
+    # Mirror the real path: WAHAClient.send_text appends the AI disclosure.
+    return SimulateResponse(reply=_with_disclosure(reply))
 
 
 # ---- WAHA admin endpoints (new) ----

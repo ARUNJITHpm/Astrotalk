@@ -167,9 +167,9 @@ async def ui_login() -> FileResponse:
     return FileResponse(_WEB_DIR / "ui" / "login.html")
 
 
-# WhatsApp-style skin over the SAME chat brain (POST /chat/message). This is a
-# demo surface only — the real whatsapp module stays compliance-locked and does
-# NOT expose open-ended AI chat (GUARDRAILS.md §3).
+# WhatsApp simulator: same brain as real WhatsApp (POST /whatsapp/simulate →
+# onboarding FSM + chat), admin-token gated. Lets us test the exact flow a real
+# WhatsApp user gets without touching the live WAHA session.
 @app.get("/whatsapp", include_in_schema=False)
 async def whatsapp_ui() -> FileResponse:
     return FileResponse(_WEB_DIR / "whatsapp.html")
