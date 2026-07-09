@@ -27,10 +27,6 @@ from app.platform.logging_config import get_logger
 
 logger = get_logger(__name__)
 
-# TEMP diagnostics: last registration traceback, surfaced via a debug route so we
-# can see the exact prod failure. Remove once the registration bug is fixed.
-_DEBUG: dict[str, str | None] = {"last_reg_error": None}
-
 # GUARDRAILS.md §3 hard cap; default 3, overridable per environment.
 MAX_WA_MESSAGES_PER_DAY = int(os.getenv("MAX_WA_MESSAGES_PER_DAY", "3"))
 
@@ -342,11 +338,8 @@ class WhatsappService:
             )
             return user
 
-        except Exception as exc:
-            import traceback
-
+        except Exception:
             logger.error("whatsapp: registration failed", exc_info=True)
-            _DEBUG["last_reg_error"] = traceback.format_exc()
             # A concurrent duplicate delivery may have created the user already
             # (or a mid-statement failure left the session dirty). Roll back and
             # re-check: if the account now exists, treat it as success instead of

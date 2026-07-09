@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import JSON
+from sqlalchemy.ext.mutable import MutableDict, MutableList
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.platform.db import Base
@@ -39,12 +40,16 @@ class WASession(Base):
     #            | collect_place | chatting | opted_out
     state: Mapped[str] = mapped_column(default="casual")
     # Partial onboarding data collected so far. Cleared after registration.
+    # MutableDict so in-place edits (data["dob"] = ...) are tracked and actually
+    # persisted — a plain JSON column silently drops same-object mutations, which
+    # made collected birth details vanish before registration.
     onboarding_data: Mapped[dict[str, Any] | None] = mapped_column(
-        JSON, nullable=True, default=None
+        MutableDict.as_mutable(JSON), nullable=True, default=None
     )
     # Rolling chat context: list of {"role": ..., "content": ...} dicts.
+    # MutableList for the same reason — in-place appends must be persisted.
     chat_context: Mapped[list[dict[str, str]] | None] = mapped_column(
-        JSON, nullable=True, default=None
+        MutableList.as_mutable(JSON), nullable=True, default=None
     )
     # Groups turns for the history sidebar (same semantics as chat.schemas).
     conversation_id: Mapped[str | None] = mapped_column(nullable=True, default=None)
