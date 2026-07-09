@@ -63,9 +63,12 @@ class WAHAClient:
         self._mock = settings.mock_whatsapp
 
     def _headers(self) -> dict[str, str]:
+        # WAHA authenticates with the ``X-Api-Key`` header — NOT
+        # ``Authorization: Bearer`` (that form returns 401 on every endpoint,
+        # which silently broke the reply path / two-way sends).
         headers: dict[str, str] = {"Content-Type": "application/json"}
         if self._api_key:
-            headers["Authorization"] = f"Bearer {self._api_key}"
+            headers["X-Api-Key"] = self._api_key
         return headers
 
     async def send_text(self, phone: str, text: str) -> dict:
