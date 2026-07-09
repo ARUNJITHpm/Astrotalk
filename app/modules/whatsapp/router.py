@@ -38,6 +38,26 @@ _service = WhatsappService()
 _waha = WAHAClient()
 
 
+def _reply_chat_id(payload: dict, from_field: str) -> str:
+    """The chat id to reply to, resolving WhatsApp's LID addressing.
+
+    GOWS delivers some messages with ``from="<lid>@lid"`` — a privacy alias, not
+    a phone number. Replying to a LID is slow/unreliable (and identity lookup on
+    it never matches a real user), but the sender's REAL phone is carried in
+    ``_data.Info.SenderAlt`` as ``"<phone>@s.whatsapp.net"``. Prefer it so the
+    reply routes to a normal ``"<phone>@c.us"`` chat and the phone key matches
+    the web-registered user. Normal ``@c.us`` senders pass straight through.
+    """
+    if from_field.endswith("@lid"):
+        info = (payload.get("_data") or {}).get("Info") or {}
+        alt = info.get("SenderAlt") or ""
+        if alt.endswith("@s.whatsapp.net"):
+            digits = alt.split("@", 1)[0].split(":", 1)[0]  # drop device suffix
+            if digits.isdigit():
+                return f"{digits}@c.us"
+    return from_field
+
+
 # ---- Existing BSP webhook (unchanged) ----
 
 
@@ -125,10 +145,13 @@ async def waha_webhook(request: Request, session: SessionDep) -> dict[str, str]:
     if not from_field or not body_text:
         return {"status": "ignored", "reason": "empty message"}
 
-    # Normalize the phone number.
+    # Resolve LID-addressed senders to their real "<phone>@c.us" chat id, then
+    # derive the phone key from THAT (not the raw LID) so identity matches the
+    # web-registered user and the reply routes to a real phone.
     from app.modules.identity.service import normalize_phone
 
-    phone = normalize_phone(_chat_id_to_phone(from_field))
+    reply_chat = _reply_chat_id(payload, from_field)
+    phone = normalize_phone(_chat_id_to_phone(reply_chat))
 
     logger.info("waha-webhook: inbound from phone ending ••%s", phone[-2:])
 
@@ -137,8 +160,8 @@ async def waha_webhook(request: Request, session: SessionDep) -> dict[str, str]:
         reply = await _service.handle_inbound_message(session, phone, body_text)
         await session.commit()
 
-        # Send the reply back.
-        await _service.send_reply(phone, reply)
+        # Send the reply back to the resolved chat id.
+        await _service.send_reply(reply_chat, reply)
 
         return {"status": "ok"}
 
@@ -147,7 +170,7 @@ async def waha_webhook(request: Request, session: SessionDep) -> dict[str, str]:
         # Best-effort error reply to the user.
         try:
             await _service.send_reply(
-                phone,
+                reply_chat,
                 "❌ ക്ഷമിക്കണം, ഒരു പിശക് സംഭവിച്ചു. ദയവായി വീണ്ടും ശ്രമിക്കൂ.",
             )
         except Exception:
