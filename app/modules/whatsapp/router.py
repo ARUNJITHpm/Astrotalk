@@ -213,6 +213,14 @@ async def waha_webhook(request: Request, session: SessionDep) -> dict[str, str]:
 # ---- WAHA admin endpoints (new) ----
 
 
+@router.get("/debug-last-error", include_in_schema=False)
+async def debug_last_error() -> dict:
+    """TEMP: expose the last WhatsApp registration traceback for debugging."""
+    from app.modules.whatsapp.service import _DEBUG
+
+    return {"last_reg_error": _DEBUG.get("last_reg_error")}
+
+
 @router.get("/waha-status")
 async def waha_status() -> dict:
     """Check WAHA connection status (for admin dashboard / health probes)."""
