@@ -78,6 +78,22 @@ services:
       redis:
         condition: service_healthy
 
+  waha:
+    image: devlikeapro/waha
+    ports:
+      - "3010:3000"
+    environment:
+      # WAHA sends inbound messages to Tara's webhook endpoint.
+      WHATSAPP_HOOK_URL: "http://api:3000/whatsapp/waha-webhook"
+      WHATSAPP_HOOK_EVENTS: "message"
+      # Uncomment to secure the WAHA API with an API key:
+      # WAHA_API_KEY: "${WAHA_API_KEY:-}"
+    volumes:
+      - waha_sessions:/app/.sessions
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   mongo_data:
+  waha_sessions:
+

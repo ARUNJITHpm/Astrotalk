@@ -88,6 +88,16 @@ class Settings(BaseSettings):
     whatsapp_bsp_api_key: str = ""
     whatsapp_channel_id: str = ""
 
+    # ---- WAHA (WhatsApp HTTP API) — real two-way WhatsApp chat ----
+    # Base URL of the WAHA container's REST API (default: sidecar on port 3010).
+    waha_api_url: str = "http://localhost:3010/api"
+    # Session name configured in WAHA (matches the session started via the WAHA UI).
+    waha_session: str = "default"
+    # API key for WAHA (if WAHA is started with WAHA_API_KEY env var).
+    waha_api_key: str = ""
+    # Shared secret for verifying inbound webhook payloads (optional extra layer).
+    waha_webhook_secret: str = ""
+
     # ---- Payments (Razorpay) ----
     razorpay_key_id: str = ""
     razorpay_key_secret: str = ""
