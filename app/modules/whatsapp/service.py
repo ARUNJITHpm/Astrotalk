@@ -172,6 +172,13 @@ class WhatsappService:
                 if ob.is_greeting(text):
                     return ob.EXISTING_USER_MSG.format(name=existing_user.name)
 
+        # --- mid-collection: let them bail out gracefully ---
+        if wa.state in ob.COLLECT_STATES and ob.is_cancel(text):
+            wa.state = "casual"
+            wa.onboarding_data = None
+            await session.flush()
+            return ob.CANCELLED_MSG
+
         # --- mid-collection: advance one step ---
         if wa.state in ob.COLLECT_STATES:
             reply, is_complete = await ob.process_collection_step(wa, text)
@@ -333,6 +340,23 @@ class WhatsappService:
 
         except Exception as exc:
             logger.error("whatsapp: registration failed (%s)", exc)
+            # A concurrent duplicate delivery may have created the user already
+            # (or a mid-statement failure left the session dirty). Roll back and
+            # re-check: if the account now exists, treat it as success instead of
+            # making the user re-enter everything.
+            try:
+                await session.rollback()
+                existing = await IdentityService().get_user_by_phone(
+                    session, wa.phone
+                )
+            except Exception:
+                existing = None
+            if existing is not None:
+                wa.onboarding_data = None
+                wa.state = "chatting"
+                wa.conversation_id = wa.conversation_id or str(uuid.uuid4())
+                await session.flush()
+                return existing
             # Rewind to the last step so they can retry.
             wa.state = "collect_place"
             await session.flush()
