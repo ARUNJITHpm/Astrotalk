@@ -55,6 +55,49 @@ async def get_user_chat(phone: str, session: SessionDep) -> list[dict]:
     return await _service.get_user_chat(session, phone)
 
 
+# TEMP: allowlisted hard-delete of throwaway accounts created while debugging the
+# WhatsApp registration flow. Can ONLY remove these exact phones — never a real
+# user. Remove this route once cleanup is done.
+_DELETABLE_TEST_PHONES = {
+    "919000000777", "919000000888", "919000001234", "919000000999",
+}
+
+
+class _DeleteTestPayload(BaseModel):
+    phone: str
+
+
+@router.post("/delete-test-user", dependencies=[AdminGuard], include_in_schema=False)
+async def delete_test_user(payload: _DeleteTestPayload, session: SessionDep) -> dict:
+    from sqlalchemy import select
+
+    from app.modules.identity.models import User
+    from app.modules.whatsapp.models import WASession
+
+    digits = "".join(c for c in payload.phone if c.isdigit())
+    if digits not in _DELETABLE_TEST_PHONES:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="not an allowlisted test phone",
+        )
+    out = {"phone": digits, "user_deleted": False, "wa_session_deleted": False}
+    user = (
+        await session.execute(
+            select(User).where(User.phone.in_([digits, f"+{digits}"]))
+        )
+    ).scalar_one_or_none()
+    if user is not None:
+        await session.delete(user)  # ORM cascade -> charts, login sessions
+        out["user_deleted"] = True
+    for key in (digits, f"+{digits}"):
+        wa = await session.get(WASession, key)
+        if wa is not None:
+            await session.delete(wa)
+            out["wa_session_deleted"] = True
+    await session.commit()
+    return out
+
+
 @router.get("/config", summary="Whether the dashboard needs a token")
 async def admin_config() -> dict:
     """Unauthenticated: lets the dashboard page decide whether to prompt for a
