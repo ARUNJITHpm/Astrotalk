@@ -97,6 +97,17 @@ class Settings(BaseSettings):
     waha_api_key: str = ""
     # Shared secret for verifying inbound webhook payloads (optional extra layer).
     waha_webhook_secret: str = ""
+    # ---- Keep-alive: stop a scale-to-zero WAHA host (e.g. Render free tier)
+    # from sleeping. Render spins the container down after ~15 min with no
+    # inbound HTTP traffic; WhatsApp messages arrive over Meta's websocket (not
+    # HTTP) so they don't wake it. When enabled (and not mocked), a background
+    # task pings the WAHA host on an interval so it keeps seeing HTTP traffic.
+    # NOTE: this only works while Tara itself is awake — if Tara is also on a
+    # scale-to-zero host, pair it with an external pinger hitting Tara's /health.
+    waha_keepalive_enabled: bool = False
+    waha_keepalive_interval_seconds: int = 600  # 10 minutes
+    # Explicit URL to ping. Empty = derive "<waha host>/ping" from waha_api_url.
+    waha_keepalive_url: str = ""
 
     # ---- Payments (Razorpay) ----
     razorpay_key_id: str = ""
