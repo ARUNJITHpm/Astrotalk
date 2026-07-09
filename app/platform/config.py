@@ -108,6 +108,12 @@ class Settings(BaseSettings):
     waha_keepalive_interval_seconds: int = 600  # 10 minutes
     # Explicit URL to ping. Empty = derive "<waha host>/ping" from waha_api_url.
     waha_keepalive_url: str = ""
+    # Auto-recover a dropped WhatsApp session: each keepalive cycle, if the WAHA
+    # session is FAILED/STOPPED (a transient connection drop), restart it so it
+    # reconnects from the persisted creds — no human re-pair needed. Sessions in
+    # SCAN_QR_CODE (a real logout needing a new QR/code) are left alone. Only
+    # runs while the keepalive task is running (waha_keepalive_enabled + live).
+    waha_autorecover_enabled: bool = True
 
     # ---- Payments (Razorpay) ----
     razorpay_key_id: str = ""

@@ -46,11 +46,44 @@ async def _ping_once(url: str) -> None:
         logger.warning("waha keepalive: ping failed for %s (%s)", url, exc)
 
 
-async def _loop(url: str, interval: int) -> None:
+# Statuses we auto-restart. SCAN_QR_CODE means a real logout that needs a fresh
+# QR/pairing code (a human) — restarting it just loops, so we leave it alone.
+_RECOVERABLE = {"FAILED", "STOPPED"}
+
+
+async def _recover_session_once(settings) -> None:
+    """If the WAHA session has dropped to FAILED/STOPPED, restart it.
+
+    A transient drop reconnects from the persisted creds and returns to WORKING
+    with no re-pair. Best-effort: any error is logged, never raised.
+    """
+    base = settings.waha_api_url.strip().rstrip("/")
+    sess = settings.waha_session
+    headers = {"X-Api-Key": settings.waha_api_key} if settings.waha_api_key else {}
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.get(f"{base}/sessions/{sess}", headers=headers)
+            if resp.status_code != 200:
+                logger.warning("waha keepalive: session check HTTP %s", resp.status_code)
+                return
+            status = (resp.json() or {}).get("status")
+            if status in _RECOVERABLE:
+                logger.warning(
+                    "waha keepalive: session '%s' is %s — auto-restarting", sess, status
+                )
+                r = await client.post(f"{base}/sessions/{sess}/restart", headers=headers)
+                logger.info("waha keepalive: auto-restart -> %s", r.status_code)
+    except Exception as exc:  # must never kill the loop
+        logger.warning("waha keepalive: session recovery failed (%s)", exc)
+
+
+async def _loop(url: str, interval: int, settings) -> None:
     logger.info("waha keepalive: started (every %ss -> %s)", interval, url)
     try:
         while True:
             await _ping_once(url)
+            if settings.waha_autorecover_enabled:
+                await _recover_session_once(settings)
             await asyncio.sleep(interval)
     except asyncio.CancelledError:  # normal on shutdown
         logger.info("waha keepalive: stopped")
@@ -69,4 +102,4 @@ def start_keepalive() -> "asyncio.Task | None":
         return None
     url = _keepalive_url(settings)
     interval = max(60, settings.waha_keepalive_interval_seconds)
-    return asyncio.create_task(_loop(url, interval), name="waha-keepalive")
+    return asyncio.create_task(_loop(url, interval, settings), name="waha-keepalive")
