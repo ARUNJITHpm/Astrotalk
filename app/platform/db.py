@@ -102,7 +102,18 @@ def _build_engine() -> AsyncEngine:
     settings = get_settings()
     url = _resolve_async_url(settings.database_url)
     connect_args = connect_args_for(settings.database_url, url)
-    return create_async_engine(url, future=True, connect_args=connect_args)
+    kwargs: dict = {"future": True, "connect_args": connect_args}
+    if url.startswith("postgresql+asyncpg://"):
+        # Managed Postgres (Neon/Supabase free tiers) auto-suspends when idle and
+        # closes its pooled connections. Without a liveness check the FIRST query
+        # after an idle period hits a dead socket, raises, and poisons the whole
+        # request session — so the next commit fails too. Observed as: the first
+        # WhatsApp message after ~5 min idle erroring instead of replying.
+        # pool_pre_ping tests+reconnects transparently (waking Neon); pool_recycle
+        # caps connection age so we never lean on a soon-to-be-dropped socket.
+        kwargs["pool_pre_ping"] = True
+        kwargs["pool_recycle"] = 300
+    return create_async_engine(url, **kwargs)
 
 
 # Engines/sessions are cheap to declare and connect lazily, so building them at
