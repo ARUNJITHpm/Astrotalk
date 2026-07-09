@@ -14,6 +14,9 @@ from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.whatsapp import consent
+from app.modules.whatsapp.models import (
+    WASession,  # noqa: F401 — ensures init_db creates wa_sessions
+)
 from app.modules.whatsapp.schemas import (
     ConsentRequest,
     ConsentResponse,
