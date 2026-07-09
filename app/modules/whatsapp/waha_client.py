@@ -57,7 +57,7 @@ class WAHAClient:
 
     def __init__(self) -> None:
         settings = get_settings()
-        self._base_url = settings.waha_api_url.rstrip("/")
+        self._base_url = settings.waha_api_url.strip().rstrip("/")
         self._session = settings.waha_session
         self._api_key = settings.waha_api_key
         self._mock = settings.mock_whatsapp
