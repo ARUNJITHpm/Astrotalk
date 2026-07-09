@@ -25,6 +25,10 @@ class WAHAWebhookEvent(BaseModel):
     are acknowledged with 200 and ignored.
     """
 
+    # WAHA event id (``evt_...``), stable across duplicate deliveries of the same
+    # message — used for idempotency/dedup (WAHA can POST the same event twice,
+    # e.g. when the number has more than one linked device session).
+    id: str = ""
     event: str
     session: str = "default"
     payload: dict[str, Any] = {}

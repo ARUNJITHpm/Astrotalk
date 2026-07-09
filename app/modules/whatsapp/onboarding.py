@@ -28,10 +28,22 @@ logger = get_logger(__name__)
 # ---- Malayalam prompts for each onboarding step ----
 
 WELCOME_MSG = (
-    "🙏 നമസ്കാരം! ഞാൻ *താര* — നിങ്ങളുടെ AI ജ്യോതിഷ സഹായി.\n\n"
-    "നിങ്ങളുടെ ജാതകം തയ്യാറാക്കാൻ ചില വിവരങ്ങൾ വേണം.\n"
-    "ആദ്യം നിങ്ങളുടെ *പേര്* പറയൂ 👇"
+    "🙏 നമസ്കാരം! ഞാൻ *താര* — നിങ്ങളുടെ AI ജ്യോതിഷ സഹായി 🌟\n\n"
+    "ജോലി, വിവാഹം, ആരോഗ്യം, ഭാവി — എന്തും എന്നോട് ചോദിക്കാം. "
+    "വെറുതെ ഒന്ന് സംസാരിക്കാനും ഞാൻ ഉണ്ട് 😊\n\n"
+    "എന്താണ് അറിയാൻ ആഗ്രഹിക്കുന്നത്?"
 )
+
+# Shown the moment a personal, chart-based question arrives from someone we don't
+# know yet — this is the ONLY place we start asking for birth details, and we do
+# it warmly, explaining why.
+COLLECT_INTRO_NAME = (
+    "അതിന് നിങ്ങളുടെ വ്യക്തിഗത ജാതകം നോക്കണം — അതിനായി കുറച്ച് ജനന വിവരങ്ങൾ വേണം 🙏\n\n"
+    "തുടങ്ങാം — എന്താണ് നിങ്ങളുടെ *പേര്*? 😊"
+)
+
+# Prefixed to the answer of the user's original question once their chart is ready.
+CHART_READY_MSG = "✅ നന്ദി! നിങ്ങളുടെ ജാതകം തയ്യാറാക്കി 🌙"
 
 ASK_DOB_MSG = (
     "നന്ദി, {name}! 🌟\n\n"
@@ -128,7 +140,9 @@ async def get_or_create_session(
     """Get the WhatsApp session for a phone, creating one if it doesn't exist."""
     wa = await session.get(WASession, phone)
     if wa is None:
-        wa = WASession(phone=phone, state="greeting", onboarding_data={})
+        # New contact starts in "casual": free conversation, no details asked
+        # until a personal chart question makes them necessary.
+        wa = WASession(phone=phone, state="casual", onboarding_data={})
         session.add(wa)
         await session.flush()
     return wa
@@ -150,52 +164,77 @@ async def reset_session(session: AsyncSession, phone: str) -> None:
 # ---- State machine ----
 
 
-async def process_onboarding_step(
+# The states in which we're actively collecting birth details, in order.
+COLLECT_STATES = ("collect_name", "collect_dob", "collect_time", "collect_place")
+
+# Casual greetings / small talk — get a warm welcome, never a form.
+_GREETING_KEYWORDS = {
+    "hi", "hii", "hiii", "hey", "hai", "hallo", "hello", "helo", "hlo", "yo",
+    "start", "namaskaram", "namaste", "vanakkam", "good morning", "good evening",
+    "ഹായ്", "ഹലോ", "നമസ്കാരം", "നമസ്തേ", "സുപ്രഭാതം", "എന്തുണ്ട്", "സുഖമാണോ",
+}
+
+# Personal, chart-dependent intent — questions that only make sense with THIS
+# person's horoscope. General knowledge ("what is rahu?") is deliberately absent,
+# so it's answered without demanding birth details.
+_PERSONAL_CHART_KEYWORDS = (
+    # English / Manglish
+    "my rashi", "my rasi", "my nakshatra", "my star", "my sign", "my chart",
+    "my horoscope", "my kundli", "my jathakam", "my future", "my career",
+    "my marriage", "my job", "my love life", "when will i", "will i get",
+    "should i marry", "my dosha", "my dasha", "my life", "for me",
+    "horoscope", "jathakam", "jadhakam", "kundli", "porutham", "compatibility",
+    "dosham", "dosha", "dasha", "rashi", "raasi", "nakshatram", "zodiac", "natal",
+    "kalyanam", "vivaham", "ente ", "eppo", "bhavi",
+    # Malayalam
+    "എന്റെ", "ജാതക", "രാശി", "നക്ഷത്ര", "ദോഷ", "ദശ", "പൊരുത്ത",
+    "വിവാഹം", "കല്യാണം", "ഭാവി", "എപ്പോൾ", "നടക്കുമോ",
+)
+
+
+def is_greeting(text: str) -> bool:
+    """True for a bare greeting / opener (so we welcome instead of interrogating)."""
+    return text.lower().strip().rstrip("!.?") in _GREETING_KEYWORDS
+
+
+def needs_personal_chart(text: str) -> bool:
+    """True when answering needs THIS user's birth chart (→ time to ask details)."""
+    lower = text.lower()
+    return any(kw in lower for kw in _PERSONAL_CHART_KEYWORDS)
+
+
+async def process_collection_step(
     wa: WASession, text: str
 ) -> tuple[str, bool]:
-    """Advance the onboarding FSM by one step.
+    """Advance the birth-details collection by one step.
 
-    Args:
-        wa: The WhatsApp session (mutated in place).
-        text: The user's message text.
-
-    Returns:
-        (reply_text, is_complete): The reply to send, and whether onboarding
-        just completed (caller should create the user).
+    Only entered once a personal chart question has been asked. Returns
+    ``(reply_text, is_complete)``; on completion the caller registers the user
+    and answers their original (pending) question.
     """
     state = wa.state
     data = wa.onboarding_data or {}
     text = text.strip()
 
-    if state == "greeting":
-        # First contact — show welcome, move to ask_name.
-        wa.state = "ask_name"
-        wa.onboarding_data = data
-        return WELCOME_MSG, False
-
-    if state == "ask_name":
-        # Validate: non-empty name.
+    if state == "collect_name":
         name = text.strip()
         if not name or len(name) < 2:
             return "❌ പേര് ശരിയായി ടൈപ്പ് ചെയ്യൂ (കുറഞ്ഞത് 2 അക്ഷരം).", False
         data["name"] = name
-        wa.state = "ask_dob"
+        wa.state = "collect_dob"
         wa.onboarding_data = data
         return ASK_DOB_MSG.format(name=name), False
 
-    if state == "ask_dob":
+    if state == "collect_dob":
         dob = parse_dob(text)
-        if dob is None:
-            return INVALID_DOB_MSG, False
-        # Basic sanity: not in the future, not before 1900.
-        if dob.year < 1900 or dob > date.today():
+        if dob is None or dob.year < 1900 or dob > date.today():
             return INVALID_DOB_MSG, False
         data["dob"] = dob.isoformat()
-        wa.state = "ask_time"
+        wa.state = "collect_time"
         wa.onboarding_data = data
         return ASK_TIME_MSG, False
 
-    if state == "ask_time":
+    if state == "collect_time":
         lower = text.lower().strip()
         if lower in ("skip", "no", "ഇല്ല", "അറിയില്ല", "ariyilla"):
             data["birth_time"] = None
@@ -204,29 +243,20 @@ async def process_onboarding_step(
             if bt is None:
                 return INVALID_TIME_MSG, False
             data["birth_time"] = bt.isoformat()
-        wa.state = "ask_place"
+        wa.state = "collect_place"
         wa.onboarding_data = data
         return ASK_PLACE_MSG, False
 
-    if state == "ask_place":
+    if state == "collect_place":
         place = text.strip()
         if not place or len(place) < 2:
             return "❌ സ്ഥലത്തിന്റെ പേര് ശരിയായി ടൈപ്പ് ചെയ്യൂ.", False
         data["birth_place"] = place
-        wa.state = "ask_password"
-        wa.onboarding_data = data
-        return ASK_PASSWORD_MSG, False
-
-    if state == "ask_password":
-        password = text.strip()
-        if len(password) < 4:
-            return INVALID_PASSWORD_MSG, False
-        data["password"] = password
         wa.state = "chatting"
         wa.onboarding_data = data
-        return REGISTRATION_SUCCESS_MSG, True  # Signal: registration needed
+        return "", True  # complete → caller registers + answers pending question
 
-    # Should not reach here — but be safe.
+    # Should not reach here — be safe.
     return WELCOME_MSG, False
 
 
@@ -242,7 +272,6 @@ def get_onboarding_fields(wa: WASession) -> dict:
         "name": data.get("name", ""),
         "dob": data.get("dob", ""),
         "birth_place": data.get("birth_place", ""),
-        "password": data.get("password", ""),
     }
     if data.get("birth_time"):
         result["birth_time"] = data["birth_time"]

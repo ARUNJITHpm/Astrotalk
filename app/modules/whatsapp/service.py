@@ -109,18 +109,31 @@ class WhatsappService:
 
     # ---- WAHA inbound message handler (new) ----
 
+    # Legacy FSM state names → the new conversation model, applied on read so old
+    # wa_sessions rows keep working without a data migration.
+    _STATE_MIGRATION = {
+        "greeting": "casual",
+        "ask_name": "collect_name",
+        "ask_dob": "collect_dob",
+        "ask_time": "collect_time",
+        "ask_place": "collect_place",
+        "ask_password": "casual",  # password no longer collected; re-collect if asked
+    }
+
     async def handle_inbound_message(
         self, session: AsyncSession, phone: str, text: str
     ) -> str:
-        """Process an inbound WhatsApp message end-to-end.
+        """Process an inbound WhatsApp message end-to-end (see the module's
+        conversation plan):
 
-        This is the core orchestrator for two-way WhatsApp chat:
-          1. Check for STOP/START keywords → handle opt-out/opt-in.
-          2. Look up the wa_session (create if new).
-          3. Check if the user already exists in identity (registered on web).
-          4. If onboarding incomplete → run the FSM.
-          5. If registered → route to ChatService.handle_message().
-          6. Return the reply text. The router sends it via WAHAClient.
+          1. STOP → opt out.
+          2. Registered user (phone matches identity) → greet by name / chat,
+             never ask for details we already have.
+          3. Mid-collection → advance; on completion register + answer their
+             original question.
+          4. Casual (unknown user): a *personal* chart question starts a polite
+             details collection; a greeting or first contact gets a warm welcome;
+             anything else is answered conversationally with no chart.
 
         The daily cap does NOT apply here — these are user-initiated messages.
         The AI disclosure is appended by WAHAClient.send_text(), not here.
@@ -128,48 +141,64 @@ class WhatsappService:
         text = (text or "").strip()
         lower = text.lower()
 
-        # --- Step 1: opt-out / opt-in keywords ---
+        # --- opt-out first (always honoured) ---
         if lower in _STOP_KEYWORDS:
             return await self._handle_stop(session, phone)
-        if lower in _START_KEYWORDS:
-            wa = await ob.get_session(session, phone)
-            if wa is not None and wa.state == "opted_out":
-                return await self._handle_start(session, phone)
-            # If not opted out, START/hi/hello falls through to normal chat.
 
-        # --- Step 2: get or create wa_session ---
         wa = await ob.get_or_create_session(session, phone)
+        migrated = self._STATE_MIGRATION.get(wa.state)
+        if migrated:
+            wa.state = migrated
 
-        # If opted out, remind them.
+        # --- opted out: only START / a greeting brings them back ---
         if wa.state == "opted_out":
+            if lower in _START_KEYWORDS or ob.is_greeting(text):
+                return await self._handle_start(session, phone)
             return (
                 "നിങ്ങൾ unsubscribe ചെയ്‌തിരിക്കുന്നു. "
                 "തിരികെ വരാൻ *START* എന്ന് അയക്കൂ."
             )
 
-        # --- Step 3: check if user already exists in identity ---
-        if wa.state in ("greeting", "ask_name", "ask_dob", "ask_time", "ask_place", "ask_password"):
+        # --- registered on the website? adopt their identity, skip onboarding ---
+        if wa.state != "chatting":
             existing_user = await self._lookup_user(session, phone)
             if existing_user is not None:
-                # User registered on the website — skip onboarding.
                 wa.state = "chatting"
-                wa.conversation_id = str(uuid.uuid4())
+                wa.conversation_id = wa.conversation_id or str(uuid.uuid4())
                 wa.onboarding_data = None
                 await session.flush()
-                return ob.EXISTING_USER_MSG.format(name=existing_user.name)
+                # A bare "hi" gets a warm welcome-back; a real question falls
+                # through to the chat handler below and is answered directly.
+                if ob.is_greeting(text):
+                    return ob.EXISTING_USER_MSG.format(name=existing_user.name)
 
-        # --- Step 4: onboarding FSM ---
-        if wa.state != "chatting":
-            reply, is_complete = await ob.process_onboarding_step(wa, text)
+        # --- mid-collection: advance one step ---
+        if wa.state in ob.COLLECT_STATES:
+            reply, is_complete = await ob.process_collection_step(wa, text)
             await session.flush()
-
             if is_complete:
-                # Registration: create user + chart via identity service.
-                reply = await self._register_user(session, wa)
-
+                return await self._complete_registration_and_answer(session, wa)
             return reply
 
-        # --- Step 5: route to ChatService ---
+        # --- registered/known user → full personalised chat ---
+        if wa.state == "chatting":
+            return await self._handle_chat(session, wa, text)
+
+        # --- casual (unknown user, not collecting) ---
+        if ob.needs_personal_chart(text):
+            # First personal question — remember it, then ask for details politely.
+            data = wa.onboarding_data or {}
+            data["pending_question"] = text
+            wa.onboarding_data = data
+            wa.state = "collect_name"
+            await session.flush()
+            return ob.COLLECT_INTRO_NAME
+
+        if ob.is_greeting(text) or wa.chat_context is None:
+            # Greeting or very first contact → warm welcome, no details asked.
+            return ob.WELCOME_MSG
+
+        # General chit-chat or general astrology → answer with no chart needed.
         return await self._handle_chat(session, wa, text)
 
     async def _handle_stop(self, session: AsyncSession, phone: str) -> str:
@@ -190,7 +219,7 @@ class WhatsappService:
             wa.state = "chatting"
             wa.conversation_id = wa.conversation_id or str(uuid.uuid4())
         else:
-            wa.state = "greeting"
+            wa.state = "casual"
             wa.onboarding_data = {}
         await session.flush()
         return ob.OPT_IN_MSG
@@ -208,14 +237,36 @@ class WhatsappService:
             logger.warning("whatsapp: identity lookup failed (%s); continuing.", exc)
             return None
 
-    async def _register_user(self, session: AsyncSession, wa: ob.WASession) -> str:
-        """Create the user account after onboarding completes.
+    async def _complete_registration_and_answer(
+        self, session: AsyncSession, wa: ob.WASession
+    ) -> str:
+        """Register the user from the collected details, then answer the personal
+        question that triggered the collection — so the flow ends with a real
+        reading, not just a "you're registered" note."""
+        pending = (wa.onboarding_data or {}).get("pending_question")
+        user = await self._register_user(session, wa)
+        if user is None:
+            return (
+                "❌ രജിസ്‌ട്രേഷൻ പരാജയപ്പെട്ടു. ദയവായി വീണ്ടും ശ്രമിക്കൂ — "
+                "നിങ്ങളുടെ ജനന സ്ഥലം ഒരിക്കൽ കൂടി പറയൂ."
+            )
+        if pending:
+            answer = await self._handle_chat(session, wa, pending)
+            return f"{ob.CHART_READY_MSG}\n\n{answer}"
+        return ob.REGISTRATION_SUCCESS_MSG
 
-        Uses the same IdentityService.create_user() + chart computation path
-        as the web registration, so the user gets a real identity row, chart,
-        and can log into the website with the same phone + password.
+    async def _register_user(self, session: AsyncSession, wa: ob.WASession):
+        """Create the user account from the collected birth details.
+
+        Uses the same IdentityService.create_user() + chart computation path as
+        web registration, so the user gets a real identity row + chart. On
+        WhatsApp we don't ask for a password (too much friction) — we set a random
+        one; the user can set their own later on the website via the name+dob
+        password reset. Returns the User on success (existing or new), or None on
+        failure (state rewound to collect_place so the last step can be retried).
         """
         import inspect
+        import secrets
 
         from app.modules.astrology_engine.service import AstrologyEngineService
         from app.modules.identity.schemas import UserCreate
@@ -226,7 +277,7 @@ class WhatsappService:
         try:
             data = UserCreate(
                 phone=fields["phone"],
-                password=fields["password"],
+                password=secrets.token_urlsafe(12),  # auto; user resets on web
                 name=fields["name"],
                 dob=fields["dob"],
                 birth_time=fields.get("birth_time"),
@@ -234,14 +285,14 @@ class WhatsappService:
             )
             identity = IdentityService()
 
-            # Check if user already exists (race: they may have registered
-            # on the web while onboarding on WhatsApp).
+            # Race: they may have registered on the web mid-collection.
             existing = await identity.get_user_by_phone(session, data.phone)
             if existing is not None:
                 wa.onboarding_data = None
-                wa.conversation_id = str(uuid.uuid4())
+                wa.state = "chatting"
+                wa.conversation_id = wa.conversation_id or str(uuid.uuid4())
                 await session.flush()
-                return ob.EXISTING_USER_MSG.format(name=existing.name)
+                return existing
 
             user = await identity.create_user(session, data)
 
@@ -270,24 +321,22 @@ class WhatsappService:
 
             # Clear sensitive onboarding data, set up for chatting.
             wa.onboarding_data = None
-            wa.conversation_id = str(uuid.uuid4())
+            wa.state = "chatting"
+            wa.conversation_id = wa.conversation_id or str(uuid.uuid4())
             await session.commit()
 
             logger.info(
                 "whatsapp: new user registered via WhatsApp onboarding (user_id=%s).",
                 user.id,
             )
-            return ob.REGISTRATION_SUCCESS_MSG
+            return user
 
         except Exception as exc:
             logger.error("whatsapp: registration failed (%s)", exc)
-            # Roll back the onboarding so they can retry.
-            wa.state = "ask_password"
+            # Rewind to the last step so they can retry.
+            wa.state = "collect_place"
             await session.flush()
-            return (
-                "❌ രജിസ്‌ട്രേഷൻ പരാജയപ്പെട്ടു. ദയവായി വീണ്ടും ശ്രമിക്കൂ.\n"
-                "ഒരു password ടൈപ്പ് ചെയ്യൂ (4+ അക്ഷരങ്ങൾ)."
-            )
+            return None
 
     async def _handle_chat(
         self, session: AsyncSession, wa: ob.WASession, text: str

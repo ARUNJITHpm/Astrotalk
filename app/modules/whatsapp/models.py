@@ -35,9 +35,9 @@ class WASession(Base):
     __tablename__ = "wa_sessions"
 
     phone: Mapped[str] = mapped_column(primary_key=True)
-    # FSM state: greeting | ask_name | ask_dob | ask_time | ask_place
-    #            | ask_password | chatting | opted_out
-    state: Mapped[str] = mapped_column(default="greeting")
+    # FSM state: casual | collect_name | collect_dob | collect_time
+    #            | collect_place | chatting | opted_out
+    state: Mapped[str] = mapped_column(default="casual")
     # Partial onboarding data collected so far. Cleared after registration.
     onboarding_data: Mapped[dict[str, Any] | None] = mapped_column(
         JSON, nullable=True, default=None

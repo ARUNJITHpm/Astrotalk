@@ -38,6 +38,33 @@ _service = WhatsappService()
 _waha = WAHAClient()
 
 
+import time as _time
+
+# Recently-processed webhook event ids → monotonic timestamp. WAHA occasionally
+# delivers the same message event twice (e.g. multiple linked-device sessions on
+# the number); we reply only to the first. In-memory is fine — the HF Space is a
+# single process, and a missed dedup after a restart is harmless (at worst one
+# duplicate reply). Check+insert is synchronous so concurrent duplicate requests
+# can't both pass (asyncio won't interleave a function with no await).
+_SEEN_EVENTS: dict[str, float] = {}
+_SEEN_TTL = 300.0  # seconds
+
+
+def _already_processed(event_id: str, msg_id: str) -> bool:
+    key = event_id or msg_id
+    if not key:
+        return False
+    now = _time.monotonic()
+    if len(_SEEN_EVENTS) > 2000:  # bounded cleanup
+        for k, t in list(_SEEN_EVENTS.items()):
+            if now - t > _SEEN_TTL:
+                del _SEEN_EVENTS[k]
+    if key in _SEEN_EVENTS and now - _SEEN_EVENTS[key] < _SEEN_TTL:
+        return True
+    _SEEN_EVENTS[key] = now
+    return False
+
+
 def _reply_chat_id(payload: dict, from_field: str) -> str:
     """The chat id to reply to, resolving WhatsApp's LID addressing.
 
@@ -144,6 +171,11 @@ async def waha_webhook(request: Request, session: SessionDep) -> dict[str, str]:
 
     if not from_field or not body_text:
         return {"status": "ignored", "reason": "empty message"}
+
+    # Drop duplicate deliveries of the same event so we don't reply twice.
+    if _already_processed(event.id, str(payload.get("id", ""))):
+        logger.info("waha-webhook: duplicate event %s ignored", event.id or payload.get("id"))
+        return {"status": "ignored", "reason": "duplicate"}
 
     # Resolve LID-addressed senders to their real "<phone>@c.us" chat id, then
     # derive the phone key from THAT (not the raw LID) so identity matches the
