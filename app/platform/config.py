@@ -88,6 +88,34 @@ class Settings(BaseSettings):
     whatsapp_bsp_api_key: str = ""
     whatsapp_channel_id: str = ""
 
+    # ---- WhatsApp transport selector: which stack sends/receives 1:1 chat ----
+    # "waha"  = self-hosted WAHA (GOWS/whatsmeow) — unofficial, links a real
+    #           device by QR/pairing code; fragile (Meta unlinks/bans it).
+    # "cloud" = official Meta WhatsApp Cloud API (graph.facebook.com) — durable,
+    #           no device linking, no unlink/ban risk. Needs a Meta app + token.
+    # Only the OUTBOUND adapter + which inbound webhook is authoritative change;
+    # the conversation brain is identical. Default stays "waha" for back-compat.
+    whatsapp_transport: str = "waha"
+
+    # ---- Meta WhatsApp Cloud API (used when whatsapp_transport == "cloud") ----
+    # From the Meta app dashboard → WhatsApp → API Setup. The access token is a
+    # secret (temporary 24h token to start; swap for a permanent System User
+    # token for production). Never logged, never committed.
+    meta_access_token: str = ""
+    # The sender's Phone Number ID (NOT the phone number itself) — a long numeric
+    # id shown next to your "From" number in API Setup.
+    meta_phone_number_id: str = ""
+    # Graph API version to pin. Bump deliberately when Meta deprecates one.
+    meta_api_version: str = "v21.0"
+    # The verify token YOU invent and type into BOTH the Meta webhook config and
+    # here — Meta echoes it back on the GET handshake so we can confirm the
+    # webhook is ours. Any non-empty random string.
+    meta_webhook_verify_token: str = ""
+    # The Meta App Secret (app dashboard → Settings → Basic). When set, inbound
+    # webhook POSTs are verified against the X-Hub-Signature-256 HMAC so a
+    # forged caller can't inject messages. Empty = signature check skipped.
+    meta_app_secret: str = ""
+
     # ---- WAHA (WhatsApp HTTP API) — real two-way WhatsApp chat ----
     # Base URL of the WAHA container's REST API (default: sidecar on port 3010).
     waha_api_url: str = "http://localhost:3010/api"

@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.whatsapp import consent
 from app.modules.whatsapp import onboarding as ob
+from app.modules.whatsapp.cloud_api_client import CloudAPIClient
 from app.modules.whatsapp.waha_client import WAHAClient
 from app.platform.config import get_settings
 from app.platform.logging_config import get_logger
@@ -47,9 +48,21 @@ def _with_footer(message: str) -> str:
     return f"{message}{_FOOTER}"
 
 
+def _make_transport():
+    """Pick the outbound WhatsApp client by config.
+
+    "cloud" → official Meta Cloud API (durable); anything else → WAHA (default,
+    back-compat). Both expose the same send_text / send_text_raw / is_healthy
+    surface, so the rest of the service is transport-agnostic.
+    """
+    if get_settings().whatsapp_transport.strip().lower() == "cloud":
+        return CloudAPIClient()
+    return WAHAClient()
+
+
 class WhatsappService:
     def __init__(self) -> None:
-        self._waha = WAHAClient()
+        self._waha = _make_transport()
 
     # ---- Channel broadcast (existing, unchanged) ----
 

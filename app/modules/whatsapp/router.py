@@ -8,9 +8,12 @@ user-initiated messages are processed by ``WhatsappService.handle_inbound_messag
 and replied to via the ``WAHAClient`` adapter.
 """
 
+import hashlib
+import hmac
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request
+from fastapi.responses import PlainTextResponse, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.whatsapp import consent
@@ -211,6 +214,136 @@ async def waha_webhook(request: Request, session: SessionDep) -> dict[str, str]:
         except Exception:
             pass
         return {"status": "error"}
+
+
+# ---- Meta WhatsApp Cloud API webhook (the durable, official transport) ----
+
+
+def _verify_meta_signature(raw_body: bytes, header: str, app_secret: str) -> bool:
+    """Verify Meta's ``X-Hub-Signature-256`` HMAC over the raw request body.
+
+    Meta signs every webhook POST with the app secret. When ``meta_app_secret``
+    is configured we reject any body whose signature doesn't match, so a forged
+    caller can't inject fake inbound messages. Empty secret = check skipped.
+    """
+    if not app_secret:
+        return True  # not configured → skip (dev / setup)
+    if not header.startswith("sha256="):
+        return False
+    expected = header.split("=", 1)[1]
+    digest = hmac.new(app_secret.encode(), raw_body, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(expected, digest)
+
+
+@router.get("/cloud-webhook")
+async def cloud_webhook_verify(request: Request) -> Response:
+    """Meta webhook verification handshake (GET).
+
+    When you save the webhook URL in the Meta app dashboard, Meta calls this with
+    ``hub.mode=subscribe``, ``hub.verify_token=<your token>`` and a
+    ``hub.challenge``. We echo the challenge back verbatim IFF the verify token
+    matches ``meta_webhook_verify_token`` — that's how Meta confirms the endpoint
+    is ours. Returns 403 on mismatch.
+    """
+    params = request.query_params
+    mode = params.get("hub.mode")
+    token = params.get("hub.verify_token")
+    challenge = params.get("hub.challenge", "")
+    expected = get_settings().meta_webhook_verify_token
+    if mode == "subscribe" and expected and token == expected:
+        # Meta expects the raw challenge string, 200, text/plain.
+        return PlainTextResponse(challenge)
+    logger.warning("cloud-webhook: verification failed (mode=%s)", mode)
+    return PlainTextResponse("forbidden", status_code=403)
+
+
+@router.post("/cloud-webhook")
+async def cloud_webhook(request: Request, session: SessionDep) -> dict[str, str]:
+    """Receive inbound WhatsApp messages from the Meta Cloud API.
+
+    Payload shape (differs from WAHA — nested):
+      entry[].changes[].value.messages[]  → inbound messages
+      entry[].changes[].value.statuses[]  → delivery/read receipts (ignored)
+
+    A message carries ``from`` (bare international digits, e.g. ``919400621156``)
+    and, for text, ``text.body``. We route each text message through the SAME
+    brain as WAHA (``handle_inbound_message``) and reply via the Cloud API client.
+
+    Always returns 200 so Meta doesn't retry-flood us; errors are logged.
+    """
+    raw = await request.body()
+
+    # Verify Meta's HMAC signature when an app secret is configured.
+    secret = get_settings().meta_app_secret
+    sig = request.headers.get("X-Hub-Signature-256", "")
+    if not _verify_meta_signature(raw, sig, secret):
+        logger.warning("cloud-webhook: bad X-Hub-Signature-256")
+        return {"status": "ignored", "reason": "bad signature"}
+
+    try:
+        body = await request.json()
+    except Exception:
+        logger.warning("cloud-webhook: invalid JSON body")
+        return {"status": "ignored", "reason": "invalid json"}
+
+    from app.modules.identity.service import normalize_phone
+
+    handled = 0
+    for entry in body.get("entry", []) or []:
+        for change in entry.get("changes", []) or []:
+            value = change.get("value") or {}
+            messages = value.get("messages") or []
+            for msg in messages:
+                from_digits = msg.get("from", "")
+                msg_id = msg.get("id", "")
+                msg_type = msg.get("type", "")
+
+                if not from_digits:
+                    continue
+                if _already_processed(msg_id, msg_id):
+                    logger.info("cloud-webhook: duplicate message %s ignored", msg_id)
+                    continue
+
+                phone = normalize_phone(from_digits)
+                logger.info(
+                    "cloud-webhook: inbound %s from phone ending ••%s",
+                    msg_type,
+                    phone[-2:] if len(phone) >= 2 else phone,
+                )
+
+                if msg_type == "text":
+                    text = (msg.get("text") or {}).get("body", "")
+                else:
+                    # Images/audio/stickers/etc. — we only do text. Nudge politely
+                    # instead of dropping silently so the user isn't left hanging.
+                    text = ""
+
+                try:
+                    if text:
+                        reply = await _service.handle_inbound_message(
+                            session, phone, text
+                        )
+                        await session.commit()
+                        await _service.send_reply(from_digits, reply)
+                    else:
+                        await _service.send_reply_raw(
+                            from_digits,
+                            "ക്ഷമിക്കണം, എനിക്ക് ഇപ്പോൾ ടെക്‌സ്റ്റ് സന്ദേശങ്ങൾ "
+                            "മാത്രമേ വായിക്കാൻ കഴിയൂ. നിങ്ങളുടെ ചോദ്യം ടൈപ്പ് "
+                            "ചെയ്‌ത് അയക്കൂ 🙏",
+                        )
+                    handled += 1
+                except Exception as exc:
+                    logger.error("cloud-webhook: processing failed (%s)", exc)
+                    try:
+                        await _service.send_reply(
+                            from_digits,
+                            "❌ ക്ഷമിക്കണം, ഒരു പിശക് സംഭവിച്ചു. ദയവായി വീണ്ടും ശ്രമിക്കൂ.",
+                        )
+                    except Exception:
+                        pass
+
+    return {"status": "ok", "handled": str(handled)}
 
 
 # ---- WhatsApp simulator (the /whatsapp demo page) ----
