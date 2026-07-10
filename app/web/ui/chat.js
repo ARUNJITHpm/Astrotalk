@@ -313,8 +313,23 @@
     document.querySelectorAll(".history-item.active").forEach((el) => el.classList.remove("active"));
     setCase("default");
     renderWelcome();
+    closeNav();
     input.focus();
   });
+
+  // ---------- mobile nav drawer (hamburger → slide-in sidebar) ----------
+  const chatApp = document.querySelector(".chat-app");
+  const navToggle = $("nav-toggle");
+  const navScrim = $("nav-scrim");
+  function setNav(open) {
+    chatApp.classList.toggle("nav-open", open);
+    if (navToggle) navToggle.setAttribute("aria-expanded", open ? "true" : "false");
+  }
+  function closeNav() { setNav(false); }
+  if (navToggle) navToggle.addEventListener("click", () => setNav(!chatApp.classList.contains("nav-open")));
+  if (navScrim) navScrim.addEventListener("click", closeNav);
+  // Close the drawer after picking a conversation on mobile.
+  historyEl.addEventListener("click", (e) => { if (e.target.closest(".history-item")) closeNav(); });
 
   // ---------- memory panel ----------
   const memoryPanel = $("memory-panel");

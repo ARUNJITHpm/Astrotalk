@@ -955,9 +955,29 @@ body {
 .needs-question { animation: shake 0.4s; border-color: rgba(224, 94, 94, 0.8) !important; }
 
 /* responsive chat */
+/* Mobile nav: hamburger + slide-in sidebar drawer (hidden on desktop). */
+.nav-toggle { display: none; }
+.nav-scrim { display: none; }
+
 @media (max-width: 860px) {
   .chat-app { grid-template-columns: 1fr; }
-  .side { display: none; }
+  .nav-toggle { display: inline-flex; }
+  /* The sidebar becomes an off-canvas drawer instead of vanishing, so history
+     + the astrologer-booking link stay reachable on phones. */
+  .side {
+    display: flex;
+    position: fixed; top: 0; left: 0; bottom: 0;
+    width: min(300px, 84vw); z-index: 60;
+    transform: translateX(-105%);
+    transition: transform 0.32s var(--ease-out);
+    box-shadow: 14px 0 46px rgba(0, 0, 0, 0.5);
+  }
+  .chat-app.nav-open .side { transform: translateX(0); }
+  .chat-app.nav-open .nav-scrim {
+    display: block; position: fixed; inset: 0; z-index: 55;
+    background: rgba(3, 3, 12, 0.55);
+    backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px);
+  }
   .panchang-strip { display: none; }
 }
 @media (max-width: 560px) {
