@@ -179,6 +179,16 @@ class WhatsappService:
             await session.flush()
             return ob.CANCELLED_MSG
 
+        # --- mid-collection: a bare greeting means they're lost or resuming a
+        #     stale/abandoned flow. Never consume "hi" as a field answer — that
+        #     silently corrupts the data and, on a broken legacy session, loops
+        #     forever on a doomed registration. Reset to a clean slate instead. ---
+        if wa.state in ob.COLLECT_STATES and ob.is_greeting(text):
+            wa.state = "casual"
+            wa.onboarding_data = None
+            await session.flush()
+            return ob.COLLECTION_RESET_MSG
+
         # --- mid-collection: advance one step ---
         if wa.state in ob.COLLECT_STATES:
             reply, is_complete = await ob.process_collection_step(wa, text)
@@ -258,6 +268,15 @@ class WhatsappService:
         """Register the user from the collected details, then answer the personal
         question that triggered the collection — so the flow ends with a real
         reading, not just a "you're registered" note."""
+        # Guard against a corrupt/incomplete session (e.g. a legacy row whose
+        # name/dob vanished) reaching registration: it would fail, rewind to
+        # collect_place, and loop on the error forever. Start over cleanly.
+        if not ob.has_required_fields(wa):
+            wa.state = "casual"
+            wa.onboarding_data = None
+            await session.flush()
+            return ob.COLLECTION_RESET_MSG
+
         pending = (wa.onboarding_data or {}).get("pending_question")
         user = await self._register_user(session, wa)
         if user is None:

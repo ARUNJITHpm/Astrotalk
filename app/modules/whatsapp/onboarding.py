@@ -239,6 +239,24 @@ CANCELLED_MSG = (
     "വേറെ എന്തെങ്കിലും അറിയണോ?"
 )
 
+# Shown when we abandon a half-finished / corrupt collection and start over —
+# e.g. the user greets mid-collection, or a stale session has missing fields.
+COLLECTION_RESET_MSG = (
+    "ശരി, നമുക്ക് പുതുതായി തുടങ്ങാം 🙂\n"
+    "എന്താണ് അറിയേണ്ടത്? (ജാതകം, വിവാഹം, ജോലി, ദോഷം-പരിഹാരം...)"
+)
+
+
+def has_required_fields(wa: WASession) -> bool:
+    """True when the collected data has the fields registration needs.
+
+    Guards against registering (and then looping on the rewind-to-collect_place
+    failure) with a corrupt/incomplete session — e.g. legacy rows created before
+    the MutableDict fix, whose name/dob silently vanished.
+    """
+    data = wa.onboarding_data or {}
+    return bool(data.get("name") and data.get("dob") and data.get("birth_place"))
+
 
 def is_greeting(text: str) -> bool:
     """True for a bare greeting / opener (so we welcome instead of interrogating)."""

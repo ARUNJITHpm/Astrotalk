@@ -97,3 +97,38 @@ async def test_personal_question_starts_collection_after_welcome(session):
     wa = await ob.get_session(session, _PHONE)
     assert wa.state == "collect_name"
     assert wa.onboarding_data["pending_question"] == "when will i get married?"
+
+
+# ---- Stuck-session recovery ----
+
+
+async def test_greeting_mid_collection_resets_instead_of_consuming(session):
+    """A bare 'hi' while collecting must not be eaten as a field answer — it
+    resets to a clean slate so a stale/abandoned flow can start over."""
+    svc = WhatsappService()
+    await svc.handle_inbound_message(session, _PHONE, "when will i get married?")
+    wa = await ob.get_session(session, _PHONE)
+    assert wa.state == "collect_name"  # mid-collection
+
+    reply = await svc.handle_inbound_message(session, _PHONE, "hi")
+    assert reply == ob.COLLECTION_RESET_MSG
+    wa = await ob.get_session(session, _PHONE)
+    assert wa.state == "casual"
+    assert wa.onboarding_data is None  # partial data cleared
+
+
+async def test_incomplete_session_at_place_resets_not_registers(session):
+    """A session that reaches collect_place with missing name/dob (corrupt
+    legacy row) must reset, not attempt a doomed registration that loops."""
+    svc = WhatsappService()
+    wa = await ob.get_or_create_session(session, _PHONE)
+    # Simulate a corrupt session: at the last step but earlier fields never set.
+    wa.state = "collect_place"
+    wa.onboarding_data = {}  # no name, no dob
+    await session.flush()
+
+    reply = await svc.handle_inbound_message(session, _PHONE, "Thrissur")
+    assert reply == ob.COLLECTION_RESET_MSG
+    wa = await ob.get_session(session, _PHONE)
+    assert wa.state == "casual"
+    assert wa.onboarding_data is None
