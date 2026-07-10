@@ -80,6 +80,43 @@ async def test_authenticate_checks_the_password(session):
     assert await service.authenticate(session, "+910000000000", "secret123") is None
 
 
+async def test_get_user_by_phone_matches_whatsapp_format(session):
+    """A number registered on the website as +91… must resolve when it arrives
+    from WhatsApp as a bare 91… (no +) — otherwise WhatsApp treats a known user
+    as new and re-onboards them."""
+    service = IdentityService()
+    await service.create_user(session, _SAMPLE)  # stored "+919876543210"
+
+    # WhatsApp delivers the number with no leading '+'.
+    whatsapp_form = await service.get_user_by_phone(session, "919876543210")
+    assert whatsapp_form is not None and whatsapp_form.phone == "+919876543210"
+
+    # Bare 10-digit local form (country code dropped) also resolves.
+    local_form = await service.get_user_by_phone(session, "9876543210")
+    assert local_form is not None and local_form.phone == "+919876543210"
+
+    # A genuinely different number still doesn't match.
+    assert await service.get_user_by_phone(session, "918089397344") is None
+
+
+async def test_get_user_by_phone_matches_plus_when_stored_bare(session):
+    """Reverse direction: a WhatsApp-registered user (stored bare 91…) resolves
+    when they later log into the website typing +91…."""
+    service = IdentityService()
+    await service.create_user(
+        session,
+        UserCreate(
+            phone="918089397344",  # WhatsApp-style, no '+'
+            password="secret123",
+            name="Ravi",
+            dob=date(1999, 5, 4),
+            birth_place="Kochi, Kerala",
+        ),
+    )
+    found = await service.get_user_by_phone(session, "+918089397344")
+    assert found is not None and found.name == "Ravi"
+
+
 async def test_verify_identity_matches_birth_details(session):
     service = IdentityService()
     await service.create_user(session, _SAMPLE)

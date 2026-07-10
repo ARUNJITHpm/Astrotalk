@@ -81,6 +81,40 @@ def normalize_phone(phone: str) -> str:
     return f"+{digits}" if stripped.startswith("+") else digits
 
 
+def phone_match_candidates(phone: str) -> list[str]:
+    """Equivalent stored forms of a mobile number, most-specific first.
+
+    People enter their number inconsistently — with or without a leading ``+``,
+    with or without the country code, sometimes a leading ``0``. WhatsApp always
+    delivers the full international number with NO ``+`` (e.g. ``918089397344``),
+    while the website often stored a ``+``-prefixed form (the auth page hints
+    ``+91…``). An exact-string lookup then fails to see they're the same person
+    and creates a duplicate WhatsApp account. Matching across these variants
+    keeps one person = one identity.
+
+    Assumes an Indian (+91) number when only a bare 10-digit local form is given
+    — this app is Kerala-focused and WhatsApp itself always carries the country
+    code, so the country-code inference only ever *adds* candidates for the
+    website-stored side.
+    """
+    norm = normalize_phone(phone)
+    digits = re.sub(r"\D", "", phone)
+    cands = [norm, digits, f"+{digits}"]
+    if digits.startswith("91") and len(digits) == 12:
+        local = digits[2:]  # strip the 91 country code
+        cands += [local, f"0{local}"]
+    elif len(digits) == 10:
+        cands += [f"91{digits}", f"+91{digits}", f"0{digits}"]
+    # De-dupe, preserving the most-specific-first order.
+    seen: set[str] = set()
+    out: list[str] = []
+    for c in cands:
+        if c and c not in seen:
+            seen.add(c)
+            out.append(c)
+    return out
+
+
 def _norm_name(name: str) -> str:
     """Canonicalize a display name for identity comparison (reset flow).
 
@@ -325,11 +359,25 @@ class IdentityService:
     async def get_user_by_phone(
         self, session: AsyncSession, phone: str
     ) -> User | None:
-        """Look up a user by mobile number — the natural identity key."""
+        """Look up a user by mobile number — the natural identity key.
+
+        Tolerant of ``+``/country-code/leading-zero formatting differences so a
+        number registered on the website (often ``+91…``) matches the same
+        number arriving from WhatsApp (bare ``91…``). Prefers the most-specific
+        (exact-normalized) match when several rows qualify.
+        """
+        candidates = phone_match_candidates(phone)
         result = await session.execute(
-            select(User).where(User.phone == normalize_phone(phone))
+            select(User).where(User.phone.in_(candidates))
         )
-        return result.scalars().first()
+        users = result.scalars().all()
+        if not users:
+            return None
+        # SQL IN() has no ordering guarantee — rank by candidate specificity so
+        # an exact match wins over a country-code/format-variant match.
+        rank = {c: i for i, c in enumerate(candidates)}
+        users.sort(key=lambda u: rank.get(u.phone, len(candidates)))
+        return users[0]
 
     async def authenticate(
         self, session: AsyncSession, phone: str, password: str
