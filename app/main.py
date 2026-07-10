@@ -35,6 +35,7 @@ from fastapi.responses import FileResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from app.modules.admin.router import router as admin_router
+from app.modules.astrologers.router import router as astrologers_router
 from app.modules.astrology_engine.router import router as astrology_engine_router
 from app.modules.chat.router import router as chat_router
 from app.modules.commerce.router import router as commerce_router
@@ -88,6 +89,7 @@ for router in (
     content_share_router,
     temples_router,
     temples_site_router,
+    astrologers_router,
     whatsapp_router,
     community_router,
     commerce_router,
@@ -132,7 +134,7 @@ async def _no_store_web_assets(request, call_next):
     response = await call_next(request)
     path = request.url.path
     if path.startswith("/static") or path in (
-        "/", "/auth", "/wa", "/whatsapp", "/ui", "/ui/login", "/admin",
+        "/", "/auth", "/wa", "/whatsapp", "/ui", "/ui/login", "/ui/astrologers", "/admin",
     ):
         response.headers["Cache-Control"] = "no-store"
     return response
@@ -165,6 +167,12 @@ async def ui_chat() -> FileResponse:
 @app.get("/ui/login", include_in_schema=False)
 async def ui_login() -> FileResponse:
     return FileResponse(_WEB_DIR / "ui" / "login.html")
+
+
+# Astrologer directory + free consult booking (dummy directory for now).
+@app.get("/ui/astrologers", include_in_schema=False)
+async def ui_astrologers() -> FileResponse:
+    return FileResponse(_WEB_DIR / "ui" / "astrologers.html")
 
 
 # WhatsApp simulator: same brain as real WhatsApp (POST /whatsapp/simulate →

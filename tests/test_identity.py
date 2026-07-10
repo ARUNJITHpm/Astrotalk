@@ -216,6 +216,25 @@ async def test_get_chart_none_when_user_has_no_chart(session):
     assert await service.get_chart(session, user.id) is None
 
 
+def test_chart_is_stale_flags_missing_severity():
+    """A real chart computed before chovva parihara rules (no ``severity``
+    field) is stale so it self-heals on next login."""
+    from app.modules.identity.router import _chart_is_stale
+
+    base = {"vargas": {}, "doshas": {"chovva_dosha": {"present": True, "computed": True}}}
+    assert _chart_is_stale(base) is True
+
+    fresh = {
+        "vargas": {},
+        "doshas": {"chovva_dosha": {"present": True, "computed": True, "severity": "mild"}},
+    }
+    assert _chart_is_stale(fresh) is False
+
+    # A chart with no computed chovva (e.g. degraded) is not stale on this basis.
+    no_chovva = {"vargas": {}, "doshas": {"chovva_dosha": {"present": False, "computed": False}}}
+    assert _chart_is_stale(no_chovva) is False
+
+
 async def test_geocode_real_mode_uses_fetched_result_and_caches(monkeypatch):
     """With mock_geocoding off, _geocode returns the provider's result and
     caches it — a later provider outage must not lose a known place."""

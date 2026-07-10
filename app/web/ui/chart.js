@@ -116,11 +116,23 @@
       .filter(([, d]) => d && d.computed !== false)
       .map(([key, d]) => {
         const [ico, name] = NAMES[key] || ["✴️", key.replace(/_/g, " ")];
+        // Three-state: cancelled (parihara) → amber; present+uncancelled → red
+        // (mark mild); absent → green.
+        let cls = "absent";
+        let label = "ഇല്ല";
+        let sub = "";
+        if (d.present && d.cancelled) {
+          cls = "cancelled";
+          label = "പരിഹരിക്കപ്പെട്ടിരിക്കുന്നു";
+          sub = `<span class="dosha-sub">ചൊവ്വ സ്വക്ഷേത്രത്തിലോ ഉച്ചത്തിലോ ആയതിനാൽ ദോഷം പരിഹരിക്കപ്പെട്ടു</span>`;
+        } else if (d.present) {
+          cls = "present";
+          label = d.severity === "mild" ? "ഉണ്ട് (മൃദു)" : "ഉണ്ട്";
+        }
         return `<div class="dosha-card">
           <span>${ico}</span><span class="name">${esc(name)}</span>
-          <span class="dosha-state ${d.present ? "present" : "absent"}">
-            ${d.present ? "ഉണ്ട്" : "ഇല്ല"}
-          </span>
+          <span class="dosha-state ${cls}">${label}</span>
+          ${sub}
         </div>`;
       })
       .join("");

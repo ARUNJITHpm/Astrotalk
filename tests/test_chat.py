@@ -141,6 +141,55 @@ async def test_normal_message_runs_astrology_pipeline(client):
     assert "transits" in body["grounded_in"]
 
 
+async def test_normal_reply_carries_curious_suggestions(client):
+    async with client:
+        resp = await client.post(
+            "/chat/message",
+            json={"messages": [{"role": "user", "content": "ഇന്ന് എങ്ങനെ ഉണ്ടാകും?"}]},
+        )
+    body = resp.json()
+    # Even without a chart, the rotating topics give at least one curious chip.
+    assert isinstance(body["suggestions"], list)
+    assert body["suggestions"]
+
+
+async def test_crisis_reply_has_no_suggestions(client):
+    async with client:
+        resp = await client.post(
+            "/chat/message",
+            json={"messages": [{"role": "user", "content": "എനിക്ക് ജീവിക്കാൻ വയ്യ, ആത്മഹത്യ ചെയ്യണം"}]},
+        )
+    body = resp.json()
+    assert body["is_safety_response"] is True
+    assert body["suggestions"] == []
+
+
+async def test_recurring_concern_offers_astrologer(client, test_db):
+    # Seed two prior marriage turns; the third (this request) crosses the
+    # 3-of-10 recurrence threshold, so the reply grounds in an astrologer.
+    factory = test_db
+    async with factory() as s:
+        for _ in range(2):
+            s.add(
+                ChatTurn(
+                    user_id="demo",
+                    messages=[{"role": "user", "content": "വിവാഹം എപ്പോൾ നടക്കും?"}],
+                    reply="ശുഭം.",
+                )
+            )
+        await s.commit()
+    async with client:
+        resp = await client.post(
+            "/chat/message",
+            json={"messages": [{"role": "user", "content": "എന്റെ വിവാഹ കാര്യം ഒന്ന് നോക്കാമോ?"}]},
+        )
+    body = resp.json()
+    assert any(t.startswith("astrologer:") for t in body["grounded_in"])
+    assert any(t.startswith("recurring:") for t in body["grounded_in"])
+    # And a booking CTA chip is offered.
+    assert any(s.startswith("📿") for s in body["suggestions"])
+
+
 def test_select_varga_maps_topics_to_divisional_charts():
     from app.modules.chat.service import ChatService
 

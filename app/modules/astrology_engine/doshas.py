@@ -8,6 +8,11 @@ persona rules (GUARDRAILS.md §1: guidance and agency, never doom).
 Detected here:
   - Chovva (Mangal/Kuja) dosha — Mars in houses 1, 2, 4, 7, 8 or 12. Kerala
     convention checks the placement both from the lagna and from the Moon.
+    Classical parihara (cancellation) rules soften or nullify the dosha when
+    Mars is dignified or sits in a house whose sign is exempt; the raw
+    ``present`` flag is kept for compatibility while ``effective``/``severity``
+    carry the real reading. Parihara rules are pending astrologer review — see
+    NEEDS_ASTROLOGER.md.
   - Kala Sarpa dosha — all seven classical grahas confined to one side of the
     Rahu–Ketu axis.
   - Sade Sati — transit Saturn in the 12th, 1st or 2nd house from the natal
@@ -18,6 +23,21 @@ from __future__ import annotations
 
 # Houses that place Mars in chovva dosha, counted from lagna or Moon.
 _CHOVVA_HOUSES = frozenset({1, 2, 4, 7, 8, 12})
+
+# Rasi indices (Mesha=0 … Meena=11) where Mars is dignified, cancelling the
+# dosha from every frame: own signs Mesha/Vrischika and exaltation Makara.
+_MARS_OWN_OR_EXALTED = frozenset({0, 7, 9})
+
+# Per-house rasi exemptions: when Mars occupies a chovva house AND its sign is
+# listed for that house, that frame's dosha is cancelled (classical parihara).
+_CHOVVA_HOUSE_EXEMPT_RASIS = {
+    1: frozenset({0}),
+    2: frozenset({2, 5}),
+    4: frozenset({0, 7}),
+    7: frozenset({3, 9}),
+    8: frozenset({8, 11}),
+    12: frozenset({1, 6}),
+}
 
 # The seven classical grahas checked against the Rahu–Ketu axis.
 _CLASSICAL_GRAHAS = ("surya", "chandra", "chevvai", "budhan", "guru", "shukran", "shani")
@@ -50,17 +70,50 @@ def _detect_chovva(planets: dict[str, dict]) -> dict:
     if not mars or not moon:
         return {"present": False, "computed": False}
 
+    mars_rasi = int(mars["rasi_index"])
     from_lagna = int(mars["house"])
-    from_moon = _house_from(int(mars["rasi_index"]), int(moon["rasi_index"]))
+    from_moon = _house_from(mars_rasi, int(moon["rasi_index"]))
     lagna_hit = from_lagna in _CHOVVA_HOUSES
     moon_hit = from_moon in _CHOVVA_HOUSES
+    present = lagna_hit or moon_hit
+
+    reasons: list[str] = []
+
+    def _frame_cancelled(house: int) -> bool:
+        cancelled = False
+        if mars_rasi in _MARS_OWN_OR_EXALTED:
+            reasons.append("mars_in_own_or_exalted_sign")
+            cancelled = True
+        if mars_rasi in _CHOVVA_HOUSE_EXEMPT_RASIS.get(house, frozenset()):
+            reasons.append(f"house{house}_sign_exempt")
+            cancelled = True
+        return cancelled
+
+    lagna_cancelled = _frame_cancelled(from_lagna) if lagna_hit else False
+    moon_cancelled = _frame_cancelled(from_moon) if moon_hit else False
+
+    # Count frames that still carry an uncancelled dosha.
+    uncancelled = int(lagna_hit and not lagna_cancelled) + int(moon_hit and not moon_cancelled)
+    if not present:
+        severity = "none"
+    elif uncancelled == 0:
+        severity = "cancelled"
+    elif uncancelled == 1:
+        severity = "mild"
+    else:
+        severity = "strong"
+
     return {
-        "present": lagna_hit or moon_hit,
+        "present": present,
         "computed": True,
         "from_lagna": lagna_hit,
         "from_moon": moon_hit,
         "mars_house_from_lagna": from_lagna,
         "mars_house_from_moon": from_moon,
+        "cancelled": present and uncancelled == 0,
+        "cancellation_reasons": list(dict.fromkeys(reasons)),
+        "effective": present and uncancelled > 0,
+        "severity": severity,
     }
 
 

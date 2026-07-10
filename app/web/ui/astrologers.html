@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="ml">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>താര ✦ — ജ്യോതിഷ വിദഗ്ധരെ കാണാം</title>
+  <link rel="stylesheet" href="/static/ui/tara-ui.css" />
+</head>
+<body data-case="default">
+  <canvas id="starfield"></canvas>
+  <div class="aurora"></div>
+  <div class="grain"></div>
+
+  <main class="astro-page">
+    <header class="astro-head">
+      <a class="astro-back" href="/ui">← സംഭാഷണത്തിലേക്ക്</a>
+      <div class="astro-title">
+        <h1><span class="star">✦</span> അനുഭവസമ്പന്നരായ ജ്യോതിഷ വിദഗ്ധർ</h1>
+        <p class="astro-sub">നിങ്ങളുടെ ജില്ല തിരഞ്ഞെടുത്ത് സൗകര്യമുള്ള സമയം ബുക്ക് ചെയ്യാം · കൺസൾട്ടേഷൻ സൗജന്യം</p>
+      </div>
+      <select id="district-filter" class="astro-select" aria-label="ജില്ല">
+        <option value="">എല്ലാ ജില്ലകളും</option>
+        <option value="Thiruvananthapuram">തിരുവനന്തപുരം</option>
+        <option value="Kollam">കൊല്ലം</option>
+        <option value="Pathanamthitta">പത്തനംതിട്ട</option>
+        <option value="Alappuzha">ആലപ്പുഴ</option>
+        <option value="Kottayam">കോട്ടയം</option>
+        <option value="Idukki">ഇടുക്കി</option>
+        <option value="Ernakulam">എറണാകുളം</option>
+        <option value="Thrissur">തൃശ്ശൂർ</option>
+        <option value="Palakkad">പാലക്കാട്</option>
+        <option value="Malappuram">മലപ്പുറം</option>
+        <option value="Kozhikode">കോഴിക്കോട്</option>
+        <option value="Wayanad">വയനാട്</option>
+        <option value="Kannur">കണ്ണൂർ</option>
+        <option value="Kasaragod">കാസർഗോഡ്</option>
+      </select>
+    </header>
+
+    <section class="astro-mine" id="mine-section" hidden>
+      <h2>എന്റെ ബുക്കിംഗുകൾ</h2>
+      <div id="mine-list" class="mine-list"></div>
+    </section>
+
+    <section class="astro-grid" id="astro-grid" aria-live="polite"></section>
+    <p class="astro-empty" id="astro-empty" hidden>ഈ ജില്ലയിൽ വിദഗ്ധരെ കണ്ടെത്താനായില്ല.</p>
+  </main>
+
+  <!-- booking drawer -->
+  <div class="astro-drawer-scrim" id="drawer-scrim" hidden></div>
+  <aside class="astro-drawer" id="drawer" hidden aria-modal="true" role="dialog">
+    <button class="drawer-close" id="drawer-close" aria-label="അടയ്ക്കുക">✕</button>
+    <div id="drawer-body"></div>
+  </aside>
+
+  <div class="astro-toast" id="toast" hidden></div>
+
+  <script src="/static/ui/starfield.js"></script>
+  <script src="/static/ui/astrologers.js"></script>
+</body>
+</html>

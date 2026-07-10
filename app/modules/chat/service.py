@@ -18,10 +18,12 @@ import time
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.astrologers.service import AstrologersService
 from app.modules.astrology_engine.service import AstrologyEngineService
-from app.modules.chat import analytics, user_memory
+from app.modules.chat import analytics, recurrence, user_memory
 from app.modules.chat.llm_client import LLMClient
 from app.modules.chat.schemas import ChatResponse, PoruthamPartner, PrashnamPick
+from app.modules.chat.suggestions import build_suggestions
 from app.modules.identity.service import IdentityService
 from app.modules.knowledge.service import KnowledgeService
 from app.modules.temples.service import TemplesService
@@ -189,6 +191,7 @@ class ChatService:
         knowledge: KnowledgeService | None = None,
         llm: LLMClient | None = None,
         temples: TemplesService | None = None,
+        astrologers: AstrologersService | None = None,
     ) -> None:
         self._tone_safety = tone_safety or ToneSafetyService()
         self._identity = identity or IdentityService()
@@ -196,6 +199,7 @@ class ChatService:
         self._knowledge = knowledge or KnowledgeService()
         self._llm = llm or LLMClient()
         self._temples = temples or TemplesService()
+        self._astrologers = astrologers or AstrologersService()
 
     async def admin_stats(self, session: AsyncSession) -> dict:
         """Chat-volume metrics for the admin dashboard (read-only).
@@ -407,6 +411,39 @@ class ChatService:
             suggested=temple_ids or None,
         )
 
+        # --- Step 3d: human-astrologer escalation. If the same concern keeps
+        # recurring (or the user asks outright), offer an experienced human
+        # astrologer near them + pair a temple visit — optional support, never
+        # pressure (GUARDRAILS.md §1). ``astrologer:<id>`` lets the UI render a
+        # booking CTA.
+        s = time.perf_counter()
+        concern = self._temples.detect_concern(latest)
+        astro_note, astrologer, recurring = await self._astrologer_guidance(
+            latest, concern, session, user_id, stored_district
+        )
+        if astrologer is not None:
+            grounded_in.append(f"astrologer:{astrologer['id']}")
+            if recurring:
+                grounded_in.append(f"recurring:{recurring}")
+            # Pair a temple visit when the recurrence fired and none was already
+            # suggested this turn (the brief: astrologer + temple together).
+            if recurring and not temple_note:
+                lat, lng = await self._load_user_location(session, user_id)
+                district = self._temples.detect_district(latest) or stored_district
+                paired = self._temples.suggest(
+                    concern=recurring, district=district, lat=lat, lng=lng, k=1
+                )
+                if paired:
+                    temple_note = self._format_temple_note(paired[0])
+                    grounded_in.append(f"temple:{paired[0].id}")
+        _mark(
+            "astrologer_guidance",
+            s,
+            tool="astrologers.suggest_for",
+            suggested=(astrologer or {}).get("id"),
+            recurring=recurring,
+        )
+
         # --- Step 4: persona system prompt with context ---
         s = time.perf_counter()
         notes = [c.text for c in retrieved]
@@ -416,6 +453,8 @@ class ChatService:
             notes.append(porutham_note)
         if temple_note:
             notes.append(temple_note)
+        if astro_note:
+            notes.append(astro_note)
         system_prompt = self._tone_safety.build_system_prompt(
             chart=chart_for_prompt,
             transits=transits,
@@ -483,10 +522,21 @@ class ChatService:
             provider_name, model_name, prompt_tokens, completion_tokens
         )
 
+        # Curious, chart-personalized follow-up chips (deterministic, no LLM).
+        suggestions = build_suggestions(
+            latest=latest,
+            chart=chart,
+            transits=transits,
+            grounded_in=grounded_in,
+            concern=concern,
+            astrologer=astrologer,
+        )
+
         return ChatResponse(
             reply=reply,
             is_safety_response=False,
             grounded_in=grounded_in,
+            suggestions=suggestions,
             llm_provider=provider_name,
             llm_model=model_name,
             prompt_tokens=prompt_tokens,
@@ -647,7 +697,7 @@ class ChatService:
             doshas = [
                 name
                 for name, d in chart_doshas.items()
-                if isinstance(d, dict) and d.get("present")
+                if isinstance(d, dict) and d.get("effective", d.get("present"))
             ]
         if transits.get("sade_sati", {}).get("active"):
             doshas.append("sade_sati")
@@ -684,9 +734,13 @@ class ChatService:
         if not suggestions:
             return None, []
 
-        t = suggestions[0]
+        return self._format_temple_note(suggestions[0]), [suggestions[0].id]
+
+    @staticmethod
+    def _format_temple_note(t) -> str:
+        """Prompt note for one temple suggestion, carrying its own §1 framing."""
         near = f", about {t.distance_km:g} km away" if t.distance_km is not None else ""
-        note = (
+        return (
             "Temple guidance (share only if it fits the conversation "
             "naturally, as an optional act of devotion the person may choose "
             "— never as a requirement, never out of fear, and never linked "
@@ -697,7 +751,58 @@ class ChatService:
             f"Vazhipadu: {', '.join(t.vazhipadu)}. Days: {t.days}. "
             f"Mantra: {t.mantra}."
         )
-        return note, [t.id]
+
+    async def _astrologer_guidance(
+        self,
+        question: str,
+        concern: str | None,
+        session: AsyncSession | None,
+        user_id: str,
+        stored_district: str | None,
+    ) -> tuple[str | None, dict | None, str | None]:
+        """Offer a human astrologer when a concern keeps recurring (or on a
+        direct ask). Returns (prompt note, astrologer dict, recurring concern).
+
+        The note frames the consult as OPTIONAL human support the person may
+        choose — never a demand, never out of fear, never a sales pitch, and
+        never implying Tara is failing them (GUARDRAILS.md §1).
+        """
+        recurring, direct_ask = await recurrence.detect_recurring_concern(
+            session, user_id, question, self._temples.detect_concern
+        )
+        if not recurring and not direct_ask:
+            return None, None, None
+
+        district = self._temples.detect_district(question) or stored_district
+        lat, lng = await self._load_user_location(session, user_id)
+        astro = self._astrologers.suggest_for(
+            concern=recurring or concern, district=district, lat=lat, lng=lng
+        )
+        if astro is None:
+            return None, None, recurring
+
+        where = astro["town"]
+        if astro["district"] and astro["district"] != astro["town"]:
+            where = f"{astro['town']}, {astro['district']}"
+        context = (
+            "this person has raised the same concern several times across recent "
+            "conversations"
+            if recurring
+            else "this person asked to speak with a human astrologer"
+        )
+        note = (
+            "Human-support guidance (share only if it fits naturally, as an "
+            "OPTIONAL idea the person may choose — never a requirement, never out "
+            "of fear, never with urgency or a sales pitch, and never implying you "
+            "are unable to help them). Consultations are free. Context: "
+            f"{context}. You may warmly mention that talking things through with an "
+            "experienced human astrologer can add comfort and depth, and that they "
+            "can pick a convenient time on the astrologers page. Copy the name and "
+            "place EXACTLY as written:\n"
+            f"- {astro['name']}, {astro['experience_years']} years of experience, "
+            f"{where}."
+        )
+        return note, astro, recurring
 
     @staticmethod
     def _prashnam_note(reading: dict) -> str:
@@ -981,7 +1086,8 @@ class ChatService:
             if maha.get("lord"):
                 cues.append(f"{maha['lord']} mahadasha dasha")
             doshas = chart.get("doshas") or {}
-            if doshas.get("chovva_dosha", {}).get("present"):
+            chovva = doshas.get("chovva_dosha", {})
+            if chovva.get("effective", chovva.get("present")):
                 cues.append("chovva dosha mangal")
             if doshas.get("kala_sarpa_dosha", {}).get("present"):
                 cues.append("kala sarpa dosha")

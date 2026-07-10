@@ -48,6 +48,32 @@ Add new uncertain terms here rather than guessing them into the product.
 - `app/modules/tone_safety/crisis_classifier.py` — keyword screen is a
   PLACEHOLDER; a clinically-reviewed classifier is required before launch.
 
+## Chovva (Kuja/Mangal) dosha parihara — cancellation rules (added 2026-07-11)
+
+`app/modules/astrology_engine/doshas.py` originally flagged chovva dosha for
+Mars in houses {1,2,4,7,8,12} counted from **both** lagna and Moon, with **no
+cancellation rules** — so ~75% of all charts read "present" (verified: 3 of 3
+sampled real profiles). We added classical parihara so the stored reading now
+carries `effective`/`severity` alongside the raw `present` flag. **An astrologer
+must confirm these rules and Malayalam copy before they are treated as
+authoritative:**
+
+- **Global (both frames) cancellation** — Mars dignified: own signs Mesha/
+  Vrischika, exaltation Makara (`_MARS_OWN_OR_EXALTED = {0, 7, 9}`).
+- **Per-house sign exemptions** (`_CHOVVA_HOUSE_EXEMPT_RASIS`): house 1 → Mesha;
+  house 2 → Mithuna/Kanni; house 4 → Mesha/Vrischika; house 7 → Karkataka/Makara;
+  house 8 → Dhanu/Meena; house 12 → Vrishabha/Thula.
+- **Severity buckets**: `none` (absent), `cancelled` (present but all firing
+  frames cancelled), `mild` (one uncancelled frame), `strong` (both frames).
+- **UI copy** (`app/web/ui/chart.js`): cancelled → "പരിഹരിക്കപ്പെട്ടിരിക്കുന്നു";
+  mild → "ഉണ്ട് (മൃദു)"; strong → "ഉണ്ട്".
+
+Open questions for the reviewer: should Simha/Kumbha carry a global exemption?
+Should the lagna frame outweigh the Moon frame (currently equal)? Is a Venus/
+Jupiter aspect cancellation wanted? Should "both partners have chovva" (a
+relationship-level parihara) be surfaced anywhere? Confirm each house's exempt
+rasis against a Kerala jyotisha manual.
+
 ## Review workflow
 
 Go through `Tara_Content_Review.pdf` part by part. Per chunk/entry: confirm as

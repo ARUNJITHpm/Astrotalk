@@ -31,22 +31,30 @@ def _chart_planets(mars_house: int, mars_rasi: int, moon_rasi: int) -> dict:
 
 
 def test_chovva_dosha_from_lagna():
-    # Mars in the 7th from lagna → dosha, regardless of the Moon count.
+    # Mars in the 7th from lagna in Thula (rasi 6, not exempt/dignified) → an
+    # uncancelled dosha. Moon count lands on the 4th (also a chovva house), so
+    # both frames fire → strong.
     planets = _chart_planets(mars_house=7, mars_rasi=6, moon_rasi=3)
     doshas = detect_natal_doshas(planets)
     chovva = doshas["chovva_dosha"]
     assert chovva["present"] is True
+    assert chovva["effective"] is True
+    assert chovva["cancelled"] is False
+    assert chovva["severity"] == "strong"
     assert chovva["from_lagna"] is True
     assert chovva["mars_house_from_lagna"] == 7
 
 
 def test_chovva_dosha_from_moon_only():
     # Mars in the 5th from lagna (clean) but 2nd from the Moon → dosha (Kerala
-    # convention counts both frames).
+    # convention counts both frames). Mars in Simha (rasi 4) is not exempt for
+    # the 2nd house, so the single frame is uncancelled → mild.
     planets = _chart_planets(mars_house=5, mars_rasi=4, moon_rasi=3)
     doshas = detect_natal_doshas(planets)
     chovva = doshas["chovva_dosha"]
     assert chovva["present"] is True
+    assert chovva["effective"] is True
+    assert chovva["severity"] == "mild"
     assert chovva["from_lagna"] is False
     assert chovva["from_moon"] is True
     assert chovva["mars_house_from_moon"] == 2
@@ -55,8 +63,55 @@ def test_chovva_dosha_from_moon_only():
 def test_no_chovva_dosha():
     # Mars 5th from lagna and 5th from Moon → no dosha.
     planets = _chart_planets(mars_house=5, mars_rasi=4, moon_rasi=0)
-    doshas = detect_natal_doshas(planets)
-    assert doshas["chovva_dosha"]["present"] is False
+    chovva = detect_natal_doshas(planets)["chovva_dosha"]
+    assert chovva["present"] is False
+    assert chovva["effective"] is False
+    assert chovva["severity"] == "none"
+
+
+def test_chovva_cancelled_by_own_sign():
+    # Mars in the 1st in its own sign Mesha (rasi 0) → present but cancelled from
+    # every frame (own-sign parihara).
+    planets = _chart_planets(mars_house=1, mars_rasi=0, moon_rasi=0)
+    chovva = detect_natal_doshas(planets)["chovva_dosha"]
+    assert chovva["present"] is True
+    assert chovva["cancelled"] is True
+    assert chovva["effective"] is False
+    assert chovva["severity"] == "cancelled"
+    assert "mars_in_own_or_exalted_sign" in chovva["cancellation_reasons"]
+
+
+def test_chovva_cancelled_by_exaltation_in_seventh():
+    # Mars exalted in Makara (rasi 9) in the 7th → cancelled.
+    planets = _chart_planets(mars_house=7, mars_rasi=9, moon_rasi=9)
+    chovva = detect_natal_doshas(planets)["chovva_dosha"]
+    assert chovva["present"] is True
+    assert chovva["cancelled"] is True
+    assert chovva["severity"] == "cancelled"
+
+
+def test_chovva_cancelled_by_house_sign_exemption():
+    # Mars in the 2nd in Mithuna (rasi 2), which is exempt for the 2nd house.
+    # Moon count also lands on the 2nd → both frames exempt → cancelled.
+    planets = _chart_planets(mars_house=2, mars_rasi=2, moon_rasi=0)
+    chovva = detect_natal_doshas(planets)["chovva_dosha"]
+    assert chovva["present"] is True
+    assert chovva["cancelled"] is True
+    assert "house2_sign_exempt" in chovva["cancellation_reasons"]
+
+
+def test_chovva_mild_when_one_frame_cancelled():
+    # Lagna frame: 2nd house in Mithuna (rasi 2) → exempt/cancelled.
+    # Moon frame: mars rasi 2 counted from moon rasi 7 → house 8 (chovva), and
+    # rasi 2 is not exempt for the 8th → uncancelled. One uncancelled → mild.
+    planets = _chart_planets(mars_house=2, mars_rasi=2, moon_rasi=7)
+    chovva = detect_natal_doshas(planets)["chovva_dosha"]
+    assert chovva["from_lagna"] is True
+    assert chovva["from_moon"] is True
+    assert chovva["mars_house_from_moon"] == 8
+    assert chovva["cancelled"] is False
+    assert chovva["effective"] is True
+    assert chovva["severity"] == "mild"
 
 
 def test_kala_sarpa_present_when_all_grahas_on_one_side():

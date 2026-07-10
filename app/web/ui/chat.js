@@ -403,18 +403,38 @@
     return out.slice(0, 3);
   }
 
-  function renderFollowUps(bubble, groundedIn) {
+  // Booking link chip built from an `astrologer:<id>` grounded-in tag. Unlike
+  // the question chips it navigates (does not auto-submit a message).
+  function astrologerLinkChip(groundedIn) {
+    const tag = (groundedIn || []).find((x) => String(x).startsWith("astrologer:"));
+    if (!tag) return null;
+    const id = String(tag).slice("astrologer:".length);
+    const a = document.createElement("a");
+    a.className = "chip chip-link";
+    a.textContent = "📿 ബുക്കിംഗ് പേജ് കാണൂ";
+    a.href = `/ui/astrologers?astro=${encodeURIComponent(id)}`;
+    return a;
+  }
+
+  function renderFollowUps(bubble, groundedIn, suggestions) {
     const row = bubble.closest(".row");
     if (!row) return;
     const wrap = document.createElement("div");
     wrap.className = "followups";
-    followUpsFor(groundedIn).forEach((c) => {
+    // Prefer the server's chart-personalized suggestions; fall back to the
+    // client-derived chips when none were sent.
+    const chips = Array.isArray(suggestions) && suggestions.length
+      ? suggestions.map((text) => ({ text }))
+      : followUpsFor(groundedIn);
+    chips.forEach((c) => {
       const btn = document.createElement("button");
       btn.className = "chip";
       btn.textContent = c.text;
       if (c.action) btn.dataset.action = c.action;
       wrap.appendChild(btn);
     });
+    const link = astrologerLinkChip(groundedIn);
+    if (link) wrap.appendChild(link);
     row.querySelector(".content").appendChild(wrap);
     scrollToBottom();
   }
@@ -649,7 +669,7 @@
       bubble.innerHTML = rich(reply); // upgrade the typed text to rendered bold
       if (!data.is_safety_response) {
         renderGrounded(bubble, data.grounded_in);
-        renderFollowUps(bubble, data.grounded_in);
+        renderFollowUps(bubble, data.grounded_in, data.suggestions);
       }
     } catch (err) {
       reply = "ക്ഷമിക്കണം, ഒരു പിശക് സംഭവിച്ചു. വീണ്ടും ശ്രമിക്കൂ.";

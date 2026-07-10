@@ -74,7 +74,12 @@ def _chart_is_stale(natal: dict[str, Any] | None) -> bool:
         return True
     # Real charts stored before divisional charts existed lack "vargas" — they
     # gain them on recompute.
-    return "vargas" not in natal
+    if "vargas" not in natal:
+        return True
+    # Charts computed before chovva parihara (cancellation) rules lack the
+    # "severity" field — recompute so cancelled doshas stop reading as present.
+    chovva = (natal.get("doshas") or {}).get("chovva_dosha") or {}
+    return bool(chovva.get("computed")) and "severity" not in chovva
 
 
 async def _refresh_chart_if_stale(session: AsyncSession, user: User) -> None:

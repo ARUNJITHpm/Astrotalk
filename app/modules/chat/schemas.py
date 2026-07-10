@@ -81,6 +81,9 @@ class ChatResponse(BaseModel):
     is_safety_response: bool
     # What grounded the reply, e.g. ["chart", "transits", "knowledge:retrograde-mercury"].
     grounded_in: list[str] = []
+    # Curious, chart-personalized follow-up chips the UI can render. Empty on the
+    # crisis path (never chip a safety reply) and when no chart context exists.
+    suggestions: list[str] = []
     # Per-turn orchestration trace (params, tools, timings, LLM config). Present
     # only when debug was requested in a non-production environment.
     debug: dict[str, Any] | None = None
