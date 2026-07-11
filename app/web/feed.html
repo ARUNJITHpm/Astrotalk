@@ -96,6 +96,21 @@
   .poll .pct { color: var(--gold); font-weight: 700; }
   .poll .total { margin-top: 10px; font-size: 12px; color: var(--muted); }
 
+  /* ---- Invite card ---- */
+  .invite.card { border-color: rgba(232,182,76,.4);
+    background: linear-gradient(180deg, #2a2050 0%, #1a2148 100%); }
+  .invite .code { display:inline-flex; align-items:center; gap:10px; margin:6px 0 12px;
+    font-family: ui-monospace, monospace; font-size: 20px; font-weight: 800; letter-spacing: 3px;
+    color: var(--gold); background: rgba(232,182,76,.1); border:1px dashed rgba(232,182,76,.5);
+    padding: 10px 16px; border-radius: 12px; }
+  .invite .copycode { cursor:pointer; font-size:12px; letter-spacing:normal; font-weight:600;
+    color: var(--muted); background:none; border:1px solid var(--line); border-radius:8px; padding:4px 8px; }
+  .invite .track { height: 10px; background: rgba(255,255,255,.08); border-radius: 999px; overflow:hidden; margin:10px 0 6px; }
+  .invite .bar { height:100%; background: linear-gradient(90deg, var(--gold-dim), var(--gold)); width:0; transition: width .6s ease; }
+  .invite .prog { font-size:13px; color: var(--muted); }
+  .invite .reward { margin-top:10px; padding:10px 12px; border-radius:10px; font-size:13.5px;
+    background: rgba(76,204,134,.12); border:1px solid rgba(76,204,134,.4); color:#8be0b0; }
+
   .empty { text-align: center; color: var(--muted); padding: 40px 20px; font-size: 14px; }
   .loading { text-align: center; color: var(--muted); padding: 30px; }
 
@@ -148,6 +163,7 @@
     <div class="signin-hint" id="signinHint" style="display:none">
       പ്രതികരിക്കാനും streak സൂക്ഷിക്കാനും <a href="/auth">സൈൻ ഇൻ ചെയ്യൂ</a>
     </div>
+    <div id="invite"></div>
     <div id="polls"></div>
     <div id="feed"><div class="loading">ഫീഡ് ലോഡ് ചെയ്യുന്നു…</div></div>
   </main>
@@ -307,6 +323,37 @@
     });
   }
 
+  // ---- Invite friends (referral loop, GROWTH_PLAN Part 2) ----
+  async function loadInvite() {
+    if (!authed) return;
+    try {
+      const res = await fetch("/identity/referral", { headers: authHeaders() });
+      if (!res.ok) return;
+      const r = await res.json();
+      // Root-UI signup link (friends land on /auth with the code prefilled).
+      const link = `${location.origin}/auth?ref=${encodeURIComponent(r.code)}`;
+      const pct = r.threshold ? Math.min(100, Math.round((r.activated / r.threshold) * 100)) : 0;
+      const reward = r.reward_granted
+        ? `<div class="reward">🎉 നിങ്ങളുടെ പ്രീമിയം റിപ്പോർട്ട് അൺലോക്ക് ആയി!</div>`
+        : `<div class="prog">${r.activated} / ${r.threshold} സുഹൃത്തുക്കൾ ചേർന്നു — ${r.threshold} പേർ ചേർന്നാൽ പ്രീമിയം റിപ്പോർട്ട് സൗജന്യം.</div>`;
+      $("invite").innerHTML = `<article class="card invite">
+        <div class="eyebrow">സുഹൃത്തുക്കളെ ക്ഷണിക്കൂ 🎁</div>
+        <h2>Tara പങ്കിട്ട് പ്രീമിയം റിപ്പോർട്ട് നേടൂ</h2>
+        <div class="code">${esc(r.code)}<button class="copycode" id="copyCode">കോപ്പി</button></div>
+        <div class="track"><div class="bar" style="width:${r.reward_granted ? 100 : pct}%"></div></div>
+        ${reward}
+        <div class="actions"><button class="cta" id="inviteShare">ക്ഷണം പങ്കിടൂ →</button></div>
+      </article>`;
+      $("copyCode").onclick = async () => { try { await navigator.clipboard.writeText(link); toast("ലിങ്ക് കോപ്പി ചെയ്തു ✨"); } catch (_) {} };
+      $("inviteShare").onclick = async () => {
+        const data = { title: "Tara ✨", text: "Tara — ശാന്തമായ മലയാളം ജ്യോതിഷ സഹായി. എന്റെ ലിങ്കിലൂടെ ചേരൂ:", url: link };
+        try { if (navigator.share) await navigator.share(data);
+          else { await navigator.clipboard.writeText(`${data.text}\n${link}`); toast("കോപ്പി ചെയ്തു ✨"); } } catch (_) {}
+      };
+    } catch (_) { /* invite panel is optional */ }
+  }
+
+  loadInvite();
   loadPolls();
   loadFeed();
 </script>
