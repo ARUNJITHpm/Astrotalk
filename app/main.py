@@ -134,7 +134,7 @@ async def _no_store_web_assets(request, call_next):
     response = await call_next(request)
     path = request.url.path
     if path.startswith("/static") or path in (
-        "/", "/auth", "/wa", "/whatsapp", "/ui", "/ui/login", "/ui/astrologers", "/admin",
+        "/", "/feed", "/auth", "/wa", "/whatsapp", "/ui", "/ui/login", "/ui/astrologers", "/admin",
     ):
         response.headers["Cache-Control"] = "no-store"
     return response
@@ -148,6 +148,14 @@ app.mount("/static", StaticFiles(directory=_WEB_DIR), name="static")
 @app.get("/", include_in_schema=False)
 async def index() -> FileResponse:
     return FileResponse(_WEB_DIR / "index.html")
+
+
+# User feed ("ഇന്ന്" / Today) — the engagement surface at the site root
+# (ENGAGEMENT_PLAN.md Part A). Public page; personalises via the bearer token
+# in localStorage. Reachable from the bottom nav (mobile) / top nav (desktop).
+@app.get("/feed", include_in_schema=False)
+async def feed_page() -> FileResponse:
+    return FileResponse(_WEB_DIR / "feed.html")
 
 
 # Login / register page. The chat (`/`) redirects here when no account is known;
