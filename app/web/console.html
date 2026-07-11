@@ -207,7 +207,7 @@ const NAV = [
     {id:"notifications", ic:"🔔", label:"Notifications", badge:"live"},
   ]},
   {group:"Growth (roadmap)", items:[
-    {id:"referrals", ic:"🎁", label:"Referrals & Virality", badge:"soon"},
+    {id:"referrals", ic:"🎁", label:"Referrals & Virality", badge:"live"},
     {id:"astrologers", ic:"🧑‍🏫", label:"Astrologer Platform", badge:"soon"},
     {id:"commerce", ic:"💳", label:"Commerce", badge:"soon"},
   ]},
@@ -581,9 +581,26 @@ PANELS.notifications = async () => {
     catch(e){ toast(e.message); }
   };
 };
-PANELS.referrals = async () => launcher("Referrals & Virality","Share cards + referral rewards",[
-  {ic:"🖼️",t:"Share cards",d:"Live: personal & daily nakshatra cards with /s landing pages.",href:"#cards"},
-  {ic:"🎁",t:"Referral rewards",d:"Planned: unlock a premium report after N activated referrals (GROWTH_PLAN Part 2 + 5b)."}]);
+PANELS.referrals = async () => {
+  $("psub").textContent = "Referral funnel — share cards carry each user's code; N activations unlock a premium report";
+  let ref = {}; try { const o = await api("/admin/overview"); ref = (o.users && o.users.referrals) || {}; } catch(_) {}
+  const stat = (n,l)=>`<div class="stat"><div class="n">${esc(n??0)}</div><div class="l">${esc(l)}</div></div>`;
+  $("panel").innerHTML = `
+    <div class="grid" style="margin-bottom:16px">
+      ${stat(ref.codes_issued, "Codes issued")}
+      ${stat(ref.referred_signups, "Referred signups")}
+      ${stat(ref.rewards_granted, "Rewards unlocked")}
+    </div>
+    <div class="card"><h3>How the loop works</h3>
+      <p class="hint" style="margin:0 0 6px">Every user gets a code (minted on first share). Share cards and the feed "invite" panel carry a link (<code>/auth?ref=CODE</code>). A friend who registers <em>and</em> completes onboarding (chart computed) counts as an activation; reaching the threshold unlocks a premium-report entitlement.</p>
+    </div>
+    <div class="launch"><div class="ic">🖼️</div>
+      <div><div class="t">Share cards</div><div class="d">Personal + daily nakshatra cards with /s landing pages carry the referral code.</div></div>
+      <div class="go"><a class="btn sm" href="#cards">Open ↗</a></div></div>
+    <div class="launch"><div class="ic">🏠</div>
+      <div><div class="t">Invite panel</div><div class="d">Live on the user feed — code, progress bar, and share button.</div></div>
+      <div class="go"><a class="btn sm" href="/feed" target="_blank">Open feed ↗</a></div></div>`;
+};
 PANELS.astrologers = async () => launcher("Astrologer Platform","White-label AI assistant, bookings, CRM",[
   {ic:"🧑‍🏫",t:"Astrologer directory",d:"Live: browse the consult directory.",href:"/ui/astrologers",blank:true,cta:"Open ↗"},
   {ic:"🏢",t:"Org dashboard",d:"Live preview: the white-label org console.",href:"/ui/org-dashboard",blank:true,cta:"Open ↗"},
