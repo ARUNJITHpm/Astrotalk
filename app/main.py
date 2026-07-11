@@ -134,7 +134,8 @@ async def _no_store_web_assets(request, call_next):
     response = await call_next(request)
     path = request.url.path
     if path.startswith("/static") or path in (
-        "/", "/feed", "/auth", "/wa", "/whatsapp", "/ui", "/ui/login", "/ui/astrologers", "/admin",
+        "/", "/feed", "/auth", "/wa", "/whatsapp", "/ui", "/ui/login", "/ui/astrologers",
+        "/admin", "/console",
     ):
         response.headers["Cache-Control"] = "no-store"
     return response
@@ -202,6 +203,15 @@ async def whatsapp_ui_legacy() -> RedirectResponse:
 @app.get("/admin", include_in_schema=False)
 async def admin_page() -> FileResponse:
     return FileResponse(_WEB_DIR / "admin.html")
+
+
+# Owner Admin Console: one place that surfaces every feature (content studio,
+# daily pack, feed & polls, panchangam, temple tools, WhatsApp simulator) plus
+# the growth-plan roadmap. Login = owner email + password (POST /admin/login);
+# every data call it makes is gated by the X-Admin-Token it stores.
+@app.get("/console", include_in_schema=False)
+async def console_page() -> FileResponse:
+    return FileResponse(_WEB_DIR / "console.html")
 
 
 # Dev entrypoint: `python main.py` (from anywhere) starts the server. Production
