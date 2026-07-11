@@ -162,6 +162,12 @@ async function api(path, opts={}) {
   if (!res.ok) throw new Error((data && data.detail) || res.statusText);
   return data;
 }
+async function apiBlob(path) {
+  const res = await fetch(path, { headers: hdr() });
+  if (res.status === 401) { logout(); throw new Error("unauthorized"); }
+  if (!res.ok) throw new Error(res.statusText);
+  return URL.createObjectURL(await res.blob());
+}
 
 // ---------- Login ----------
 async function doLogin() {
@@ -194,11 +200,11 @@ const NAV = [
   {group:"Astrology & Temples", items:[
     {id:"panchangam", ic:"🌙", label:"Panchangam", badge:"live"},
     {id:"templefinder", ic:"🛕", label:"Temple Finder", badge:"live"},
-    {id:"partners", ic:"🤝", label:"Temple Partners", badge:"soon"},
+    {id:"partners", ic:"🤝", label:"Temple Partners", badge:"live"},
   ]},
   {group:"Channels", items:[
     {id:"whatsapp", ic:"💬", label:"WhatsApp Simulator", badge:"sim"},
-    {id:"notifications", ic:"🔔", label:"Notifications", badge:"soon"},
+    {id:"notifications", ic:"🔔", label:"Notifications", badge:"live"},
   ]},
   {group:"Growth (roadmap)", items:[
     {id:"referrals", ic:"🎁", label:"Referrals & Virality", badge:"soon"},
@@ -470,10 +476,111 @@ function launcher(title, sub, cards){
 }
 PANELS.whatsapp = async () => launcher("WhatsApp Simulator","Test the exact onboarding + chat flow (no real WhatsApp)",[
   {ic:"💬",t:"WhatsApp Simulator",d:"Same brain as real WhatsApp; safe local sandbox. Real BSP wiring comes later.",href:"/whatsapp",blank:true,cta:"Open simulator ↗"}]);
-PANELS.notifications = async () => launcher("Notifications","Festival & panchangam nudges (opt-in, throttled)",[
-  {ic:"🔔",t:"Festival notifications",d:"Planned: T-3 day festival alerts to opted-in temple subscribers via WhatsApp (GROWTH_PLAN Part 3)."}]);
-PANELS.partners = async () => launcher("Temple Partners","Temples as distribution partners — QR, microsites, festival updates",[
-  {ic:"🛕",t:"Temple microsites & QR",d:"Planned: /t/{slug} public pages + printable QR codes + embeddable panchangam widget (GROWTH_PLAN Part 3)."}]);
+PANELS.partners = async () => {
+  $("psub").textContent = "Temples as distribution partners — microsites, QR, widget, festivals";
+  let dir = [];
+  try { dir = await api("/temples/directory"); } catch(_) {}
+  const opts = dir.map(t=>`<option value="${esc(t.id)}">${esc(t.name)} — ${esc(t.district)}</option>`).join("");
+  $("panel").innerHTML = `
+    <div class="card">
+      <h3>Register a partner temple</h3>
+      <p class="hint">Turns a directory temple into a partner with a public microsite (/t/{slug}), a printable QR, and an embeddable panchangam widget.</p>
+      <div class="row">
+        <div style="flex:1;min-width:220px"><label class="muted" style="font-size:12px">Temple</label>
+          <select id="ptTemple">${opts||'<option>No temples loaded</option>'}</select></div>
+        <div style="min-width:150px"><label class="muted" style="font-size:12px">Slug (URL)</label>
+          <input id="ptSlug" placeholder="guruvayur"></div>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <div style="flex:1;min-width:160px"><label class="muted" style="font-size:12px">Contact name</label>
+          <input id="ptName" placeholder="optional"></div>
+        <div style="flex:1;min-width:150px"><label class="muted" style="font-size:12px">Contact phone</label>
+          <input id="ptPhone" placeholder="optional"></div>
+        <div style="min-width:120px"><label class="muted" style="font-size:12px">Tier</label>
+          <select id="ptTier"><option value="free">free</option><option value="partner">partner</option></select></div>
+        <button class="btn sm" id="ptCreate">Register</button>
+      </div>
+    </div>
+    <div id="ptList"><div class="center">Loading partners…</div></div>`;
+  $("ptCreate").onclick = async () => {
+    try{ await api("/temples/partners",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({temple_id:$("ptTemple").value, slug:$("ptSlug").value.trim(),
+        contact_name:$("ptName").value.trim(), contact_phone:$("ptPhone").value.trim(), tier:$("ptTier").value})});
+      toast("Partner registered"); $("ptSlug").value=""; loadPartners(); }
+    catch(e){ toast(e.message); }
+  };
+  loadPartners();
+};
+async function loadPartners(){
+  const partners = await api("/temples/partners");
+  const origin = location.origin;
+  $("ptList").innerHTML = partners.length ? partners.map(p=>`
+    <div class="post" data-slug="${esc(p.slug)}">
+      <div class="head"><strong>${esc(p.slug)}</strong>
+        <span class="tag">${esc(p.temple_id)}</span><span class="tag">${esc(p.tier)}</span>
+        <span class="tag ${p.active?'status-published':'status-failed'}">${p.active?'active':'inactive'}</span></div>
+      <div class="acts">
+        <a class="btn sm ghost" href="/t/${encodeURIComponent(p.slug)}" target="_blank">Microsite ↗</a>
+        <button class="btn sm ghost" data-act="qr">Show QR</button>
+        <button class="btn sm ghost" data-act="embed">Widget embed</button>
+        <button class="btn sm ghost" data-act="festival">+ Festival</button>
+      </div>
+      <div class="pt-extra" style="margin-top:10px"></div>
+    </div>`).join("")
+    : '<div class="center">No partners yet. Register one above.</div>';
+  bindPartners(origin);
+}
+function bindPartners(origin){
+  document.querySelectorAll("#ptList .post").forEach(card=>{
+    const slug=card.dataset.slug, extra=card.querySelector(".pt-extra");
+    const acts={
+      qr: async()=>{ const url=await apiBlob(`/temples/partners/${encodeURIComponent(slug)}/qr.png`);
+        extra.innerHTML=`<img src="${url}" style="width:160px;border-radius:10px;background:#fff;padding:6px">
+          <div><a class="btn sm ghost" href="${url}" download="${slug}-qr.png">Download QR</a></div>`; },
+      embed: ()=>{ const code=`<iframe src="${origin}/widget/panchangam?temple=${slug}" width="320" height="200" frameborder="0"></iframe>`;
+        extra.innerHTML=`<div class="muted" style="font-size:12px;margin-bottom:6px">Paste on the temple's website:</div>
+          <pre class="out">${esc(code)}</pre><button class="btn sm ghost" id="cp-${slug}">Copy</button>`;
+        const b=document.getElementById(`cp-${slug}`); if(b) b.onclick=()=>{navigator.clipboard.writeText(code);toast("Copied");}; },
+      festival: ()=>{ extra.innerHTML=`
+        <div class="row" style="align-items:flex-end">
+          <div style="flex:1;min-width:140px"><label class="muted" style="font-size:12px">Festival (English)</label><input class="fName" placeholder="Utsavam"></div>
+          <div style="flex:1;min-width:140px"><label class="muted" style="font-size:12px">Malayalam</label><input class="fNameMl" placeholder="ഉത്സവം"></div>
+          <div style="min-width:150px"><label class="muted" style="font-size:12px">Date</label><input class="fDay" type="date"></div>
+          <button class="btn sm fAdd">Add</button></div>`;
+        extra.querySelector(".fAdd").onclick=async()=>{
+          try{ await api(`/temples/partners/${encodeURIComponent(slug)}/festivals`,{method:"POST",
+            headers:{"Content-Type":"application/json"},body:JSON.stringify({
+              name:extra.querySelector(".fName").value.trim(),
+              name_ml:extra.querySelector(".fNameMl").value.trim(),
+              day:extra.querySelector(".fDay").value})});
+            toast("Festival added"); extra.innerHTML=""; }
+          catch(e){toast(e.message);} }; },
+    };
+    card.querySelectorAll("[data-act]").forEach(b=> b.onclick=()=>{
+      try { const r = acts[b.dataset.act](); if (r && r.catch) r.catch(e=>toast(e.message)); }
+      catch(e){ toast(e.message); }
+    });
+  });
+}
+
+PANELS.notifications = async () => {
+  $("psub").textContent = "Festival updates to opted-in subscribers (consent + cap enforced)";
+  $("panel").innerHTML = `
+    <div class="card">
+      <h3>Festival notifications</h3>
+      <p class="hint">Sends a one-time WhatsApp update to subscribers of temples with a festival exactly 3 days out. WhatsApp is mocked for now — this shows who <em>would</em> be notified. Idempotent: re-running never double-sends.</p>
+      <button class="btn sm" id="runFest">Run festival notifications now</button>
+      <div id="festOut" style="margin-top:14px"></div>
+    </div>
+    <div class="card"><h3>How it works</h3>
+      <p class="hint" style="margin:0">Subscribers opt in on a temple microsite (/t/{slug}). The daily cron (POST /notifications/run-festivals) picks up festivals at T-3 days and sends via the WhatsApp module's compliant path (opt-in, 3/day cap, opt-out). No real BSP is wired yet.</p></div>`;
+  $("runFest").onclick = async () => {
+    try{ const s = await api("/notifications/run-festivals",{method:"POST"});
+      $("festOut").innerHTML = `<pre class="out">${esc(JSON.stringify(s,null,2))}</pre>
+        <div class="muted" style="margin-top:6px">Target day ${esc(s.target_day)}: ${s.festivals} festival(s), ${s.sent} sent, ${s.skipped} skipped.</div>`; }
+    catch(e){ toast(e.message); }
+  };
+};
 PANELS.referrals = async () => launcher("Referrals & Virality","Share cards + referral rewards",[
   {ic:"🖼️",t:"Share cards",d:"Live: personal & daily nakshatra cards with /s landing pages.",href:"#cards"},
   {ic:"🎁",t:"Referral rewards",d:"Planned: unlock a premium report after N activated referrals (GROWTH_PLAN Part 2 + 5b)."}]);
