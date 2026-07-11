@@ -53,3 +53,38 @@ class ShareCardOut(BaseModel):
     media_url: str
     share_url: str
     hits: int = 0
+
+
+# ---- Content Studio (ENGAGEMENT_PLAN.md Part B) ----
+
+
+class StudioGeneratePayload(BaseModel):
+    """Owner's request to draft one creative piece."""
+
+    kind: str  # one of content.models.STUDIO_KINDS
+    topic: str = ""  # optional steer: a nakshatra, a festival, a myth
+    day: date | None = None  # defaults to today (grounds the panchangam facts)
+
+
+class StudioDraftOut(BaseModel):
+    """A studio draft as shown in the /admin Content Studio."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    kind: str
+    topic: str | None
+    title: str
+    body: str
+    caption: str | None
+    media_url: str | None = None
+    status: str
+    external_url: str | None
+    created_at: datetime
+    published_at: datetime | None
+
+
+class MarkPublishedPayload(BaseModel):
+    """Manual-posting proof: the public URL of the post the owner made by hand."""
+
+    external_url: str

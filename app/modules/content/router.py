@@ -19,13 +19,16 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.content import share_cards
-from app.modules.content.models import ShareCard
+from app.modules.content.models import STUDIO_KINDS, ShareCard
 from app.modules.content.schemas import (
     ApprovePayload,
     ContentPostOut,
+    MarkPublishedPayload,
     RunDailySummary,
     ShareCardCreate,
     ShareCardOut,
+    StudioDraftOut,
+    StudioGeneratePayload,
 )
 from app.modules.content.service import (
     ContentPostNotFound,
@@ -120,6 +123,95 @@ async def publish_post(session: SessionDep, post_id: int) -> ContentPostOut:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Post not found")
     except InvalidTransition as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, detail=str(exc))
+
+
+@router.post(
+    "/posts/{post_id}/mark-published",
+    response_model=ContentPostOut,
+    dependencies=[AdminGuard],
+    summary="Mark a daily post published-by-hand (paste the post URL)",
+)
+async def mark_post_published(
+    session: SessionDep, post_id: int, payload: MarkPublishedPayload
+) -> ContentPostOut:
+    try:
+        return await _service.mark_post_published(session, post_id, payload.external_url)
+    except ContentPostNotFound:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Post not found")
+    except InvalidTransition as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, detail=str(exc))
+
+
+# ---- Content Studio (ENGAGEMENT_PLAN.md Part B) ----
+
+
+@router.post(
+    "/generate",
+    response_model=StudioDraftOut,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[AdminGuard],
+    summary="Generate one creative studio draft (reel/weekly/festival/nakshatra/myth)",
+)
+async def generate_studio(session: SessionDep, payload: StudioGeneratePayload) -> StudioDraftOut:
+    if payload.kind not in STUDIO_KINDS:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Unknown kind. Choose one of: {', '.join(STUDIO_KINDS)}",
+        )
+    return await _service.generate_studio(session, payload.kind, payload.topic, payload.day)
+
+
+@router.get(
+    "/studio",
+    response_model=list[StudioDraftOut],
+    dependencies=[AdminGuard],
+    summary="List studio drafts (newest first)",
+)
+async def list_studio(session: SessionDep) -> list[StudioDraftOut]:
+    return await _service.list_studio(session)
+
+
+@router.post(
+    "/studio/{draft_id}/approve",
+    response_model=StudioDraftOut,
+    dependencies=[AdminGuard],
+    summary="Approve a studio draft (optionally with an inline edit)",
+)
+async def approve_studio(
+    session: SessionDep, draft_id: int, payload: ApprovePayload | None = None
+) -> StudioDraftOut:
+    try:
+        return await _service.approve_studio(session, draft_id, (payload or ApprovePayload()).body)
+    except ContentPostNotFound:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Draft not found")
+
+
+@router.post(
+    "/studio/{draft_id}/mark-published",
+    response_model=StudioDraftOut,
+    dependencies=[AdminGuard],
+    summary="Mark a studio draft posted-by-hand (paste the YouTube/Instagram URL)",
+)
+async def mark_studio_published(
+    session: SessionDep, draft_id: int, payload: MarkPublishedPayload
+) -> StudioDraftOut:
+    try:
+        return await _service.mark_studio_published(session, draft_id, payload.external_url)
+    except ContentPostNotFound:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Draft not found")
+
+
+@router.delete(
+    "/studio/{draft_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[AdminGuard],
+    summary="Delete a studio draft",
+)
+async def delete_studio(session: SessionDep, draft_id: int) -> None:
+    try:
+        await _service.delete_studio(session, draft_id)
+    except ContentPostNotFound:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Draft not found")
 
 
 # ---- Share cards (GROWTH_PLAN.md Part 2) ----
