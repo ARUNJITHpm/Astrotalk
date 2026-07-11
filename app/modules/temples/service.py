@@ -48,6 +48,20 @@ class TemplesService:
                 return dict(temple)
         return None
 
+    def list_temples(self) -> list[dict]:
+        """The directory as light rows for the admin partner-registration picker."""
+        return [
+            {
+                "id": t["id"],
+                "name": t["name"],
+                "name_ml": t.get("name_ml", ""),
+                "district": t.get("district", ""),
+                "town": t.get("town", ""),
+                "deity": t.get("deity", ""),
+            }
+            for t in self._temples
+        ]
+
     # ---- partnership data, exposed for the notifications module (Part 3).
     # Plain dicts/strs out — other modules never touch this module's tables.
 
