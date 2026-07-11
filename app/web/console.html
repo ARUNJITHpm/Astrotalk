@@ -209,7 +209,7 @@ const NAV = [
   {group:"Growth (roadmap)", items:[
     {id:"referrals", ic:"🎁", label:"Referrals & Virality", badge:"live"},
     {id:"astrologers", ic:"🧑‍🏫", label:"Astrologer Platform", badge:"soon"},
-    {id:"commerce", ic:"💳", label:"Commerce", badge:"soon"},
+    {id:"commerce", ic:"💳", label:"Commerce", badge:"mock"},
   ]},
 ];
 
@@ -605,8 +605,40 @@ PANELS.astrologers = async () => launcher("Astrologer Platform","White-label AI 
   {ic:"🧑‍🏫",t:"Astrologer directory",d:"Live: browse the consult directory.",href:"/ui/astrologers",blank:true,cta:"Open ↗"},
   {ic:"🏢",t:"Org dashboard",d:"Live preview: the white-label org console.",href:"/ui/org-dashboard",blank:true,cta:"Open ↗"},
   {ic:"📅",t:"Bookings & CRM",d:"Planned: multi-tenant booking + customer management (GROWTH_PLAN Part 4)."}]);
-PANELS.commerce = async () => launcher("Commerce","Premium reports & SaaS subscriptions",[
-  {ic:"💳",t:"Payments core",d:"Planned: Razorpay orders + entitlements; premium PDF reports; SaaS plans (GROWTH_PLAN Part 5)."}]);
+PANELS.commerce = async () => {
+  $("psub").textContent = "Payments, entitlements & premium reports (Razorpay — mock mode)";
+  // Pull commerce.* counters from the metrics snapshot in the overview payload.
+  let counters = {};
+  try {
+    const o = await api("/admin/overview");
+    const snap = (o.llm && o.llm.counters) || o.llm || {};
+    for (const [k,v] of Object.entries(snap)) if (k.startsWith("commerce.")) counters[k]=v;
+  } catch(_) {}
+  const c = (k)=>counters["commerce."+k] ?? 0;
+  const stat = (n,l)=>`<div class="stat"><div class="n">${esc(n)}</div><div class="l">${esc(l)}</div></div>`;
+  $("panel").innerHTML = `
+    <div class="card" style="border-color:rgba(232,182,76,.35)">
+      <h3>Mock mode <span class="pill-badge soon">no real charges</span></h3>
+      <p class="hint" style="margin:0">Razorpay is mocked (<code>mock_razorpay=true</code>). Orders get <code>order_mock_*</code> ids and the user's "Unlock" button simulates the capture, so the whole flow works with zero keys. Flip the flag + add keys to go live (payments are a human-approval gate in AGENTS.md).</p>
+    </div>
+    <div class="grid" style="margin-bottom:16px">
+      ${stat(c("orders_created"),"Orders created")}
+      ${stat(c("payments_captured"),"Payments captured")}
+      ${stat(c("entitlements_granted"),"Entitlements granted")}
+      ${stat(c("reports_generated"),"Reports generated")}
+    </div>
+    <div class="card"><h3>Product catalog</h3>
+      <div class="post"><div class="head"><strong>Premium ജാതക റിപ്പോർട്ട്</strong>
+        <span class="tag" style="margin-left:auto">₹199 · one-time</span></div>
+        <div class="muted" style="font-size:13px">product key <code>premium_report</code> — detailed PDF (graha, dasha). Unlocks via purchase OR 3 referral activations.</div></div>
+    </div>
+    <div class="launch"><div class="ic">🏠</div>
+      <div><div class="t">Test the purchase flow</div><div class="d">The user feed shows the premium card with the mock "Unlock" button and download.</div></div>
+      <div class="go"><a class="btn sm" href="/feed" target="_blank">Open feed ↗</a></div></div>
+    <div class="launch"><div class="ic">🎁</div>
+      <div><div class="t">Referral rewards land here</div><div class="d">Reaching the referral threshold grants a premium_report entitlement (granted_by=referral).</div></div>
+      <div class="go"><a class="btn sm" href="#referrals">Referrals ↗</a></div></div>`;
+};
 
 // ---------- Sidebar mobile ----------
 function closeSidebar(){ $("sidebar").classList.remove("open"); $("backdrop").classList.remove("open"); }

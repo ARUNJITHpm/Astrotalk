@@ -111,6 +111,17 @@
   .invite .reward { margin-top:10px; padding:10px 12px; border-radius:10px; font-size:13.5px;
     background: rgba(76,204,134,.12); border:1px solid rgba(76,204,134,.4); color:#8be0b0; }
 
+  /* ---- Premium card ---- */
+  .premium.card { border-color: rgba(120,160,255,.35); }
+  .premium .price { font-size: 22px; font-weight: 800; color: var(--text); margin: 4px 0 2px; }
+  .premium .price small { font-size: 13px; color: var(--muted); font-weight: 500; }
+  .premium .locked-note { font-size: 13px; color: var(--muted); margin: 8px 0 0; }
+  .premium .owned { display:inline-flex; align-items:center; gap:6px; font-size:13px; font-weight:700;
+    color:#8be0b0; background:rgba(76,204,134,.12); border:1px solid rgba(76,204,134,.4);
+    padding:5px 11px; border-radius:999px; margin-bottom:8px; }
+  .mockflag { font-size:11px; color:var(--muted); border:1px solid var(--line); border-radius:6px;
+    padding:2px 7px; margin-left:8px; }
+
   .empty { text-align: center; color: var(--muted); padding: 40px 20px; font-size: 14px; }
   .loading { text-align: center; color: var(--muted); padding: 30px; }
 
@@ -164,6 +175,7 @@
       പ്രതികരിക്കാനും streak സൂക്ഷിക്കാനും <a href="/auth">സൈൻ ഇൻ ചെയ്യൂ</a>
     </div>
     <div id="invite"></div>
+    <div id="premium"></div>
     <div id="polls"></div>
     <div id="feed"><div class="loading">ഫീഡ് ലോഡ് ചെയ്യുന്നു…</div></div>
   </main>
@@ -353,7 +365,67 @@
     } catch (_) { /* invite panel is optional */ }
   }
 
+  // ---- Premium report (commerce, GROWTH_PLAN Part 5; mock checkout) ----
+  async function loadPremium() {
+    if (!authed) return;
+    try {
+      const ents = await (await fetch("/commerce/entitlements", { headers: authHeaders() })).json();
+      const owned = Array.isArray(ents) && ents.some(e => e.product_key === "premium_report");
+      $("premium").innerHTML = owned ? premiumOwnedCard() : premiumLockedCard();
+      if (owned) $("downloadReport").onclick = downloadReport;
+      else $("unlockPremium").onclick = unlockPremium;
+    } catch (_) { /* premium card is optional */ }
+  }
+  function premiumOwnedCard() {
+    return `<article class="card premium">
+      <div class="eyebrow">പ്രീമിയം ജാതക റിപ്പോർട്ട്</div>
+      <div class="owned">✓ അൺലോക്ക് ചെയ്തു</div>
+      <h2>നിങ്ങളുടെ വിശദമായ ജാതക റിപ്പോർട്ട് തയ്യാർ</h2>
+      <div class="body">ഗ്രഹനില, ദശ, കൂടുതൽ വിശദാംശങ്ങൾ — ശാന്തമായ മാർഗനിർദേശമായി.</div>
+      <div class="actions"><button class="cta" id="downloadReport">റിപ്പോർട്ട് ഡൗൺലോഡ് ചെയ്യൂ ↓</button></div>
+    </article>`;
+  }
+  function premiumLockedCard() {
+    return `<article class="card premium">
+      <div class="eyebrow">പ്രീമിയം ജാതക റിപ്പോർട്ട് <span class="mockflag">mock checkout</span></div>
+      <h2>വിശദമായ ജാതക റിപ്പോർട്ട്</h2>
+      <div class="body">ഗ്രഹനില, ദശ, കൂടുതൽ വിശദാംശങ്ങൾ ഉൾപ്പെട്ട PDF റിപ്പോർട്ട്.</div>
+      <div class="price">₹199 <small>ഒറ്റത്തവണ</small></div>
+      <div class="actions"><button class="cta" id="unlockPremium">അൺലോക്ക് ചെയ്യൂ</button></div>
+      <p class="locked-note">അല്ലെങ്കിൽ 3 സുഹൃത്തുക്കളെ ക്ഷണിച്ച് സൗജന്യമായി നേടൂ.</p>
+    </article>`;
+  }
+  async function unlockPremium() {
+    const btn = $("unlockPremium"); btn.disabled = true; btn.textContent = "പ്രോസസ്സിംഗ്…";
+    try {
+      const order = await (await fetch("/commerce/orders",
+        { method: "POST", headers: authHeaders({ "Content-Type": "application/json" }),
+          body: JSON.stringify({ product: "premium_report" }) })).json();
+      if (order.mock && order.order_id) {
+        const r = await fetch(`/commerce/orders/${encodeURIComponent(order.order_id)}/mock-pay`,
+          { method: "POST", headers: authHeaders() });
+        if (!r.ok) throw new Error();
+        toast("അൺലോക്ക് ചെയ്തു ✨");
+        loadPremium();
+      } else {
+        toast("ഈ ബിൽഡിൽ ചെക്കൗട്ട് ലഭ്യമല്ല");
+        btn.disabled = false; btn.textContent = "അൺലോക്ക് ചെയ്യൂ";
+      }
+    } catch (_) { toast("കഴിഞ്ഞില്ല, വീണ്ടും ശ്രമിക്കൂ"); btn.disabled = false; btn.textContent = "അൺലോക്ക് ചെയ്യൂ"; }
+  }
+  async function downloadReport() {
+    const btn = $("downloadReport"); btn.disabled = true; btn.textContent = "തയ്യാറാക്കുന്നു…";
+    try {
+      const res = await fetch("/commerce/reports/premium", { method: "POST", headers: authHeaders() });
+      if (!res.ok) throw new Error();
+      const d = await res.json();
+      if (d.download_url) window.open(d.download_url, "_blank");
+    } catch (_) { toast("റിപ്പോർട്ട് ലഭ്യമായില്ല"); }
+    finally { btn.disabled = false; btn.textContent = "റിപ്പോർട്ട് ഡൗൺലോഡ് ചെയ്യൂ ↓"; }
+  }
+
   loadInvite();
+  loadPremium();
   loadPolls();
   loadFeed();
 </script>
