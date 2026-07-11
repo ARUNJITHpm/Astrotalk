@@ -41,6 +41,7 @@ tara_project_overview.pdf
 
 # Local / scratch directories
 vinimon/
+.venv312/
 
 # Local object storage (mock_storage=true) — generated cards/PDFs, never commit
 var/
