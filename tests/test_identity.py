@@ -216,6 +216,32 @@ async def test_get_chart_none_when_user_has_no_chart(session):
     assert await service.get_chart(session, user.id) is None
 
 
+def test_compute_age_and_user_out_age():
+    from datetime import date as _date, datetime as _dt
+
+    from app.modules.identity.schemas import UserOut, compute_age
+
+    # Birthday already passed this year vs. not yet.
+    assert compute_age(_date(1990, 1, 1), today=_date(2026, 7, 11)) == 36
+    assert compute_age(_date(1990, 12, 31), today=_date(2026, 7, 11)) == 35
+
+    class _Row:
+        id = 1
+        phone = "+919000000000"
+        name = "Arya"
+        dob = _date(1995, 4, 12)
+        birth_time = None
+        birth_place = "Thrissur"
+        lat = 10.5
+        lng = 76.2
+        tz = "Asia/Kolkata"
+        created_at = _dt(2026, 7, 1)
+
+    out = UserOut.model_validate(_Row())
+    assert out.age == compute_age(_Row.dob)
+    assert "age" in out.model_dump()
+
+
 def test_chart_is_stale_flags_missing_severity():
     """A real chart computed before chovva parihara rules (no ``severity``
     field) is stale so it self-heals on next login."""

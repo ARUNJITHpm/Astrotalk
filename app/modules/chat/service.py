@@ -219,6 +219,8 @@ class ChatService:
         prashnam: PrashnamPick | None = None,
         porutham: PoruthamPartner | None = None,
         provider: str | None = None,
+        name: str | None = None,
+        age: int | None = None,
     ) -> ChatResponse:
         """Run the §6 orchestrator. When ``debug`` is set, attach a per-turn trace
         (params, tools invoked, timings, LLM config) to the response so a
@@ -460,6 +462,8 @@ class ChatService:
             transits=transits,
             retrieved=notes,
             memory=memory,
+            name=name,
+            age=age,
         )
         # --- Step 4b: white-label persona overlay (Part 4a). Appended AFTER
         # the safety persona and pre-wrapped by orgs with an immutable-

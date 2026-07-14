@@ -71,8 +71,10 @@ def _no_mongo(monkeypatch):
 class _FakeUser:
     """Stand-in for the authenticated identity.User require_user resolves."""
 
-    def __init__(self, phone: str):
+    def __init__(self, phone: str, name: str = "Demo", dob=None):
         self.phone = phone
+        self.name = name
+        self.dob = dob
         self.id = 0
 
 

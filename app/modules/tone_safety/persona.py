@@ -93,15 +93,32 @@ def build_system_prompt(
     transits: Any | None = None,
     retrieved: Any | None = None,
     memory: Any | None = None,
+    name: str | None = None,
+    age: int | None = None,
 ) -> str:
     """Assemble the persona system prompt, optionally grafting in context.
 
-    Context (what you remember about the person, chart, current transits,
-    retrieved knowledge) is appended after the persona rules so the model grounds
-    claims in real placements (rule 3) and speaks to the person it knows. With no
-    context this returns the base persona prompt unchanged.
+    Context (the person's name/age, what you remember about them, chart, current
+    transits, retrieved knowledge) is appended after the persona rules so the
+    model grounds claims in real placements (rule 3) and speaks to the person it
+    knows. With no context this returns the base persona prompt unchanged.
     """
     sections = [PERSONA_SYSTEM_PROMPT, "\n" + TERMINOLOGY_GLOSSARY]
+    if name:
+        sections.append(
+            f"\nThe person you are speaking with is named {name}. Address them "
+            "warmly by their first name now and then when it feels natural (not "
+            "in every message), and if they ask what their name is, tell them "
+            "their name directly."
+        )
+    if age is not None:
+        sections.append(
+            f"\nThe person is {age} years old. Keep their life stage in mind and "
+            "tailor guidance naturally to it (studies, career, marriage, "
+            "children, health, retirement — whatever fits their age), and if they "
+            "ask their age, tell them directly. Never make them feel judged about "
+            "their age."
+        )
     if memory is not None:
         sections.append(
             "\nWhat you remember about this person (weave in naturally where "

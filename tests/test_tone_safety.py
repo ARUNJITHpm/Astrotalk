@@ -57,6 +57,26 @@ def test_system_prompt_omits_memory_section_when_absent():
     assert "What you remember about this person" not in _svc.build_system_prompt()
 
 
+def test_system_prompt_injects_user_name():
+    prompt = _svc.build_system_prompt(name="Arya")
+    assert "speaking with is named Arya" in prompt
+    assert "if they ask what their name is" in prompt
+
+
+def test_system_prompt_omits_name_section_when_absent():
+    assert "speaking with is named" not in _svc.build_system_prompt()
+
+
+def test_system_prompt_injects_user_age():
+    prompt = _svc.build_system_prompt(age=32)
+    assert "32 years old" in prompt
+    assert "if they ask their age" in prompt
+
+
+def test_system_prompt_omits_age_section_when_absent():
+    assert "years old" not in _svc.build_system_prompt()
+
+
 def test_screen_flags_manglish_distress():
     # Romanized Malayalam distress must route to the helpline too — a large
     # share of users type Malayalam in Latin script.

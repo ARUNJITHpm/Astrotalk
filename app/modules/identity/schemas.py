@@ -7,7 +7,14 @@ these payloads or place their fields in URLs.
 from datetime import date, datetime, time
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, computed_field
+
+
+def compute_age(dob: date, today: date | None = None) -> int:
+    """Age in whole years from date of birth. Derived, never stored — a stored
+    age column would silently drift out of date every birthday."""
+    today = today or date.today()
+    return today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
 
 
 class UserCreate(BaseModel):
@@ -88,6 +95,11 @@ class UserOut(BaseModel):
     lng: float
     tz: str
     created_at: datetime
+
+    @computed_field  # derived from dob so the profile can show age without a column
+    @property
+    def age(self) -> int:
+        return compute_age(self.dob)
 
 
 class AuthResponse(BaseModel):

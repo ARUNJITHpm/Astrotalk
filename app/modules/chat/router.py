@@ -21,6 +21,7 @@ from app.modules.chat.schemas import (
 )
 from app.modules.chat.service import ChatService
 from app.modules.identity.auth import CurrentUser
+from app.modules.identity.schemas import compute_age
 from app.platform.config import get_settings
 from app.platform.db import get_session
 
@@ -76,6 +77,8 @@ async def send_message(
         prashnam=payload.prashnam,
         porutham=payload.porutham,
         provider=payload.provider,
+        name=user.name,
+        age=compute_age(user.dob) if user.dob else None,
     )
 
     # Persist history + schedule durable-memory extraction only on the normal

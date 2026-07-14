@@ -52,9 +52,11 @@ class ToneSafetyService:
         transits: Any | None = None,
         retrieved: Any | None = None,
         memory: Any | None = None,
+        name: str | None = None,
+        age: int | None = None,
     ) -> str:
         """Assemble the persona system prompt for the chat LLM call."""
-        return persona.build_system_prompt(chart, transits, retrieved, memory)
+        return persona.build_system_prompt(chart, transits, retrieved, memory, name, age)
 
 
 # Module-level convenience surface (PROJECT_DOCS.md §6 references tone_safety.screen).
@@ -67,5 +69,7 @@ def build_system_prompt(
     transits: Any | None = None,
     retrieved: Any | None = None,
     memory: Any | None = None,
+    name: str | None = None,
+    age: int | None = None,
 ) -> str:
-    return persona.build_system_prompt(chart, transits, retrieved, memory)
+    return persona.build_system_prompt(chart, transits, retrieved, memory, name, age)
