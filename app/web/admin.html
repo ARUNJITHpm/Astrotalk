@@ -366,7 +366,12 @@
   <!-- Dashboard Main Window -->
   <div id="dash" class="wrap hidden">
     <header class="top">
-      <div class="brand"><span class="star">✦</span> Tara <small>Admin</small></div>
+      <div class="brand">
+        <button class="tara-back" data-back="/" aria-label="തിരികെ">
+          <span class="tara-back-ic" aria-hidden="true">←</span><span class="tara-back-label">തിരികെ</span>
+        </button>
+        <span class="star">✦</span> Tara <small>Admin</small>
+      </div>
       <div class="row-actions">
         <span class="gen-at">Updated <b id="genAt">—</b></span>
         <button class="btn" onclick="refreshData()" id="refreshBtn">↻ Refresh</button>
@@ -541,6 +546,8 @@
     </div>
   </div>
 
-  <script src="/static/admin.js?v=4"></script>
+  <!-- Back button + the app's bottom nav, so /admin is not a dead end on mobile. -->
+  <script src="/static/shell.js?v=1" data-nav="admin"></script>
+  <script src="/static/admin.js?v=5"></script>
 </body>
 </html>

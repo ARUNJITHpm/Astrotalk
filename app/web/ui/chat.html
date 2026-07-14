@@ -57,6 +57,9 @@
       <!-- case-morphing top banner: icon/title/accent change per context -->
       <header class="topbar" id="topbar">
         <button class="btn btn-icon nav-toggle" id="nav-toggle" aria-label="മെനു" aria-expanded="false">☰</button>
+        <button class="tara-back" data-back="/feed" aria-label="തിരികെ">
+          <span class="tara-back-ic" aria-hidden="true">←</span><span class="tara-back-label">തിരികെ</span>
+        </button>
         <div class="case-badge" id="case-badge">✦</div>
         <div class="case-meta" id="case-meta">
           <div class="case-title" id="case-title">താര</div>
@@ -259,6 +262,8 @@
     })();
   </script>
 
+  <!-- Back button wiring. This page already has its own bottom nav, so data-nav="off". -->
+  <script src="/static/shell.js?v=1" data-nav="off"></script>
   <script src="/static/ui/starfield.js"></script>
   <script src="/static/ui/chart.js?v=20260714a"></script>
   <script src="/static/ui/chat.js?v=20260714a"></script>

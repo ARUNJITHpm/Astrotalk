@@ -161,6 +161,9 @@
 </head>
 <body>
   <header class="appbar">
+    <button class="tara-back" data-back="/" aria-label="തിരികെ">
+      <span class="tara-back-ic" aria-hidden="true">←</span><span class="tara-back-label">തിരികെ</span>
+    </button>
     <div class="brand">Tara <span class="spark">✨</span><small>ജ്യോതിഷ സഹായി</small></div>
     <nav class="topnav">
       <a href="/feed" class="active">ഇന്ന്</a>
@@ -193,6 +196,9 @@
   </nav>
 
   <div class="toast" id="toast"></div>
+
+  <!-- Back button wiring. This page already has its own bottom nav, so data-nav="off". -->
+  <script src="/static/shell.js?v=1" data-nav="off"></script>
 
 <script>
   const token = localStorage.getItem("tara_token");

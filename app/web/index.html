@@ -58,6 +58,9 @@
         <div class="chat-head-left">
           <button id="sidebar-toggle" class="sidebar-toggle" type="button"
                   aria-label="മെനു" aria-expanded="false">☰</button>
+          <button class="tara-back" data-back="/feed" aria-label="തിരികെ">
+            <span class="tara-back-ic" aria-hidden="true">←</span><span class="tara-back-label">തിരികെ</span>
+          </button>
           <div class="chat-head-titles">
             <div class="chat-title">താര</div>
             <div class="chat-sub">മാർഗനിർദേശം, ഭയമല്ല</div>
@@ -261,6 +264,8 @@
     </div>
   </div>
 
+  <!-- Back button wiring. This page already has its own bottom nav, so data-nav="off". -->
+  <script src="/static/shell.js?v=1" data-nav="off"></script>
   <script src="/static/vendor/gsap.min.js"></script>
   <script src="/static/ui/chart.js?v=1"></script>
   <script src="/static/app.js?v=15"></script>
