@@ -154,14 +154,37 @@ async def api():
 
 
 async def test_admin_login(api):
-    # Valid login
+    # Legacy username/password still works (kept for existing bookmarks/scripts).
     resp = await api.post("/admin/login", json={"username": "admin", "password": "chargemod"})
     assert resp.status_code == 200
-    assert resp.json() == {"token": "chargemod"}
+    body = resp.json()
+    assert body["token"] == "chargemod"
+    # Login now also echoes the owner email so the console can show who is signed in.
+    assert body["email"] == get_settings().admin_email
 
     # Invalid login
     resp_invalid = await api.post("/admin/login", json={"username": "admin", "password": "wrongpassword"})
     assert resp_invalid.status_code == 401
+
+
+async def test_admin_login_with_owner_email(api):
+    """Owner may sign in with the configured email + admin password."""
+    settings = get_settings()
+    resp = await api.post(
+        "/admin/login",
+        json={"username": settings.admin_email, "password": settings.admin_password},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["token"] == "chargemod"
+    assert body["email"] == settings.admin_email
+
+    # Wrong password for the owner email is rejected.
+    bad = await api.post(
+        "/admin/login",
+        json={"username": settings.admin_email, "password": "nope"},
+    )
+    assert bad.status_code == 401
 
 
 async def test_overview_requires_token_always(api, monkeypatch):
