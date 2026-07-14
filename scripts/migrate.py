@@ -26,6 +26,7 @@ against a half-migrated schema. Run manually any time: ``python scripts/migrate.
 import asyncio
 import sys
 from pathlib import Path
+from urllib.parse import urlsplit
 
 _ROOT = Path(__file__).resolve().parents[1]
 if str(_ROOT) not in sys.path:
@@ -44,10 +45,18 @@ async def _table_names() -> set[str]:
     raw = get_settings().database_url
     url = _resolve_async_url(raw)
     connect_args = connect_args_for(raw, url)
+    # Announce the target BEFORE connecting, and flush: this is the first thing
+    # the container does, so an unreachable database stalls here with no output
+    # at all — indistinguishable in the Space log from a container that never
+    # started. Host only, never the credentials in the URL.
+    print(f"migrate: connecting to {urlsplit(url).hostname or url.split('://', 1)[0]}",
+          flush=True)
     engine = create_async_engine(url, connect_args=connect_args)
     try:
         async with engine.connect() as conn:
-            return set(await conn.run_sync(lambda c: sa_inspect(c).get_table_names()))
+            names = set(await conn.run_sync(lambda c: sa_inspect(c).get_table_names()))
+        print(f"migrate: connected ({len(names)} tables)", flush=True)
+        return names
     finally:
         await engine.dispose()
 
