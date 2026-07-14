@@ -3,6 +3,9 @@
   "use strict";
 
   const TOKEN_KEY = "tara_admin_token";
+  // The app's own login session (set by /auth and /ui/login), reused here so an
+  // admin phone doesn't have to log in again on this page.
+  const USER_TOKEN_KEY = "tara_token";
   const $ = (id) => document.getElementById(id);
   const nf = new Intl.NumberFormat();
   const fmtNum = (n) => nf.format(n || 0);
@@ -37,9 +40,16 @@
   // silently showing "no chats" when the store is simply disabled.
   let chatAvailable = true;
 
+  // The console's own token wins; otherwise an owner who is already signed into
+  // the app (a mobile listed in ADMIN_PHONES) authorizes with their ordinary
+  // session, so /admin does not ask for a second login. The server decides
+  // whether that session is really an admin's — see platform/admin_auth.py.
   function authHeaders() {
     const t = localStorage.getItem(TOKEN_KEY);
-    return t ? { "X-Admin-Token": t, "Content-Type": "application/json" } : { "Content-Type": "application/json" };
+    if (t) return { "X-Admin-Token": t, "Content-Type": "application/json" };
+    const user = localStorage.getItem(USER_TOKEN_KEY);
+    if (user) return { Authorization: "Bearer " + user, "Content-Type": "application/json" };
+    return { "Content-Type": "application/json" };
   }
 
   function showGate(msg) {
@@ -95,6 +105,13 @@
 
   window.signOut = function () {
     localStorage.removeItem(TOKEN_KEY);
+    // Signed in through the app session? The password gate is not this owner's
+    // way back in — showing it would just strand them. Return them to the app;
+    // signing out of Tara itself happens there.
+    if (localStorage.getItem(USER_TOKEN_KEY)) {
+      window.location.href = "/";
+      return;
+    }
     showGate("");
   };
 
@@ -155,7 +172,12 @@
       tokenRequired = !!cfg.token_required;
     } catch (_) { /* Fallback to gating on load error */ }
 
-    if (tokenRequired && !localStorage.getItem(TOKEN_KEY)) {
+    // Either credential is worth a try: the console token, or an app session
+    // that may belong to an admin phone. A session that isn't an admin's just
+    // 401s in loadOverview() and lands on the gate.
+    const haveCredential =
+      localStorage.getItem(TOKEN_KEY) || localStorage.getItem(USER_TOKEN_KEY);
+    if (tokenRequired && !haveCredential) {
       showGate("");
       return;
     }

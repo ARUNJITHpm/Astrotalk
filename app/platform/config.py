@@ -42,10 +42,11 @@ class Settings(BaseSettings):
     admin_password: str = "tara@admin"
 
     # Mobile numbers (comma-separated) whose signed-in users are treated as app
-    # administrators — the web app reveals the admin/console nav links for them.
+    # administrators — the web app reveals the admin/console nav links for them,
+    # and their app session authorizes the admin API (see platform/admin_auth).
     # Matched on the trailing 10 digits, so "8089397344", "918089397344" and
-    # "+918089397344" are the same person. NOTE: the admin *pages/APIs* stay
-    # separately gated by ``admin_token``; this flag only drives nav visibility.
+    # "+918089397344" are the same person. Treat this list as a credential:
+    # anyone who can sign in as one of these numbers is an owner.
     admin_phones: str = "8089397344"
 
     @property
@@ -223,8 +224,8 @@ def is_admin_phone(phone: str | None) -> bool:
     """Whether ``phone`` belongs to an app administrator (see ``admin_phones``).
 
     Compared on the trailing 10 digits so country-code/`+` variants of the same
-    number all match. Drives admin/console nav visibility only — never used to
-    authorize an admin API call.
+    number all match. Drives admin/console nav visibility, and — via
+    ``platform.admin_auth`` — lets an admin's app session reach the admin API.
     """
     if not phone:
         return False

@@ -1,7 +1,9 @@
 """HTTP routes for the admin analytics dashboard.
 
-Every route is gated by ``require_admin`` (X-Admin-Token). The dashboard is
-read-only: it reports aggregate metrics and never mutates domain data.
+Every route is gated by ``require_admin``, which takes either the console's
+X-Admin-Token or an app session belonging to an ``admin_phones`` mobile. The
+dashboard is read-only: it reports aggregate metrics and never mutates domain
+data.
 """
 
 from typing import Annotated

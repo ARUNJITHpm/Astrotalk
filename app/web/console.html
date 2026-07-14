@@ -136,6 +136,10 @@
         <div class="topbar">
           <div>
             <button class="hamburger" id="ham">☰</button>
+            <button class="tara-back" data-back="/" aria-label="തിരികെ"
+                    style="vertical-align:middle;margin-right:8px">
+              <span class="tara-back-ic" aria-hidden="true">←</span><span class="tara-back-label">തിരികെ</span>
+            </button>
             <h2 id="ptitle" style="display:inline-block;vertical-align:middle">Dashboard</h2>
             <div class="sub" id="psub"></div>
           </div>
@@ -146,14 +150,27 @@
   </div>
   <div class="toast" id="toast"></div>
 
+  <!-- Back button + the app's bottom nav, so /console is not a dead end on mobile. -->
+  <script src="/static/shell.js?v=1" data-nav="console"></script>
+
 <script>
 const TOKEN_KEY = "tara_admin_token";
+// The app's own login session (set by /auth and /ui/login). An owner already
+// signed in on an ADMIN_PHONES mobile authorizes with it, so the console does
+// not ask for a second login. The server decides whether that session really
+// belongs to an admin — see platform/admin_auth.py.
+const USER_TOKEN_KEY = "tara_token";
 let TOKEN = localStorage.getItem(TOKEN_KEY) || "";
+const userToken = () => localStorage.getItem(USER_TOKEN_KEY) || "";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => (s==null?"":String(s)).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 function toast(m){const t=$("toast");t.textContent=m;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),1900);}
-const hdr = (extra={}) => ({...extra, "X-Admin-Token": TOKEN});
+const hdr = (extra={}) => {
+  if (TOKEN) return {...extra, "X-Admin-Token": TOKEN};
+  const u = userToken();
+  return u ? {...extra, Authorization: "Bearer " + u} : extra;
+};
 async function api(path, opts={}) {
   const res = await fetch(path, {...opts, headers: hdr(opts.headers||{})});
   if (res.status === 401) { logout(); throw new Error("unauthorized"); }
@@ -181,7 +198,14 @@ async function doLogin() {
     boot();
   } catch(e) { $("loginErr").textContent = e.message; }
 }
-function logout(){ TOKEN=""; localStorage.removeItem(TOKEN_KEY); $("shell").style.display="none"; $("login").style.display="flex"; }
+function logout(){
+  TOKEN=""; localStorage.removeItem(TOKEN_KEY);
+  // Signed in through the app session? The password box is not this owner's way
+  // back in — send them to the app instead of stranding them on it. Signing out
+  // of Tara itself happens there.
+  if (userToken()) { window.location.href = "/"; return; }
+  $("shell").style.display="none"; $("login").style.display="flex";
+}
 $("loginBtn").onclick = doLogin;
 $("password").addEventListener("keydown", e => { if(e.key==="Enter") doLogin(); });
 $("logout").onclick = logout;
@@ -647,8 +671,8 @@ $("backdrop").onclick = closeSidebar;
 
 // ---------- Boot ----------
 function boot(){ $("login").style.display="none"; $("shell").style.display="block"; renderNav(); route(); }
-if (TOKEN) {
-  // Validate the stored token with a cheap admin call. api() already calls
+if (TOKEN || userToken()) {
+  // Validate the stored credential with a cheap admin call. api() already calls
   // logout() on a 401; any OTHER error (e.g. a flaky overview) should NOT sign
   // the owner out — boot the console anyway.
   api("/admin/overview")

@@ -205,3 +205,67 @@ async def test_overview_requires_token_always(api, monkeypatch):
     assert ok.status_code == 200
     data = ok.json()
     assert set(data) == {"generated_at", "system", "users", "chat", "llm"}
+
+
+async def test_admin_phone_session_authorizes_admin_api(api, monkeypatch):
+    """An owner signed into the app reaches /admin with their ordinary session.
+
+    This is what keeps /admin and /console from demanding a second login: the
+    phone is read from the server-side session, never from the request.
+    """
+    monkeypatch.setattr(get_settings(), "admin_token", "")
+    monkeypatch.setattr(get_settings(), "admin_phones", "8089397344")
+
+    reg = await api.post(
+        "/identity/users",
+        json={
+            "phone": "+918089397344",
+            "password": "secret123",
+            "name": "Owner",
+            "dob": "1995-04-12",
+            "birth_time": "06:30",
+            "birth_place": "Thrissur, Kerala",
+        },
+    )
+    assert reg.status_code == 201
+    body = reg.json()
+    # The country-code form matches the configured bare number (last 10 digits).
+    assert body["is_admin"] is True
+
+    ok = await api.get(
+        "/admin/overview",
+        headers={"Authorization": f"Bearer {body['token']}"},
+    )
+    assert ok.status_code == 200
+    assert set(ok.json()) == {"generated_at", "system", "users", "chat", "llm"}
+
+
+async def test_non_admin_session_cannot_reach_admin_api(api, monkeypatch):
+    """An ordinary user's session is not an admin credential."""
+    monkeypatch.setattr(get_settings(), "admin_token", "")
+    monkeypatch.setattr(get_settings(), "admin_phones", "8089397344")
+
+    reg = await api.post(
+        "/identity/users",
+        json={
+            "phone": "+919000000123",
+            "password": "secret123",
+            "name": "Arya",
+            "dob": "1995-04-12",
+            "birth_time": "06:30",
+            "birth_place": "Thrissur, Kerala",
+        },
+    )
+    assert reg.status_code == 201
+    assert reg.json()["is_admin"] is False
+
+    denied = await api.get(
+        "/admin/overview",
+        headers={"Authorization": f"Bearer {reg.json()['token']}"},
+    )
+    assert denied.status_code == 401
+
+    # A made-up bearer token is rejected the same way.
+    assert (
+        await api.get("/admin/overview", headers={"Authorization": "Bearer nope"})
+    ).status_code == 401
