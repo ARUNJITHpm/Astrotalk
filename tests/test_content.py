@@ -15,9 +15,10 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
 from app.main import app as main_app
-from app.modules.content import templates
+from app.modules.content import studio, templates
 from app.modules.content.models import PLATFORMS
 from app.modules.content.service import ContentService, InvalidTransition
+from app.modules.tone_safety.service import ToneSafetyService
 from app.platform.config import get_settings
 from app.platform.db import Base, get_session
 from app.platform.storage import reset_storage
@@ -175,3 +176,27 @@ async def test_content_http_surface_gating_and_flow(session, monkeypatch):
             assert card.headers["content-type"] == "image/png"
     finally:
         main_app.dependency_overrides.pop(get_session, None)
+
+
+# ---- Content Studio (ENGAGEMENT_PLAN Part B): on-demand creative drafts ----
+
+
+@pytest.mark.asyncio
+async def test_studio_generate_persists_a_screened_draft(session):
+    draft = await studio.generate(session, "reel_script", topic="ചൊവ്വ ദോഷം", day=_DAY)
+
+    assert draft.id is not None
+    assert draft.kind == "reel_script"
+    assert draft.topic == "ചൊവ്വ ദോഷം"
+    assert draft.body and draft.caption
+    # Public copy is never stored unscreened — the persisted body passes tone_safety.
+    assert not ToneSafetyService().screen_reply(draft.body)
+
+    listed = await studio.list_drafts(session)
+    assert [d.id for d in listed] == [draft.id]
+
+
+@pytest.mark.asyncio
+async def test_studio_rejects_unknown_kind(session):
+    with pytest.raises(studio.UnknownStudioKind):
+        await studio.generate(session, "not_a_real_kind")
