@@ -376,18 +376,20 @@ def build() -> None:
     pdf.body("REAL = fully implemented and working.  PARTIAL = infra built, one piece missing.  STUB = TODO placeholder only, no logic.")
     pdf.ln(2)
     modules_status = [
-        ("identity", "REAL", GREEN, "Register/login, PBKDF2 passwords, bearer sessions, birth-data capture, real geocoding, chart persistence."),
+        ("identity", "REAL", GREEN, "Register/login, PBKDF2 passwords, bearer sessions, birth-data capture, real geocoding, chart persistence - plus the referral loop (per-user code, activation tracking, reward grant)."),
         ("astrology_engine", "REAL", GREEN, "Real Swiss Ephemeris sidereal engine: natal chart, vargas, dasha, doshas, transits, panchangam, prashnam, and the ten-porutham marriage matching (porutham.py)."),
         ("knowledge (RAG)", "REAL", GREEN, "Hybrid BM25 + Chroma retrieval over 2,451 chunks (248 curated + 2,203 ingested). BM25 is live now; the Chroma/dense half is code-complete but dormant (MOCK_CHROMA=true)."),
         ("tone_safety", "REAL*", AMBER, "Persona prompt + reply-screen guardrails are real and enforced. The crisis classifier is an explicit keyword-only placeholder, not clinically reviewed."),
         ("chat", "REAL", GREEN, "The orchestrator wiring every module together; real Sarvam/OpenAI calls; Mongo-backed history + memory; per-user rate limit; token/price accounting per reply."),
-        ("temples", "REAL", GREEN, "53 curated temples + deterministic concern/dosha/graha -> deity/temple lookup tables."),
-        ("admin", "REAL", GREEN, "Read-only analytics dashboard at /admin (own auth): user list, chat volume, token spend + estimated cost, live system/integration status. Composes other modules' public services only."),
-        ("content", "REAL (narrow)", AMBER, "Only the daily WhatsApp-style Malayalam message generator exists. No weekly content module."),
+        ("temples", "REAL", GREEN, "53 curated temples + concern/dosha/graha -> deity/temple lookup, PLUS the Part-3 partner layer: register a temple, festival calendar, WhatsApp-opt-in microsite, QR poster (PNG), embeddable widget."),
+        ("content", "REAL", GREEN, "Daily Malayalam message generator + the Content Studio: LLM-drafted reel scripts, weekly astro-news, festival specials, nakshatra episodes and myth-busters, each tone-screened, with an approve -> publish workflow feeding the user feed."),
+        ("community", "REAL", GREEN, "The user feed: today's panchangam + published posts, emoji reactions (toggle), daily check-in streaks, and live polls with vote tallies. Optional-auth (richer when logged in)."),
+        ("commerce", "REAL (mock)", AMBER, "Orders, entitlements and a generated premium jathakam PDF report (Pillow) are live in MOCK mode: create_order -> mock-pay -> entitlement -> download. Real Razorpay capture is code-complete but gated OFF (MOCK_RAZORPAY=true) pending human approval."),
+        ("notifications", "REAL (narrow)", AMBER, "run_festivals(): on a partner temple's festival day it queues a Malayalam WhatsApp nudge to that temple's opt-in subscribers (idempotent). Dispatch rides the whatsapp module, so real sends wait on the BSP call."),
+        ("admin / console", "REAL", GREEN, "Read-only analytics at /admin PLUS the owner Console at /console (email login): daily content, studio, polls, cards, panchangam, temple partners, notifications, referral funnel and the commerce panel - every growth feature in one place."),
+        ("astrologers", "REAL", GREEN, "Human-astrologer marketplace: profiles, availability, booking + cancel. A path to blend AI answers with real consultations."),
+        ("orgs (B2B)", "REAL", GREEN, "Multi-tenant workspace for astrologer businesses: public handle page, booking, billing/subscribe, and a CRM (customers, per-customer charts, bookings, notes, transcript)."),
         ("whatsapp", "PARTIAL", AMBER, "Real consent ledger, opt-out, 3/day throttle, and the daily pipeline exist - but the actual BSP send call is NotImplementedError (currently just logs)."),
-        ("commerce", "STUB", RED, "Router/service/models are empty TODO placeholders. No subscriptions, no Razorpay."),
-        ("community", "STUB", RED, "Empty TODO placeholders. No audio rooms, no moderation."),
-        ("notifications", "STUB", RED, "Empty TODO placeholders. No push/email dispatch."),
         ("event bus", "UNUSED", RED, "EventBus class exists but nothing calls .on()/.emit(). Modules call each other's public services directly instead."),
         ("Celery + worker.py", "PARTIAL", AMBER, "Real infra, but only ONE task registered: the WhatsApp daily message job (05:30 IST). Chat's history/memory saves use FastAPI BackgroundTasks, not Celery."),
     ]
@@ -411,7 +413,7 @@ def build() -> None:
         ("MOCK_MONGO = false", "Chat history and durable user memory are really persisted to MongoDB (database: tara)."),
         ("MOCK_CHROMA = true (default, unchanged)", "The vector/dense half of knowledge retrieval is OFF. Only BM25 keyword search is active."),
         ("MOCK_WHATSAPP = true (default, unchanged)", "Daily messages are composed but only logged, never actually sent to a BSP."),
-        ("MOCK_RAZORPAY = true (default, unchanged)", "Irrelevant in practice - commerce module has no logic to call it anyway."),
+        ("MOCK_RAZORPAY = true (default, unchanged)", "Commerce is now fully wired but deliberately runs mock: orders are captured locally and entitlements granted without a real charge. The real Razorpay create-order/webhook path exists in code but stays OFF until human sign-off (payments are a hard approval gate)."),
     ]
     for key, detail in env_rows:
         pdf.kv_row(key, detail)
@@ -763,9 +765,81 @@ def build() -> None:
         indent=2,
     )
 
-    # == 13: Malayalam handling matrix ======================================
+    # == 13: engagement & growth layer ======================================
     pdf.add_page()
-    pdf.section_title("13. How Malayalam is handled  -  feature by feature")
+    pdf.section_title("13. The engagement & growth layer  -  beyond the chatbot")
+    pdf.body(
+        "The chat brain (sections 5-12) is the core, but a companion people return to daily needs "
+        "more than a question box. This layer - built module by module - turns Tara from a Q&A bot "
+        "into a habit: a content feed to open every morning, temple partnerships that put Tara on "
+        "posters, a referral loop that grows it, and a premium report that earns from it. Every "
+        "surface reuses the same public services and the same tone_safety screen; nothing here "
+        "bypasses a guardrail."
+    )
+    pdf.sub_title("13.1  Two web surfaces at the root (not /ui)")
+    for item in [
+        "/feed - the USER home: a mobile bottom-nav / desktop top-nav page showing today's panchangam, published content posts, emoji reactions, a check-in streak chip, live polls, an invite-a-friend card (referral) and a premium-report card. Optional-auth: it works logged-out and gets personal when a token is present.",
+        "/console - the OWNER console: an email-login (arunjithpm1999@gmail.com) dashboard exposing every growth feature - daily content, Content Studio, polls, share cards, panchangam lookup, temple partners, notifications, the referral funnel and the commerce panel. Many nav items on purpose: it is the single back-office for one operator.",
+        "Users only ever see feed + chat; the console is owner-only, behind the X-Admin-Token the email login returns.",
+    ]:
+        pdf.bullet(item)
+    pdf.sub_title("13.2  Content Studio (content module)")
+    pdf.body(
+        "One admin action, POST /content/generate, drafts a piece in one of five formats - reel "
+        "script, weekly astro-news, festival special, nakshatra episode, myth-buster - from the "
+        "day's (or the week's) panchangam. Each draft is LLM-written, passed through the SAME "
+        "reply-screen guardrail as chat (retry-then-fallback), then sits at status=draft until the "
+        "owner approves and marks it published. Publishing a post is what makes it appear on /feed. "
+        "TTS/audio is intentionally NOT wired yet - narration is added by hand for now.",
+        indent=2,
+    )
+    pdf.sub_title("13.3  Community feed (community module)")
+    for item in [
+        "GET /community/feed assembles today's panchangam card + the published content posts; loading it records a check-in and updates the user's streak.",
+        "POST /community/posts/{id}/react toggles one of three reactions; GET /streak returns the running day count; GET/POST /community/polls runs lightweight polls with live tallies.",
+        "No cross-module foreign keys: posts are referenced by plain id, users by the identity phone/id - the module boundary rule holds.",
+    ]:
+        pdf.bullet(item)
+    pdf.sub_title("13.4  Temple partnerships (temples module, Part 3)")
+    pdf.body(
+        "Any of the 53 directory temples can be registered as a distribution partner: it gets a "
+        "public microsite, a printable QR poster (a real PNG served at /temples/partners/{slug}/"
+        "qr.png), an embeddable widget, and a festival calendar. Devotees opt in to WhatsApp "
+        "updates from the microsite (explicit consent, logged). On a festival day the notifications "
+        "module queues a Malayalam nudge to that temple's subscribers - a growth channel that puts "
+        "Tara in front of real temple-goers, offline.",
+        indent=2,
+    )
+    pdf.sub_title("13.5  Referral loop (identity module)")
+    pdf.body(
+        "Every user has a referral code; GET /identity/referral returns it plus a live activation "
+        "count. Registration consumes an incoming ref code, records the activation against the "
+        "referrer, and once a threshold is crossed grants a reward (a commerce entitlement) "
+        "automatically. The /feed invite card turns this into a one-tap share link (/auth?ref=CODE); "
+        "the console shows the funnel.",
+        indent=2,
+    )
+    pdf.sub_title("13.6  Commerce - premium report (commerce module, MOCK mode)")
+    pdf.body(
+        "The first paid product is a Premium Jathakam Report (Rs 199 / 19,900 paise). Flow: POST "
+        "/commerce/orders {product: premium_report} -> in mock mode POST /orders/{id}/mock-pay "
+        "captures it and grants an entitlement -> POST /commerce/reports/premium generates a real "
+        "PDF (Pillow) and returns it; without the entitlement that endpoint 402s. The real "
+        "Razorpay create-order + signature-verified webhook path is written but OFF: no money moves "
+        "until a human flips MOCK_RAZORPAY and signs off. There is also a B2B path (orgs module): "
+        "astrologer businesses subscribe to plans and run their own booking + CRM.",
+        indent=2,
+    )
+    pdf.info_box(
+        "The whole growth layer honours the same non-negotiables: tone_safety screens every piece "
+        "of published copy, WhatsApp stays opt-in and throttled, birth data never leaves its tables, "
+        "and payments are mock-only until explicitly approved. Growth never comes at the cost of a "
+        "guardrail."
+    )
+
+    # == 14: Malayalam handling matrix ======================================
+    pdf.add_page()
+    pdf.section_title("14. How Malayalam is handled  -  feature by feature")
     pdf.body(
         "Malayalam is not one feature; it is threaded through every layer. Users write in three "
         "forms - Malayalam script, English, and Manglish (Malayalam in Latin letters, loose "
@@ -792,7 +866,7 @@ def build() -> None:
 
     # == 14: LLM providers + evals ==========================================
     pdf.add_page()
-    pdf.section_title("14. LLM providers  -  why Sarvam, not just OpenAI")
+    pdf.section_title("15. LLM providers  -  why Sarvam, not just OpenAI")
     pdf.body(
         "llm_client.py talks to all providers through one OpenAI-compatible AsyncOpenAI client "
         "(Sarvam just uses a different base_url) and resolves which to use per request:"
@@ -811,7 +885,7 @@ def build() -> None:
         "  else canned Malayalam apology. Usage + estimated INR/USD price recorded",
         "  per call (platform/metrics.py) and shown per-reply and in /admin.",
     ])
-    pdf.section_title("15. Evals  -  this has actually been measured, not just claimed")
+    pdf.section_title("16. Evals  -  this has actually been measured, not just claimed")
     pdf.body(
         "evals/golden_set.py defines 25 fixed conversations (everyday questions, 2 crisis cases, "
         "temple/remedy asks, all 3 prashnam modes, adversarial guardrail probes). evals/run.py "
@@ -836,7 +910,7 @@ def build() -> None:
 
     # == 16: auth + running ==================================================
     pdf.add_page()
-    pdf.section_title("16. Auth & identity  -  how a user is recognized")
+    pdf.section_title("17. Auth & identity  -  how a user is recognized")
     for item in [
         "The identity key is the normalized mobile number (IdentityService.normalize_phone) - not a UUID. Everything (chat_history, user_memory, charts, sessions) is keyed off this phone.",
         "Passwords: PBKDF2-HMAC-SHA256, 200,000 rounds, unique salt per user, constant-time comparison.",
@@ -848,7 +922,7 @@ def build() -> None:
         "The admin dashboard (/admin, app/web/admin.html) has its own auth guard (admin/auth.py), separate from user sessions.",
     ]:
         pdf.bullet(item)
-    pdf.section_title("17. Running it locally")
+    pdf.section_title("18. Running it locally")
     pdf.mono_block([
         "  python -m venv .venv && .venv\\Scripts\\activate",
         "  pip install -e \".[dev]\"       (or: pip install -r requirements.txt)",
@@ -856,6 +930,8 @@ def build() -> None:
         "  python main.py                  # or: uvicorn app.main:app --reload --port 3000",
         "",
         "  Website chat UI    ->  http://localhost:3000/",
+        "  User feed          ->  http://localhost:3000/feed      (streak, posts, polls)",
+        "  Owner console      ->  http://localhost:3000/console   (email login)",
         "  WhatsApp demo skin ->  http://localhost:3000/whatsapp   (same brain, other CSS)",
         "  Admin dashboard    ->  http://localhost:3000/admin",
         "  API docs (Swagger) ->  http://localhost:3000/docs",
@@ -867,11 +943,12 @@ def build() -> None:
 
     # == 18: gaps + file map =================================================
     pdf.add_page()
-    pdf.section_title("18. Known gaps  -  read before promising a feature")
+    pdf.section_title("19. Known gaps  -  read before promising a feature")
     for item in [
         "Crisis classifier is keyword-only (section 12.2) - needs a clinically-reviewed upgrade before real users in distress rely on it.",
-        "WhatsApp sending is not implemented - _send_via_bsp() raises NotImplementedError; only the consent/throttle/pipeline scaffolding is real.",
-        "commerce, community, notifications are empty TODO stubs - no payments, no audio rooms, no push.",
+        "WhatsApp sending is not implemented - _send_via_bsp() raises NotImplementedError; only the consent/throttle/pipeline scaffolding is real. Festival nudges (notifications) and daily content therefore compose but don't actually send yet.",
+        "Commerce runs MOCK only: orders are captured and entitlements granted locally with no real charge. The Razorpay create-order/webhook code exists but MOCK_RAZORPAY stays true until a human signs off (payments are a hard approval gate).",
+        "Content Studio has no TTS/audio: reel and episode scripts are text; narration/audio is added manually for now (integration is a later step).",
         "The event bus (platform/events.py) is defined but never called - modules import each other's public services directly.",
         "Celery has exactly one real job (the WhatsApp daily message); chat persistence uses FastAPI BackgroundTasks.",
         "The dense/Chroma half of retrieval is code-complete but OFF (MOCK_CHROMA=true) - BM25 only right now. No cross-encoder reranker either (noted in code as a later addition).",
@@ -881,7 +958,7 @@ def build() -> None:
     ]:
         pdf.bullet(item)
 
-    pdf.section_title("19. Where things live  -  quick file map")
+    pdf.section_title("20. Where things live  -  quick file map")
     pdf.mono_block([
         "  app/main.py                      FastAPI app, wires every module's router",
         "  app/platform/config.py           ALL settings + every MOCK_* flag (read first)",
@@ -894,13 +971,17 @@ def build() -> None:
         "  app/modules/knowledge/           RAG corpus + hybrid BM25/Chroma retrieval",
         "  app/modules/tone_safety/         persona, crisis screen, output guardrail",
         "  app/modules/chat/                the orchestrator + history/memory/analytics",
-        "  app/modules/temples/             53 temples + remedy/deity lookup tables",
-        "  app/modules/admin/               read-only analytics dashboard (+ own auth)",
-        "  app/modules/content/             daily Malayalam message generator",
+        "  app/modules/temples/             53 temples + remedy/deity lookup + partners",
+        "  app/modules/admin/               analytics dashboard + owner console (own auth)",
+        "  app/modules/content/             daily message + Content Studio (5 formats)",
+        "  app/modules/community/           user feed, reactions, streaks, polls",
+        "  app/modules/commerce/            orders, entitlements, premium PDF (mock mode)",
+        "  app/modules/notifications/       partner-festival WhatsApp nudges (run_festivals)",
+        "  app/modules/astrologers, orgs/   human-astrologer booking + B2B CRM/billing",
         "  app/modules/whatsapp/            consent ledger + daily pipeline (send = TODO)",
-        "  app/modules/commerce, community, notifications/   empty stubs",
         "",
-        "  app/web/                         index.html, wa skin, admin.html + JS/CSS",
+        "  app/web/                         index.html, feed.html, console.html, wa skin,",
+        "                                   admin.html + JS/CSS  (all served from / root)",
         "  evals/                           25-case golden set + automated grading",
         "  NEEDS_ASTROLOGER.md              living punch-list of unreviewed content",
         "  AGENTS.md / GUARDRAILS.md        the ORIGINAL rules - still binding for the",

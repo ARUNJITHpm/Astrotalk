@@ -23,6 +23,18 @@ KINDS = ("panchangam", "nakshatra", "festival", "tip")
 
 STATUSES = ("draft", "approved", "published", "failed")
 
+# Content Studio (ENGAGEMENT_PLAN.md Part B): on-demand creative pieces the
+# owner generates, reviews, then posts BY HAND to YouTube/Instagram (auto-publish
+# to those platforms stays mocked). Distinct from the scheduled daily pack.
+STUDIO_KINDS = (
+    "reel_script",  # 45-60s spoken Malayalam: Hook / Body / CTA + caption
+    "weekly_astro_news",  # "ഈ ആഴ്ചയിലെ ജ്യോതിഷ വിശേഷങ്ങൾ" — the weekly show
+    "festival_special",  # around an upcoming festival (owner supplies the name)
+    "nakshatra_episode",  # one of 27 evergreen "know your nakshatram" scripts
+    "myth_buster",  # gentle no-fear correction of a common astrology scare
+)
+STUDIO_STATUSES = ("draft", "approved", "published")
+
 
 def _utcnow() -> datetime:
     return datetime.now(UTC)
@@ -73,3 +85,31 @@ class ShareCard(Base):
     created_by_user_id: Mapped[int | None] = mapped_column(nullable=True, default=None)
     hits: Mapped[int] = mapped_column(default=0)
     created_at: Mapped[datetime] = mapped_column(default=_utcnow)
+
+
+class StudioDraft(Base):
+    """An on-demand creative piece from the Content Studio (ENGAGEMENT_PLAN Part B).
+
+    Unlike ``ContentPost`` (one per platform per day, scheduled), studio drafts
+    are ad-hoc — the owner generates a reel script / weekly-news script /
+    myth-buster, reviews it, then posts it MANUALLY to YouTube/Instagram and
+    pastes the resulting link back into ``external_url`` (status → published).
+    No unique constraint: the owner may generate many pieces on any day.
+    """
+
+    __tablename__ = "studio_drafts"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    kind: Mapped[str]  # one of STUDIO_KINDS
+    # Free-text steer the owner typed (a nakshatra, a festival, a myth) — audit.
+    topic: Mapped[str | None] = mapped_column(nullable=True, default=None)
+    title: Mapped[str] = mapped_column(default="")
+    body: Mapped[str] = mapped_column(Text)
+    # Suggested caption + hashtags block for the manual post (reels/shorts).
+    caption: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
+    media_key: Mapped[str | None] = mapped_column(nullable=True, default=None)
+    status: Mapped[str] = mapped_column(default="draft")  # one of STUDIO_STATUSES
+    # The public URL the owner pastes after posting by hand (proof + feed link).
+    external_url: Mapped[str | None] = mapped_column(nullable=True, default=None)
+    created_at: Mapped[datetime] = mapped_column(default=_utcnow)
+    published_at: Mapped[datetime | None] = mapped_column(nullable=True, default=None)

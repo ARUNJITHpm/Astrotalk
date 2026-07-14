@@ -12,14 +12,15 @@ template so the daily pipeline works with zero API key.
 """
 
 import os
-from datetime import UTC, date as date_type, datetime
+from datetime import UTC, datetime
+from datetime import date as date_type
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.content import pipeline, publishers, templates
-from app.modules.content.models import ContentPost
-from app.modules.content.schemas import ContentPostOut
+from app.modules.content import pipeline, publishers, studio, templates
+from app.modules.content.models import ContentPost, StudioDraft
+from app.modules.content.schemas import ContentPostOut, StudioDraftOut
 from app.platform import metrics
 from app.platform.config import get_settings
 from app.platform.logging_config import get_logger
@@ -64,7 +65,6 @@ class ContentService:
             ],
         )
         return (response.choices[0].message.content or "").strip()
-
 
     # ---- Daily content pack (GROWTH_PLAN.md Part 1) ----
 
@@ -128,6 +128,76 @@ class ContentService:
             metrics.increment("content.posts_failed")
         await session.commit()
         return ContentPostOut.model_validate(post)
+
+    async def mark_post_published(
+        self, session: AsyncSession, post_id: int, external_url: str
+    ) -> ContentPostOut:
+        """Manual-posting path: mark an approved daily post published by hand.
+
+        For platforms whose API isn't wired yet (FB/IG/YouTube), the owner posts
+        by hand and pastes the link — no publisher call, but metrics and the feed
+        archive stay truthful.
+        """
+        post = await self._get(session, post_id)
+        if post.status not in ("approved", "draft"):
+            raise InvalidTransition(f"cannot mark a {post.status} post published")
+        post.external_id = external_url.strip()
+        post.status = "published"
+        post.published_at = datetime.now(UTC)
+        await session.commit()
+        metrics.increment("content.posts_published")
+        return ContentPostOut.model_validate(post)
+
+    # ---- Content Studio (ENGAGEMENT_PLAN.md Part B) ----
+
+    def _studio_out(self, draft: StudioDraft) -> StudioDraftOut:
+        dto = StudioDraftOut.model_validate(draft)
+        if draft.media_key:
+            dto.media_url = get_storage().url(draft.media_key)
+        return dto
+
+    async def generate_studio(
+        self, session: AsyncSession, kind: str, topic: str = "", day=None
+    ) -> StudioDraftOut:
+        draft = await studio.generate(session, kind, topic, day)
+        return self._studio_out(draft)
+
+    async def list_studio(self, session: AsyncSession) -> list[StudioDraftOut]:
+        return [self._studio_out(d) for d in await studio.list_drafts(session)]
+
+    async def _get_studio(self, session: AsyncSession, draft_id: int) -> StudioDraft:
+        draft = await session.get(StudioDraft, draft_id)
+        if draft is None:
+            raise ContentPostNotFound(f"studio draft {draft_id} not found")
+        return draft
+
+    async def approve_studio(
+        self, session: AsyncSession, draft_id: int, body: str | None = None
+    ) -> StudioDraftOut:
+        """Approve a studio draft, optionally applying the owner's inline edit."""
+        draft = await self._get_studio(session, draft_id)
+        if body is not None and body.strip():
+            draft.body = body.strip()
+        draft.status = "approved"
+        await session.commit()
+        return self._studio_out(draft)
+
+    async def mark_studio_published(
+        self, session: AsyncSession, draft_id: int, external_url: str
+    ) -> StudioDraftOut:
+        """Owner posted this by hand — record the link and flip to published."""
+        draft = await self._get_studio(session, draft_id)
+        draft.external_url = external_url.strip()
+        draft.status = "published"
+        draft.published_at = datetime.now(UTC)
+        await session.commit()
+        metrics.increment("content.studio_published")
+        return self._studio_out(draft)
+
+    async def delete_studio(self, session: AsyncSession, draft_id: int) -> None:
+        draft = await self._get_studio(session, draft_id)
+        await session.delete(draft)
+        await session.commit()
 
 
 # Module-level convenience surface.

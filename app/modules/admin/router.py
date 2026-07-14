@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.admin.auth import AdminGuard, admin_required
 from app.modules.admin.schemas import AdminOverview
 from app.modules.admin.service import AdminService
+from app.platform.config import get_settings
 from app.platform.db import get_session
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -23,17 +24,34 @@ SessionDep = Annotated[AsyncSession, Depends(get_session)]
 
 
 class LoginPayload(BaseModel):
+    # Accepts either the owner email or the legacy "admin" username.
     username: str
     password: str
 
 
-@router.post("/login", summary="Admin username/password authentication")
+def _admin_token() -> str:
+    """The token the console uses on every later call (configured, else legacy)."""
+    return get_settings().admin_token or "chargemod"
+
+
+@router.post("/login", summary="Owner login (email or legacy username) → admin token")
 async def admin_login_endpoint(payload: LoginPayload) -> dict:
-    if payload.username == "admin" and payload.password == "chargemod":
-        return {"token": "chargemod"}
+    settings = get_settings()
+    username = payload.username.strip().lower()
+
+    # 1) Owner console login: the email + configured password.
+    email_ok = (
+        username == settings.admin_email.strip().lower()
+        and payload.password == settings.admin_password
+    )
+    # 2) Legacy username/password kept working for existing bookmarks/scripts.
+    legacy_ok = payload.username == "admin" and payload.password == "chargemod"
+
+    if email_ok or legacy_ok:
+        return {"token": _admin_token(), "email": settings.admin_email}
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Invalid username or password",
+        detail="Invalid email or password",
     )
 
 

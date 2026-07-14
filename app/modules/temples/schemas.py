@@ -5,6 +5,17 @@ from datetime import date, datetime
 from pydantic import BaseModel, ConfigDict
 
 
+class TempleDirectoryItem(BaseModel):
+    """A directory temple, for the admin partner-registration picker."""
+
+    id: str
+    name: str
+    name_ml: str
+    district: str
+    town: str
+    deity: str
+
+
 class PartnerCreate(BaseModel):
     """Register a directory temple as a distribution partner (admin console)."""
 

@@ -1,0 +1,433 @@
+<!doctype html>
+<html lang="ml">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>ഇന്ന് · Tara</title>
+<style>
+  :root {
+    --bg: #0b0f2a; --bg2: #131a3f; --card: #1a2148; --card2: #222a55;
+    --text: #f5f1e8; --muted: #9aa3c4; --gold: #e8b64c; --gold-dim: #c9992f;
+    --line: rgba(255,255,255,.08); --radius: 16px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: radial-gradient(1200px 700px at 50% -10%, #1a2350 0%, var(--bg) 60%);
+    color: var(--text); font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    min-height: 100vh; -webkit-font-smoothing: antialiased;
+    padding-bottom: 84px; /* room for the mobile bottom nav */
+  }
+  a { color: inherit; text-decoration: none; }
+
+  /* ---- Top bar ---- */
+  header.appbar {
+    position: sticky; top: 0; z-index: 20; backdrop-filter: blur(10px);
+    background: rgba(11,15,42,.82); border-bottom: 1px solid var(--line);
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; padding: 12px 16px;
+  }
+  .brand { font-size: 19px; font-weight: 800; letter-spacing: .3px; }
+  .brand .spark { color: var(--gold); }
+  .brand small { display: block; font-size: 11px; color: var(--muted); font-weight: 500; }
+  .top-actions { display: flex; align-items: center; gap: 10px; }
+  .streak {
+    display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700;
+    background: rgba(232,182,76,.12); color: var(--gold);
+    border: 1px solid rgba(232,182,76,.35); padding: 6px 12px; border-radius: 999px;
+  }
+  /* Desktop top nav (hidden on mobile) */
+  nav.topnav { display: none; gap: 4px; }
+  nav.topnav a {
+    padding: 8px 16px; border-radius: 999px; font-size: 14px; font-weight: 600; color: var(--muted);
+  }
+  nav.topnav a.active { color: var(--bg); background: var(--gold); }
+  nav.topnav a:not(.active):hover { color: var(--text); background: var(--card); }
+
+  /* ---- Feed ---- */
+  main { max-width: 640px; margin: 0 auto; padding: 18px 16px 8px; }
+  .card {
+    background: linear-gradient(180deg, var(--card) 0%, var(--card2) 100%);
+    border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 18px; margin-bottom: 16px; box-shadow: 0 8px 30px rgba(0,0,0,.28);
+  }
+  .card.hero { border-color: rgba(232,182,76,.35);
+    background: linear-gradient(180deg, #232c5e 0%, #1a2148 100%); }
+  .eyebrow { font-size: 12px; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--gold); font-weight: 700; margin-bottom: 8px; }
+  .card h2 { margin: 0 0 8px; font-size: 18px; line-height: 1.35; }
+  .card .body { font-size: 15.5px; line-height: 1.7; color: #e9e6f5; white-space: pre-wrap; }
+  .card img.media { width: 100%; border-radius: 12px; margin: 12px 0 4px; display: block; }
+  .meta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+    margin-top: 6px; font-size: 12px; color: var(--muted); }
+  .chip { background: rgba(255,255,255,.06); border: 1px solid var(--line);
+    padding: 3px 10px; border-radius: 999px; }
+
+  .actions { display: flex; align-items: center; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+  .react {
+    display: inline-flex; align-items: center; gap: 6px; cursor: pointer; user-select: none;
+    background: rgba(255,255,255,.05); border: 1px solid var(--line); color: var(--text);
+    padding: 7px 13px; border-radius: 999px; font-size: 15px; transition: transform .08s, background .15s;
+  }
+  .react:active { transform: scale(.92); }
+  .react.on { background: rgba(232,182,76,.16); border-color: rgba(232,182,76,.45); }
+  .react .count { font-size: 13px; color: var(--muted); font-weight: 700; }
+  .react.on .count { color: var(--gold); }
+  .btn-ghost { margin-left: auto; background: none; border: 1px solid var(--line); color: var(--muted);
+    padding: 7px 14px; border-radius: 999px; font-size: 13px; cursor: pointer; }
+  .btn-ghost:hover { color: var(--text); border-color: var(--gold-dim); }
+  .cta {
+    display: inline-block; margin-top: 12px; background: var(--gold); color: var(--bg);
+    font-weight: 700; padding: 10px 18px; border-radius: 999px; font-size: 14px;
+  }
+
+  /* ---- Poll ---- */
+  .poll .opt {
+    position: relative; overflow: hidden; cursor: pointer; margin-top: 10px;
+    border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; font-size: 14.5px;
+    background: rgba(255,255,255,.04); transition: border-color .15s;
+  }
+  .poll .opt:hover { border-color: var(--gold-dim); }
+  .poll .opt.mine { border-color: var(--gold); }
+  .poll .fill { position: absolute; inset: 0; background: rgba(232,182,76,.14);
+    width: 0; transition: width .5s ease; z-index: 0; }
+  .poll .opt .row { position: relative; z-index: 1; display: flex; justify-content: space-between; gap: 10px; }
+  .poll .pct { color: var(--gold); font-weight: 700; }
+  .poll .total { margin-top: 10px; font-size: 12px; color: var(--muted); }
+
+  /* ---- Invite card ---- */
+  .invite.card { border-color: rgba(232,182,76,.4);
+    background: linear-gradient(180deg, #2a2050 0%, #1a2148 100%); }
+  .invite .code { display:inline-flex; align-items:center; gap:10px; margin:6px 0 12px;
+    font-family: ui-monospace, monospace; font-size: 20px; font-weight: 800; letter-spacing: 3px;
+    color: var(--gold); background: rgba(232,182,76,.1); border:1px dashed rgba(232,182,76,.5);
+    padding: 10px 16px; border-radius: 12px; }
+  .invite .copycode { cursor:pointer; font-size:12px; letter-spacing:normal; font-weight:600;
+    color: var(--muted); background:none; border:1px solid var(--line); border-radius:8px; padding:4px 8px; }
+  .invite .track { height: 10px; background: rgba(255,255,255,.08); border-radius: 999px; overflow:hidden; margin:10px 0 6px; }
+  .invite .bar { height:100%; background: linear-gradient(90deg, var(--gold-dim), var(--gold)); width:0; transition: width .6s ease; }
+  .invite .prog { font-size:13px; color: var(--muted); }
+  .invite .reward { margin-top:10px; padding:10px 12px; border-radius:10px; font-size:13.5px;
+    background: rgba(76,204,134,.12); border:1px solid rgba(76,204,134,.4); color:#8be0b0; }
+
+  /* ---- Premium card ---- */
+  .premium.card { border-color: rgba(120,160,255,.35); }
+  .premium .price { font-size: 22px; font-weight: 800; color: var(--text); margin: 4px 0 2px; }
+  .premium .price small { font-size: 13px; color: var(--muted); font-weight: 500; }
+  .premium .locked-note { font-size: 13px; color: var(--muted); margin: 8px 0 0; }
+  .premium .owned { display:inline-flex; align-items:center; gap:6px; font-size:13px; font-weight:700;
+    color:#8be0b0; background:rgba(76,204,134,.12); border:1px solid rgba(76,204,134,.4);
+    padding:5px 11px; border-radius:999px; margin-bottom:8px; }
+  .mockflag { font-size:11px; color:var(--muted); border:1px solid var(--line); border-radius:6px;
+    padding:2px 7px; margin-left:8px; }
+
+  .empty { text-align: center; color: var(--muted); padding: 40px 20px; font-size: 14px; }
+  .loading { text-align: center; color: var(--muted); padding: 30px; }
+
+  .signin-hint { text-align: center; margin: 4px 0 18px; font-size: 13px; color: var(--muted); }
+  .signin-hint a { color: var(--gold); font-weight: 700; }
+
+  /* ---- Mobile bottom nav ---- */
+  nav.bottomnav {
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 30;
+    display: flex; justify-content: space-around; align-items: stretch;
+    background: rgba(14,19,52,.96); backdrop-filter: blur(12px);
+    border-top: 1px solid var(--line); padding: 6px 6px calc(6px + env(safe-area-inset-bottom));
+  }
+  nav.bottomnav a {
+    flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
+    padding: 8px 4px; font-size: 11px; color: var(--muted); font-weight: 600;
+  }
+  nav.bottomnav a .ic { font-size: 21px; line-height: 1; }
+  nav.bottomnav a.active { color: var(--gold); }
+
+  @media (min-width: 760px) {
+    nav.topnav { display: flex; }
+    nav.bottomnav { display: none; }
+    body { padding-bottom: 24px; }
+  }
+  .toast {
+    position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%) translateY(20px);
+    background: var(--gold); color: var(--bg); font-weight: 700; font-size: 14px;
+    padding: 10px 20px; border-radius: 999px; opacity: 0; pointer-events: none;
+    transition: opacity .25s, transform .25s; z-index: 50;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  @media (min-width: 760px) { .toast { bottom: 32px; } }
+</style>
+</head>
+<body>
+  <header class="appbar">
+    <div class="brand">Tara <span class="spark">✨</span><small>ജ്യോതിഷ സഹായി</small></div>
+    <nav class="topnav">
+      <a href="/feed" class="active">ഇന്ന്</a>
+      <a href="/">ചാറ്റ്</a>
+      <a href="/ui/astrologers">ജ്യോതിഷർ</a>
+    </nav>
+    <div class="top-actions">
+      <span class="streak" id="streak" style="display:none">🔥 <span id="streakN">0</span></span>
+    </div>
+  </header>
+
+  <main>
+    <div class="signin-hint" id="signinHint" style="display:none">
+      പ്രതികരിക്കാനും streak സൂക്ഷിക്കാനും <a href="/auth">സൈൻ ഇൻ ചെയ്യൂ</a>
+    </div>
+    <div id="invite"></div>
+    <div id="premium"></div>
+    <div id="polls"></div>
+    <div id="feed"><div class="loading">ഫീഡ് ലോഡ് ചെയ്യുന്നു…</div></div>
+  </main>
+
+  <nav class="bottomnav">
+    <a href="/feed" class="active"><span class="ic">🏠</span>ഇന്ന്</a>
+    <a href="/"><span class="ic">💬</span>ചാറ്റ്</a>
+    <a href="/ui/astrologers"><span class="ic">🧑‍🏫</span>ജ്യോതിഷർ</a>
+  </nav>
+
+  <div class="toast" id="toast"></div>
+
+<script>
+  const token = localStorage.getItem("tara_token");
+  const authed = !!token;
+  const authHeaders = (extra = {}) =>
+    authed ? { ...extra, Authorization: `Bearer ${token}` } : extra;
+
+  const $ = (id) => document.getElementById(id);
+  function toast(msg) {
+    const t = $("toast"); t.textContent = msg; t.classList.add("show");
+    setTimeout(() => t.classList.remove("show"), 1800);
+  }
+  const esc = (s) => (s || "").replace(/[&<>"]/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+  if (!authed) $("signinHint").style.display = "block";
+
+  // ---- Feed ----
+  async function loadFeed() {
+    try {
+      const res = await fetch("/community/feed", { headers: authHeaders() });
+      const data = await res.json();
+      if (data.streak > 0) { $("streak").style.display = "inline-flex"; $("streakN").textContent = data.streak; }
+      renderFeed(data.items || [], data.available_reactions || ["🙏", "❤️", "✨"]);
+    } catch (e) {
+      $("feed").innerHTML = '<div class="empty">ഫീഡ് ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല. വീണ്ടും ശ്രമിക്കൂ.</div>';
+    }
+  }
+
+  function reactBar(item, reactions) {
+    return reactions.map((emoji) => {
+      const count = (item.reactions && item.reactions[emoji]) || 0;
+      const on = (item.my_reactions || []).includes(emoji);
+      return `<span class="react ${on ? "on" : ""}" data-post="${item.post_id}" data-emoji="${emoji}">
+        ${emoji}<span class="count">${count || ""}</span></span>`;
+    }).join("");
+  }
+
+  function renderFeed(items, reactions) {
+    if (!items.length) { $("feed").innerHTML = '<div class="empty">ഇന്ന് പുതിയ പോസ്റ്റുകൾ ഇല്ല. ഉടൻ വരും ✨</div>'; return; }
+    $("feed").innerHTML = items.map((item) => {
+      if (item.kind === "panchangam_today") {
+        return `<article class="card hero">
+          <div class="eyebrow">ഇന്നത്തെ പഞ്ചാംഗം</div>
+          <h2>${esc(item.title)}</h2>
+          <div class="body">${esc(item.body)}</div>
+          <a class="cta" href="/">ഇതിനെക്കുറിച്ച് താരയോട് ചോദിക്കൂ →</a>
+        </article>`;
+      }
+      const media = item.media_url ? `<img class="media" src="${esc(item.media_url)}" alt="" loading="lazy">` : "";
+      const link = item.external_url
+        ? `<a class="btn-ghost" href="${esc(item.external_url)}" target="_blank" rel="noopener">കാണുക ↗</a>` : "";
+      return `<article class="card">
+        <div class="meta"><span class="chip">${esc(item.platform || "Tara")}</span><span>${esc(item.title)}</span></div>
+        ${media}
+        <div class="body">${esc(item.body)}</div>
+        <div class="actions">
+          ${reactBar(item, reactions)}
+          <button class="btn-ghost" data-share="${item.post_id}">പങ്കിടൂ ↗</button>
+          ${link}
+        </div>
+      </article>`;
+    }).join("");
+    bindReactions();
+    bindShares(items);
+  }
+
+  function bindReactions() {
+    document.querySelectorAll(".react").forEach((el) => {
+      el.addEventListener("click", async () => {
+        if (!authed) { toast("സൈൻ ഇൻ ചെയ്യൂ"); location.href = "/auth"; return; }
+        const postId = el.dataset.post, emoji = el.dataset.emoji;
+        try {
+          const res = await fetch(`/community/posts/${postId}/react`,
+            { method: "POST", headers: authHeaders({ "Content-Type": "application/json" }),
+              body: JSON.stringify({ emoji }) });
+          if (!res.ok) throw new Error();
+          const data = await res.json();
+          // Update every react pill for this post from the server truth.
+          document.querySelectorAll(`.react[data-post="${postId}"]`).forEach((pill) => {
+            const em = pill.dataset.emoji;
+            const c = (data.reactions && data.reactions[em]) || 0;
+            pill.querySelector(".count").textContent = c || "";
+            pill.classList.toggle("on", (data.my_reactions || []).includes(em));
+          });
+        } catch (_) { toast("കഴിഞ്ഞില്ല, വീണ്ടും ശ്രമിക്കൂ"); }
+      });
+    });
+  }
+
+  function bindShares(items) {
+    const byId = {}; items.forEach((i) => { if (i.post_id) byId[i.post_id] = i; });
+    document.querySelectorAll("[data-share]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const item = byId[btn.dataset.share] || {};
+        const shareData = { title: "Tara ✨", text: item.body || "", url: location.origin + "/feed" };
+        try {
+          if (navigator.share) await navigator.share(shareData);
+          else { await navigator.clipboard.writeText(`${shareData.text}\n${shareData.url}`); toast("കോപ്പി ചെയ്തു ✨"); }
+        } catch (_) {}
+      });
+    });
+  }
+
+  // ---- Polls ----
+  async function loadPolls() {
+    try {
+      const res = await fetch("/community/polls", { headers: authHeaders() });
+      const polls = await res.json();
+      $("polls").innerHTML = (polls || []).map(renderPoll).join("");
+      bindPolls();
+    } catch (_) { /* polls are optional */ }
+  }
+
+  function renderPoll(p) {
+    const total = p.total_votes || 0;
+    const opts = p.results.map((o, i) => {
+      const pct = total ? Math.round((o.votes / total) * 100) : 0;
+      const mine = p.my_vote === i;
+      return `<div class="opt ${mine ? "mine" : ""}" data-poll="${p.id}" data-opt="${i}">
+        <div class="fill" style="width:${p.my_vote !== null ? pct : 0}%"></div>
+        <div class="row"><span>${esc(o.text)}${mine ? " ✓" : ""}</span>
+          <span class="pct" style="visibility:${p.my_vote !== null ? "visible" : "hidden"}">${pct}%</span></div>
+      </div>`;
+    }).join("");
+    return `<article class="card poll">
+      <div class="eyebrow">വാരാന്ത്യ പോൾ</div>
+      <h2>${esc(p.question)}</h2>
+      ${opts}
+      <div class="total">${total} വോട്ടുകൾ</div>
+    </article>`;
+  }
+
+  function bindPolls() {
+    document.querySelectorAll(".poll .opt").forEach((el) => {
+      el.addEventListener("click", async () => {
+        if (!authed) { toast("സൈൻ ഇൻ ചെയ്യൂ"); location.href = "/auth"; return; }
+        try {
+          const res = await fetch(`/community/polls/${el.dataset.poll}/vote`,
+            { method: "POST", headers: authHeaders({ "Content-Type": "application/json" }),
+              body: JSON.stringify({ option_index: Number(el.dataset.opt) }) });
+          if (!res.ok) throw new Error();
+          loadPolls();
+        } catch (_) { toast("കഴിഞ്ഞില്ല"); }
+      });
+    });
+  }
+
+  // ---- Invite friends (referral loop, GROWTH_PLAN Part 2) ----
+  async function loadInvite() {
+    if (!authed) return;
+    try {
+      const res = await fetch("/identity/referral", { headers: authHeaders() });
+      if (!res.ok) return;
+      const r = await res.json();
+      // Root-UI signup link (friends land on /auth with the code prefilled).
+      const link = `${location.origin}/auth?ref=${encodeURIComponent(r.code)}`;
+      const pct = r.threshold ? Math.min(100, Math.round((r.activated / r.threshold) * 100)) : 0;
+      const reward = r.reward_granted
+        ? `<div class="reward">🎉 നിങ്ങളുടെ പ്രീമിയം റിപ്പോർട്ട് അൺലോക്ക് ആയി!</div>`
+        : `<div class="prog">${r.activated} / ${r.threshold} സുഹൃത്തുക്കൾ ചേർന്നു — ${r.threshold} പേർ ചേർന്നാൽ പ്രീമിയം റിപ്പോർട്ട് സൗജന്യം.</div>`;
+      $("invite").innerHTML = `<article class="card invite">
+        <div class="eyebrow">സുഹൃത്തുക്കളെ ക്ഷണിക്കൂ 🎁</div>
+        <h2>Tara പങ്കിട്ട് പ്രീമിയം റിപ്പോർട്ട് നേടൂ</h2>
+        <div class="code">${esc(r.code)}<button class="copycode" id="copyCode">കോപ്പി</button></div>
+        <div class="track"><div class="bar" style="width:${r.reward_granted ? 100 : pct}%"></div></div>
+        ${reward}
+        <div class="actions"><button class="cta" id="inviteShare">ക്ഷണം പങ്കിടൂ →</button></div>
+      </article>`;
+      $("copyCode").onclick = async () => { try { await navigator.clipboard.writeText(link); toast("ലിങ്ക് കോപ്പി ചെയ്തു ✨"); } catch (_) {} };
+      $("inviteShare").onclick = async () => {
+        const data = { title: "Tara ✨", text: "Tara — ശാന്തമായ മലയാളം ജ്യോതിഷ സഹായി. എന്റെ ലിങ്കിലൂടെ ചേരൂ:", url: link };
+        try { if (navigator.share) await navigator.share(data);
+          else { await navigator.clipboard.writeText(`${data.text}\n${link}`); toast("കോപ്പി ചെയ്തു ✨"); } } catch (_) {}
+      };
+    } catch (_) { /* invite panel is optional */ }
+  }
+
+  // ---- Premium report (commerce, GROWTH_PLAN Part 5; mock checkout) ----
+  async function loadPremium() {
+    if (!authed) return;
+    try {
+      const ents = await (await fetch("/commerce/entitlements", { headers: authHeaders() })).json();
+      const owned = Array.isArray(ents) && ents.some(e => e.product_key === "premium_report");
+      $("premium").innerHTML = owned ? premiumOwnedCard() : premiumLockedCard();
+      if (owned) $("downloadReport").onclick = downloadReport;
+      else $("unlockPremium").onclick = unlockPremium;
+    } catch (_) { /* premium card is optional */ }
+  }
+  function premiumOwnedCard() {
+    return `<article class="card premium">
+      <div class="eyebrow">പ്രീമിയം ജാതക റിപ്പോർട്ട്</div>
+      <div class="owned">✓ അൺലോക്ക് ചെയ്തു</div>
+      <h2>നിങ്ങളുടെ വിശദമായ ജാതക റിപ്പോർട്ട് തയ്യാർ</h2>
+      <div class="body">ഗ്രഹനില, ദശ, കൂടുതൽ വിശദാംശങ്ങൾ — ശാന്തമായ മാർഗനിർദേശമായി.</div>
+      <div class="actions"><button class="cta" id="downloadReport">റിപ്പോർട്ട് ഡൗൺലോഡ് ചെയ്യൂ ↓</button></div>
+    </article>`;
+  }
+  function premiumLockedCard() {
+    return `<article class="card premium">
+      <div class="eyebrow">പ്രീമിയം ജാതക റിപ്പോർട്ട് <span class="mockflag">mock checkout</span></div>
+      <h2>വിശദമായ ജാതക റിപ്പോർട്ട്</h2>
+      <div class="body">ഗ്രഹനില, ദശ, കൂടുതൽ വിശദാംശങ്ങൾ ഉൾപ്പെട്ട PDF റിപ്പോർട്ട്.</div>
+      <div class="price">₹199 <small>ഒറ്റത്തവണ</small></div>
+      <div class="actions"><button class="cta" id="unlockPremium">അൺലോക്ക് ചെയ്യൂ</button></div>
+      <p class="locked-note">അല്ലെങ്കിൽ 3 സുഹൃത്തുക്കളെ ക്ഷണിച്ച് സൗജന്യമായി നേടൂ.</p>
+    </article>`;
+  }
+  async function unlockPremium() {
+    const btn = $("unlockPremium"); btn.disabled = true; btn.textContent = "പ്രോസസ്സിംഗ്…";
+    try {
+      const order = await (await fetch("/commerce/orders",
+        { method: "POST", headers: authHeaders({ "Content-Type": "application/json" }),
+          body: JSON.stringify({ product: "premium_report" }) })).json();
+      if (order.mock && order.order_id) {
+        const r = await fetch(`/commerce/orders/${encodeURIComponent(order.order_id)}/mock-pay`,
+          { method: "POST", headers: authHeaders() });
+        if (!r.ok) throw new Error();
+        toast("അൺലോക്ക് ചെയ്തു ✨");
+        loadPremium();
+      } else {
+        toast("ഈ ബിൽഡിൽ ചെക്കൗട്ട് ലഭ്യമല്ല");
+        btn.disabled = false; btn.textContent = "അൺലോക്ക് ചെയ്യൂ";
+      }
+    } catch (_) { toast("കഴിഞ്ഞില്ല, വീണ്ടും ശ്രമിക്കൂ"); btn.disabled = false; btn.textContent = "അൺലോക്ക് ചെയ്യൂ"; }
+  }
+  async function downloadReport() {
+    const btn = $("downloadReport"); btn.disabled = true; btn.textContent = "തയ്യാറാക്കുന്നു…";
+    try {
+      const res = await fetch("/commerce/reports/premium", { method: "POST", headers: authHeaders() });
+      if (!res.ok) throw new Error();
+      const d = await res.json();
+      if (d.download_url) window.open(d.download_url, "_blank");
+    } catch (_) { toast("റിപ്പോർട്ട് ലഭ്യമായില്ല"); }
+    finally { btn.disabled = false; btn.textContent = "റിപ്പോർട്ട് ഡൗൺലോഡ് ചെയ്യൂ ↓"; }
+  }
+
+  loadInvite();
+  loadPremium();
+  loadPolls();
+  loadFeed();
+</script>
+</body>
+</html>

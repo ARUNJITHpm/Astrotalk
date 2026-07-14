@@ -23,6 +23,7 @@ from app.modules.temples.schemas import (
     PartnerCreate,
     PartnerOut,
     SubscribePayload,
+    TempleDirectoryItem,
     TempleSuggestion,
 )
 from app.modules.temples.service import TemplesService
@@ -69,6 +70,16 @@ async def suggest(
 
 
 # ---- Partner console (admin) ----
+
+
+@router.get(
+    "/directory",
+    response_model=list[TempleDirectoryItem],
+    dependencies=[AdminGuard],
+    summary="List directory temples (for the partner-registration picker)",
+)
+async def temple_directory() -> list[dict]:
+    return _service.list_temples()
 
 
 @router.post(

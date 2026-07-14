@@ -35,6 +35,12 @@ class Settings(BaseSettings):
     # as the ``X-Admin-Token`` header. Never logged.
     admin_token: str = ""
 
+    # Owner console login (POST /admin/login). The dashboard exchanges these
+    # for the admin token. Defaults let the owner sign in on a fresh deploy;
+    # override in production via env. The password is never logged.
+    admin_email: str = "arunjithpm1999@gmail.com"
+    admin_password: str = "tara@admin"
+
     # Shared secret gating the scheduled "cron endpoints" (e.g. POST
     # /content/run-daily), sent as ``X-Cron-Token`` by an external scheduler
     # (GitHub Actions cron / cron-job.org). Same policy as admin_token:

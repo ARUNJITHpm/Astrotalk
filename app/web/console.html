@@ -1,0 +1,660 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Tara · Admin Console</title>
+<style>
+  :root {
+    --bg:#0a0e24; --panel:#121938; --panel2:#171f45; --line:rgba(255,255,255,.09);
+    --text:#eef1fb; --muted:#98a1c6; --gold:#e8b64c; --gold-dim:#c9992f;
+    --green:#4ccc86; --red:#e8686b; --blue:#5aa9f0; --radius:14px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;font-size:14px}
+  a{color:var(--blue);text-decoration:none}
+  button{font-family:inherit}
+
+  /* ---- Login ---- */
+  #login{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+    background:radial-gradient(900px 500px at 50% -10%,#1a2350,#0a0e24 60%);z-index:100}
+  #login .box{background:var(--panel);border:1px solid var(--line);border-radius:20px;
+    padding:34px 30px;width:min(380px,92vw);box-shadow:0 20px 60px rgba(0,0,0,.5)}
+  #login h1{margin:0 0 4px;font-size:22px}#login h1 span{color:var(--gold)}
+  #login p{margin:0 0 22px;color:var(--muted);font-size:13px}
+  .field{margin-bottom:14px}
+  .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
+  input,select,textarea{width:100%;background:#0d1330;border:1px solid var(--line);color:var(--text);
+    border-radius:10px;padding:11px 13px;font-size:14px;font-family:inherit}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--gold-dim)}
+  .btn{background:var(--gold);color:#0a0e24;font-weight:700;border:none;border-radius:10px;
+    padding:11px 18px;cursor:pointer;font-size:14px}
+  .btn:hover{background:#f0c65f}
+  .btn.sm{padding:7px 13px;font-size:12.5px;border-radius:8px}
+  .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--text)}
+  .btn.ghost:hover{border-color:var(--gold-dim)}
+  .btn.danger{background:transparent;border:1px solid rgba(232,104,107,.5);color:var(--red)}
+  .err{color:var(--red);font-size:13px;margin-top:8px;min-height:16px}
+
+  /* ---- Shell ---- */
+  #shell{display:none;height:100%}
+  .layout{display:grid;grid-template-columns:248px 1fr;height:100vh}
+  aside{background:var(--panel);border-right:1px solid var(--line);overflow-y:auto;padding:14px 10px}
+  .logo{display:flex;align-items:center;gap:8px;padding:8px 12px 16px;font-weight:800;font-size:18px}
+  .logo span{color:var(--gold)}
+  .navgroup{margin:14px 0 4px;padding:0 12px;font-size:11px;letter-spacing:.12em;
+    text-transform:uppercase;color:var(--muted)}
+  .navitem{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:9px;
+    color:var(--text);cursor:pointer;font-size:13.5px;margin:1px 0}
+  .navitem .ic{width:20px;text-align:center}
+  .navitem .badge{margin-left:auto;font-size:9.5px;letter-spacing:.05em;text-transform:uppercase;
+    color:var(--muted);border:1px solid var(--line);padding:1px 6px;border-radius:6px}
+  .navitem:hover{background:var(--panel2)}
+  .navitem.active{background:rgba(232,182,76,.14);color:var(--gold)}
+  .navitem.active .badge{color:var(--gold);border-color:rgba(232,182,76,.4)}
+
+  main{overflow-y:auto;padding:22px 26px}
+  .topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;gap:12px}
+  .topbar h2{margin:0;font-size:20px}
+  .topbar .sub{color:var(--muted);font-size:13px;margin-top:3px}
+  .hamburger{display:none;background:none;border:1px solid var(--line);color:var(--text);
+    border-radius:8px;padding:7px 11px;cursor:pointer}
+
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px;margin-bottom:16px}
+  .card h3{margin:0 0 4px;font-size:15px}
+  .card .hint{color:var(--muted);font-size:12.5px;margin:0 0 14px}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+  .stat{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:16px}
+  .stat .n{font-size:26px;font-weight:800}
+  .stat .l{color:var(--muted);font-size:12px;margin-top:4px}
+
+  .post{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
+  .post .head{display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap}
+  .tag{font-size:11px;padding:2px 9px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
+  .tag.status-draft{color:var(--muted)} .tag.status-approved{color:var(--blue);border-color:rgba(90,169,240,.4)}
+  .tag.status-published{color:var(--green);border-color:rgba(76,204,134,.4)}
+  .tag.status-failed{color:var(--red);border-color:rgba(232,104,107,.4)}
+  .post .body{white-space:pre-wrap;font-size:13.5px;line-height:1.6;color:#e2e5f4;
+    background:#0d1330;border:1px solid var(--line);border-radius:9px;padding:11px;margin:8px 0}
+  .post .caption{white-space:pre-wrap;font-size:12.5px;color:var(--muted);margin:0 0 8px}
+  .post .acts{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}
+  .muted{color:var(--muted)} .center{text-align:center;padding:30px;color:var(--muted)}
+  .pill-badge{display:inline-block;font-size:10px;text-transform:uppercase;letter-spacing:.06em;
+    padding:2px 8px;border-radius:6px;border:1px solid var(--line);color:var(--muted);margin-left:8px}
+  .pill-badge.live{color:var(--green);border-color:rgba(76,204,134,.4)}
+  .pill-badge.soon{color:var(--gold);border-color:rgba(232,182,76,.4)}
+  .launch{display:flex;align-items:center;gap:14px;background:var(--panel2);border:1px solid var(--line);
+    border-radius:12px;padding:16px;margin-bottom:10px}
+  .launch .ic{font-size:26px}
+  .launch .t{font-weight:700}.launch .d{color:var(--muted);font-size:12.5px;margin-top:2px}
+  .launch .go{margin-left:auto}
+  pre.out{background:#0d1330;border:1px solid var(--line);border-radius:9px;padding:12px;
+    overflow:auto;font-size:12px;max-height:340px;white-space:pre-wrap;word-break:break-word}
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--gold);
+    color:#0a0e24;font-weight:700;padding:10px 20px;border-radius:999px;opacity:0;transition:.25s;z-index:200}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  @media(max-width:820px){
+    .layout{grid-template-columns:1fr}
+    aside{position:fixed;top:0;bottom:0;left:0;width:250px;z-index:60;transform:translateX(-100%);transition:.2s}
+    aside.open{transform:translateX(0)}
+    .hamburger{display:inline-block}
+    .backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:55}
+    .backdrop.open{display:block}
+  }
+</style>
+</head>
+<body>
+  <!-- ================= LOGIN ================= -->
+  <div id="login">
+    <div class="box">
+      <h1>Tara <span>Admin</span></h1>
+      <p>Owner console — content, feed, temples & growth.</p>
+      <div class="field"><label>Email</label>
+        <input id="email" type="email" value="arunjithpm1999@gmail.com" autocomplete="username"></div>
+      <div class="field"><label>Password</label>
+        <input id="password" type="password" placeholder="••••••••" autocomplete="current-password"></div>
+      <button class="btn" style="width:100%" id="loginBtn">Sign in</button>
+      <div class="err" id="loginErr"></div>
+    </div>
+  </div>
+
+  <!-- ================= SHELL ================= -->
+  <div id="shell">
+    <div class="layout">
+      <div class="backdrop" id="backdrop"></div>
+      <aside id="sidebar">
+        <div class="logo">Tara <span>✦</span> Admin</div>
+        <div id="nav"></div>
+        <div class="navgroup">Session</div>
+        <div class="navitem" id="logout"><span class="ic">⎋</span> Sign out</div>
+      </aside>
+      <main>
+        <div class="topbar">
+          <div>
+            <button class="hamburger" id="ham">☰</button>
+            <h2 id="ptitle" style="display:inline-block;vertical-align:middle">Dashboard</h2>
+            <div class="sub" id="psub"></div>
+          </div>
+        </div>
+        <div id="panel"></div>
+      </main>
+    </div>
+  </div>
+  <div class="toast" id="toast"></div>
+
+<script>
+const TOKEN_KEY = "tara_admin_token";
+let TOKEN = localStorage.getItem(TOKEN_KEY) || "";
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => (s==null?"":String(s)).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function toast(m){const t=$("toast");t.textContent=m;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),1900);}
+const hdr = (extra={}) => ({...extra, "X-Admin-Token": TOKEN});
+async function api(path, opts={}) {
+  const res = await fetch(path, {...opts, headers: hdr(opts.headers||{})});
+  if (res.status === 401) { logout(); throw new Error("unauthorized"); }
+  const txt = await res.text();
+  let data; try { data = txt ? JSON.parse(txt) : null; } catch { data = txt; }
+  if (!res.ok) throw new Error((data && data.detail) || res.statusText);
+  return data;
+}
+async function apiBlob(path) {
+  const res = await fetch(path, { headers: hdr() });
+  if (res.status === 401) { logout(); throw new Error("unauthorized"); }
+  if (!res.ok) throw new Error(res.statusText);
+  return URL.createObjectURL(await res.blob());
+}
+
+// ---------- Login ----------
+async function doLogin() {
+  $("loginErr").textContent = "";
+  try {
+    const r = await fetch("/admin/login", {method:"POST",headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({username:$("email").value.trim(), password:$("password").value})});
+    if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(e.detail||"Login failed"); }
+    const d = await r.json();
+    TOKEN = d.token; localStorage.setItem(TOKEN_KEY, TOKEN);
+    boot();
+  } catch(e) { $("loginErr").textContent = e.message; }
+}
+function logout(){ TOKEN=""; localStorage.removeItem(TOKEN_KEY); $("shell").style.display="none"; $("login").style.display="flex"; }
+$("loginBtn").onclick = doLogin;
+$("password").addEventListener("keydown", e => { if(e.key==="Enter") doLogin(); });
+$("logout").onclick = logout;
+
+// ---------- Nav config ----------
+const NAV = [
+  {group:"Overview", items:[
+    {id:"dashboard", ic:"📊", label:"Dashboard", badge:"live"},
+  ]},
+  {group:"Content Engine", items:[
+    {id:"daily", ic:"🗞️", label:"Daily Content", badge:"live"},
+    {id:"studio", ic:"🎬", label:"Content Studio", badge:"live"},
+    {id:"polls", ic:"📊", label:"Feed & Polls", badge:"live"},
+    {id:"cards", ic:"🖼️", label:"Share Cards", badge:"live"},
+  ]},
+  {group:"Astrology & Temples", items:[
+    {id:"panchangam", ic:"🌙", label:"Panchangam", badge:"live"},
+    {id:"templefinder", ic:"🛕", label:"Temple Finder", badge:"live"},
+    {id:"partners", ic:"🤝", label:"Temple Partners", badge:"live"},
+  ]},
+  {group:"Channels", items:[
+    {id:"whatsapp", ic:"💬", label:"WhatsApp Simulator", badge:"sim"},
+    {id:"notifications", ic:"🔔", label:"Notifications", badge:"live"},
+  ]},
+  {group:"Growth (roadmap)", items:[
+    {id:"referrals", ic:"🎁", label:"Referrals & Virality", badge:"live"},
+    {id:"astrologers", ic:"🧑‍🏫", label:"Astrologer Platform", badge:"soon"},
+    {id:"commerce", ic:"💳", label:"Commerce", badge:"mock"},
+  ]},
+];
+
+function renderNav() {
+  $("nav").innerHTML = NAV.map(g =>
+    `<div class="navgroup">${g.group}</div>` +
+    g.items.map(it => `<div class="navitem" data-id="${it.id}">
+      <span class="ic">${it.ic}</span> ${it.label}
+      ${it.badge?`<span class="badge">${it.badge}</span>`:""}</div>`).join("")
+  ).join("");
+  document.querySelectorAll(".navitem[data-id]").forEach(el =>
+    el.onclick = () => { location.hash = el.dataset.id; closeSidebar(); });
+}
+
+// ---------- Router ----------
+const PANELS = {};
+function setActive(id){ document.querySelectorAll(".navitem[data-id]").forEach(el=>
+  el.classList.toggle("active", el.dataset.id===id)); }
+async function route() {
+  const id = (location.hash||"#dashboard").slice(1);
+  const item = NAV.flatMap(g=>g.items).find(i=>i.id===id) || NAV[0].items[0];
+  setActive(item.id); $("ptitle").textContent = item.label; $("psub").textContent = "";
+  $("panel").innerHTML = '<div class="center">Loading…</div>';
+  try { await (PANELS[item.id] || PANELS.dashboard)(); }
+  catch(e){ $("panel").innerHTML = `<div class="card"><div class="err">${esc(e.message)}</div></div>`; }
+}
+window.addEventListener("hashchange", route);
+
+// ---------- Panels ----------
+PANELS.dashboard = async () => {
+  $("psub").textContent = "Live analytics across the platform";
+  let o; try { o = await api("/admin/overview"); } catch { o = null; }
+  const sys = (o&&o.system)||{}, users=(o&&o.users)||{}, chat=(o&&o.chat)||{}, llm=(o&&o.llm)||{};
+  const stat = (n,l)=>`<div class="stat"><div class="n">${esc(n??"—")}</div><div class="l">${esc(l)}</div></div>`;
+  $("panel").innerHTML = `
+    <div class="grid" style="margin-bottom:16px">
+      ${stat(users.total ?? users.count, "Users")}
+      ${stat(chat.messages ?? chat.total, "Chat messages")}
+      ${stat(chat.sessions, "Chat sessions")}
+      ${stat(llm.total_tokens ?? llm.tokens, "LLM tokens")}
+    </div>
+    <div class="card"><h3>System</h3><pre class="out">${esc(JSON.stringify(o||{note:"overview unavailable"},null,2))}</pre></div>`;
+};
+
+const STUDIO_KINDS = [
+  ["reel_script","Reel / Short script"],["weekly_astro_news","Weekly astro news"],
+  ["festival_special","Festival special"],["nakshatra_episode","Nakshatra episode"],
+  ["myth_buster","Myth-buster (no-fear)"]];
+
+PANELS.daily = async () => {
+  $("psub").textContent = "The scheduled morning content pack";
+  $("panel").innerHTML = `
+    <div class="card">
+      <h3>Generate today's pack</h3>
+      <p class="hint">Drafts one piece per platform (WhatsApp / Facebook / Instagram / YouTube), tone-screened.</p>
+      <div class="row">
+        <input id="dailyDate" type="date" style="max-width:180px">
+        <button class="btn sm" id="runDaily">Run daily pack</button>
+        <button class="btn sm ghost" id="refreshDaily">Refresh list</button>
+      </div>
+    </div>
+    <div id="dailyList"><div class="center">Loading posts…</div></div>`;
+  $("runDaily").onclick = async () => {
+    const d = $("dailyDate").value; const q = d?`?day=${d}`:"";
+    try { const s = await api("/content/run-daily"+q,{method:"POST"});
+      toast(`Created: ${s.created.join(", ")||"none (already drafted)"}`); loadDaily(); }
+    catch(e){ toast(e.message); }
+  };
+  $("refreshDaily").onclick = loadDaily;
+  loadDaily();
+};
+async function loadDaily(){
+  const posts = await api("/content/posts");
+  $("dailyList").innerHTML = posts.length ? posts.map(dailyCard).join("")
+    : '<div class="center">No posts yet. Run the daily pack above.</div>';
+  bindDaily();
+}
+function dailyCard(p){
+  const media = p.media_url?`<a href="${esc(p.media_url)}" target="_blank">card ↗</a>`:"";
+  return `<div class="post" data-id="${p.id}">
+    <div class="head"><span class="tag">${esc(p.platform)}</span><span class="tag">${esc(p.kind)}</span>
+      <span class="tag status-${esc(p.status)}">${esc(p.status)}</span><span class="muted">${esc(p.day)}</span>
+      <span style="margin-left:auto">${media}</span></div>
+    <div class="body">${esc(p.body)}</div>
+    <div class="acts">
+      ${p.status==="draft"?`<button class="btn sm" data-act="approve">Approve</button>`:""}
+      ${p.status==="approved"?`<button class="btn sm" data-act="publish">Publish (WA/mock)</button>`:""}
+      ${p.status!=="published"?`<button class="btn sm ghost" data-act="markpub">Mark posted (URL)</button>`:""}
+    </div></div>`;
+}
+function bindDaily(){
+  document.querySelectorAll("#dailyList .post").forEach(card=>{
+    const id=card.dataset.id;
+    card.querySelectorAll("[data-act]").forEach(b=> b.onclick=async()=>{
+      try{
+        if(b.dataset.act==="approve") await api(`/content/posts/${id}/approve`,{method:"POST"});
+        else if(b.dataset.act==="publish") await api(`/content/posts/${id}/publish`,{method:"POST"});
+        else if(b.dataset.act==="markpub"){ const u=prompt("Public URL of the post you made:"); if(!u)return;
+          await api(`/content/posts/${id}/mark-published`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({external_url:u})});}
+        toast("Updated"); loadDaily();
+      }catch(e){toast(e.message);}
+    });
+  });
+}
+
+PANELS.studio = async () => {
+  $("psub").textContent = "On-demand scripts you post by hand to YouTube / Instagram";
+  $("panel").innerHTML = `
+    <div class="card">
+      <h3>Generate a piece</h3>
+      <p class="hint">Pick a format, add an optional topic (a nakshatra, a festival, a myth). Each draft is tone-screened and comes with a caption.</p>
+      <div class="row">
+        <div style="flex:1;min-width:200px"><label class="muted" style="font-size:12px">Format</label>
+          <select id="skind">${STUDIO_KINDS.map(k=>`<option value="${k[0]}">${k[1]}</option>`).join("")}</select></div>
+        <div style="flex:1;min-width:160px"><label class="muted" style="font-size:12px">Topic (optional)</label>
+          <input id="stopic" placeholder="e.g. Vishu, Ashwathi"></div>
+        <button class="btn" id="genBtn">Generate</button>
+      </div>
+    </div>
+    <div id="studioList"><div class="center">Loading drafts…</div></div>`;
+  $("genBtn").onclick = async () => {
+    $("genBtn").disabled=true; $("genBtn").textContent="Generating…";
+    try{ await api("/content/generate",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({kind:$("skind").value, topic:$("stopic").value.trim()})});
+      toast("Draft ready"); $("stopic").value=""; loadStudio(); }
+    catch(e){toast(e.message);}
+    finally{ $("genBtn").disabled=false; $("genBtn").textContent="Generate"; }
+  };
+  loadStudio();
+};
+async function loadStudio(){
+  const drafts = await api("/content/studio");
+  $("studioList").innerHTML = drafts.length ? drafts.map(studioCard).join("")
+    : '<div class="center">No drafts yet. Generate one above.</div>';
+  bindStudio();
+}
+function studioCard(d){
+  const link = d.external_url?`<a href="${esc(d.external_url)}" target="_blank">posted ↗</a>`:"";
+  return `<div class="post" data-id="${d.id}">
+    <div class="head"><span class="tag">${esc(d.kind)}</span>${d.topic?`<span class="tag">${esc(d.topic)}</span>`:""}
+      <span class="tag status-${esc(d.status)}">${esc(d.status)}</span>
+      <span style="margin-left:auto">${link}</span></div>
+    <div class="body" id="body-${d.id}">${esc(d.body)}</div>
+    ${d.caption?`<div class="caption">📝 ${esc(d.caption)}</div>`:""}
+    <div class="acts">
+      <button class="btn sm ghost" data-act="copy">Copy caption</button>
+      <button class="btn sm ghost" data-act="edit">Edit + approve</button>
+      <button class="btn sm" data-act="markpub">Mark posted (URL)</button>
+      <button class="btn sm danger" data-act="del">Delete</button>
+    </div></div>`;
+}
+function bindStudio(){
+  document.querySelectorAll("#studioList .post").forEach(card=>{
+    const id=card.dataset.id;
+    const acts={
+      copy:async()=>{const el=card.querySelector(".caption");await navigator.clipboard.writeText((el?el.textContent:"").replace(/^📝 /,""));toast("Caption copied");},
+      edit:async()=>{const cur=$("body-"+id).textContent;const nv=prompt("Edit script:",cur);if(nv==null)return;
+        await api(`/content/studio/${id}/approve`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({body:nv})});toast("Approved");loadStudio();},
+      markpub:async()=>{const u=prompt("Public URL (YouTube/Instagram):");if(!u)return;
+        await api(`/content/studio/${id}/mark-published`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({external_url:u})});toast("Marked posted");loadStudio();},
+      del:async()=>{if(!confirm("Delete this draft?"))return;await api(`/content/studio/${id}`,{method:"DELETE"});toast("Deleted");loadStudio();},
+    };
+    card.querySelectorAll("[data-act]").forEach(b=> b.onclick=()=>acts[b.dataset.act]().catch(e=>toast(e.message)));
+  });
+}
+
+PANELS.polls = async () => {
+  $("psub").textContent = "Weekly polls that appear in the user feed";
+  $("panel").innerHTML = `
+    <div class="card">
+      <h3>Create a poll</h3>
+      <div class="field"><label>Question (Malayalam)</label><input id="pq" placeholder="ഏത് ദിവസമാണ് നല്ലത്?"></div>
+      <div class="field"><label>Options (one per line, min 2)</label><textarea id="popts" rows="3" placeholder="തിങ്കൾ&#10;വ്യാഴം&#10;വെള്ളി"></textarea></div>
+      <button class="btn sm" id="mkPoll">Create poll</button>
+      <a class="btn sm ghost" href="/feed" target="_blank" style="margin-left:8px">Open user feed ↗</a>
+    </div>
+    <div id="pollList"><div class="center">Loading polls…</div></div>`;
+  $("mkPoll").onclick = async () => {
+    const opts = $("popts").value.split("\n").map(s=>s.trim()).filter(Boolean);
+    try{ await api("/community/polls",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({question:$("pq").value.trim(), options:opts})});
+      toast("Poll created"); $("pq").value="";$("popts").value=""; loadPolls(); }
+    catch(e){toast(e.message);}
+  };
+  loadPolls();
+};
+async function loadPolls(){
+  const polls = await api("/community/polls");
+  $("pollList").innerHTML = polls.length ? polls.map(p=>{
+    const rows = p.results.map(o=>{const pct=p.total_votes?Math.round(o.votes/p.total_votes*100):0;
+      return `<div style="margin:6px 0"><span>${esc(o.text)}</span> <span class="muted">— ${o.votes} (${pct}%)</span></div>`;}).join("");
+    return `<div class="post"><div class="head"><strong>${esc(p.question)}</strong>
+      <span class="tag" style="margin-left:auto">${p.total_votes} votes</span></div>${rows}</div>`;
+  }).join("") : '<div class="center">No polls yet.</div>';
+}
+
+PANELS.cards = async () => {
+  $("psub").textContent = "Shareable branded nakshatra cards (public)";
+  $("panel").innerHTML = `
+    <div class="card"><h3>Preview a daily nakshatra card</h3>
+      <p class="hint">Generates/fetches the public card for a nakshatra (name or index 0–26). These are your WhatsApp Status / Stories fodder.</p>
+      <div class="row"><input id="nak" placeholder="e.g. Ashwathi or 0" style="max-width:220px">
+        <button class="btn sm" id="mkCard">Get card</button></div>
+      <div id="cardOut" style="margin-top:14px"></div></div>`;
+  $("mkCard").onclick = async () => {
+    try{ const d = await api("/content/cards/daily/"+encodeURIComponent($("nak").value.trim()||"0"));
+      $("cardOut").innerHTML = `<img src="${esc(d.media_url)}" style="max-width:320px;border-radius:12px;border:1px solid var(--line)">
+        <div class="muted" style="margin-top:8px">Share URL: <a href="${esc(d.share_url)}" target="_blank">${esc(d.share_url)}</a></div>`; }
+    catch(e){toast(e.message);}
+  };
+};
+
+PANELS.panchangam = async () => {
+  $("psub").textContent = "Today's / any day's panchangam from the ephemeris engine";
+  $("panel").innerHTML = `
+    <div class="card"><h3>Panchangam lookup</h3>
+      <div class="row"><input id="pcDate" type="date" style="max-width:180px">
+        <button class="btn sm" id="pcGo">Get panchangam</button></div>
+      <div id="pcOut" style="margin-top:14px"></div></div>`;
+  $("pcGo").onclick = async () => {
+    const d=$("pcDate").value; const q=d?`?day=${encodeURIComponent(d)}`:"";
+    try{ const r = await api("/astrology/panchangam"+q);
+      $("pcOut").innerHTML = `<pre class="out">${esc(JSON.stringify(r,null,2))}</pre>`; }
+    catch(e){ toast(e.message); }
+  };
+  $("pcGo").click();
+};
+
+const CONCERNS = ["career","marriage","children","education","health","wealth","ancestors","obstacles","peace"];
+PANELS.templefinder = async () => {
+  $("psub").textContent = "Suggest temples for a concern (knowledge + directory)";
+  $("panel").innerHTML = `
+    <div class="card"><h3>Temple suggestions</h3>
+      <p class="hint">No birth data — pick a life concern and (optionally) a district.</p>
+      <div class="row">
+        <div style="min-width:180px"><label class="muted" style="font-size:12px">Concern</label>
+          <select id="tfConcern">${CONCERNS.map(c=>`<option value="${c}">${c}</option>`).join("")}</select></div>
+        <div style="min-width:160px"><label class="muted" style="font-size:12px">District (optional)</label>
+          <input id="tfDistrict" placeholder="e.g. Thrissur"></div>
+        <button class="btn sm" id="tfGo">Suggest</button>
+      </div>
+      <div id="tfOut" style="margin-top:14px"></div></div>`;
+  $("tfGo").onclick = async () => {
+    const params = new URLSearchParams({concern:$("tfConcern").value});
+    const dist=$("tfDistrict").value.trim(); if(dist) params.set("district", dist);
+    try{ const r = await api("/temples/suggest?"+params.toString());
+      $("tfOut").innerHTML = r.length? r.map(t=>`<div class="post"><strong>${esc(t.name_ml||t.name)}</strong>
+        <div class="muted">${esc(t.town||"")}, ${esc(t.district||"")} · ${esc(t.deity_ml||t.deity||"")}</div>
+        <div style="margin-top:6px;font-size:13px">${esc(t.reason||"")}</div></div>`).join("")
+        : '<div class="center">No suggestions for that concern.</div>'; }
+    catch(e){toast(e.message);}
+  };
+  $("tfGo").click();
+};
+
+// Launchers / roadmap panels
+function launcher(title, sub, cards){
+  $("psub").textContent = sub;
+  $("panel").innerHTML = cards.map(c=>`
+    <div class="launch"><div class="ic">${c.ic}</div>
+      <div><div class="t">${esc(c.t)}</div><div class="d">${esc(c.d)}</div></div>
+      <div class="go">${c.href?`<a class="btn sm" href="${c.href}" ${c.blank?'target="_blank"':''}>${esc(c.cta||"Open ↗")}</a>`
+        :`<span class="pill-badge soon">planned</span>`}</div></div>`).join("");
+}
+PANELS.whatsapp = async () => launcher("WhatsApp Simulator","Test the exact onboarding + chat flow (no real WhatsApp)",[
+  {ic:"💬",t:"WhatsApp Simulator",d:"Same brain as real WhatsApp; safe local sandbox. Real BSP wiring comes later.",href:"/whatsapp",blank:true,cta:"Open simulator ↗"}]);
+PANELS.partners = async () => {
+  $("psub").textContent = "Temples as distribution partners — microsites, QR, widget, festivals";
+  let dir = [];
+  try { dir = await api("/temples/directory"); } catch(_) {}
+  const opts = dir.map(t=>`<option value="${esc(t.id)}">${esc(t.name)} — ${esc(t.district)}</option>`).join("");
+  $("panel").innerHTML = `
+    <div class="card">
+      <h3>Register a partner temple</h3>
+      <p class="hint">Turns a directory temple into a partner with a public microsite (/t/{slug}), a printable QR, and an embeddable panchangam widget.</p>
+      <div class="row">
+        <div style="flex:1;min-width:220px"><label class="muted" style="font-size:12px">Temple</label>
+          <select id="ptTemple">${opts||'<option>No temples loaded</option>'}</select></div>
+        <div style="min-width:150px"><label class="muted" style="font-size:12px">Slug (URL)</label>
+          <input id="ptSlug" placeholder="guruvayur"></div>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <div style="flex:1;min-width:160px"><label class="muted" style="font-size:12px">Contact name</label>
+          <input id="ptName" placeholder="optional"></div>
+        <div style="flex:1;min-width:150px"><label class="muted" style="font-size:12px">Contact phone</label>
+          <input id="ptPhone" placeholder="optional"></div>
+        <div style="min-width:120px"><label class="muted" style="font-size:12px">Tier</label>
+          <select id="ptTier"><option value="free">free</option><option value="partner">partner</option></select></div>
+        <button class="btn sm" id="ptCreate">Register</button>
+      </div>
+    </div>
+    <div id="ptList"><div class="center">Loading partners…</div></div>`;
+  $("ptCreate").onclick = async () => {
+    try{ await api("/temples/partners",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({temple_id:$("ptTemple").value, slug:$("ptSlug").value.trim(),
+        contact_name:$("ptName").value.trim(), contact_phone:$("ptPhone").value.trim(), tier:$("ptTier").value})});
+      toast("Partner registered"); $("ptSlug").value=""; loadPartners(); }
+    catch(e){ toast(e.message); }
+  };
+  loadPartners();
+};
+async function loadPartners(){
+  const partners = await api("/temples/partners");
+  const origin = location.origin;
+  $("ptList").innerHTML = partners.length ? partners.map(p=>`
+    <div class="post" data-slug="${esc(p.slug)}">
+      <div class="head"><strong>${esc(p.slug)}</strong>
+        <span class="tag">${esc(p.temple_id)}</span><span class="tag">${esc(p.tier)}</span>
+        <span class="tag ${p.active?'status-published':'status-failed'}">${p.active?'active':'inactive'}</span></div>
+      <div class="acts">
+        <a class="btn sm ghost" href="/t/${encodeURIComponent(p.slug)}" target="_blank">Microsite ↗</a>
+        <button class="btn sm ghost" data-act="qr">Show QR</button>
+        <button class="btn sm ghost" data-act="embed">Widget embed</button>
+        <button class="btn sm ghost" data-act="festival">+ Festival</button>
+      </div>
+      <div class="pt-extra" style="margin-top:10px"></div>
+    </div>`).join("")
+    : '<div class="center">No partners yet. Register one above.</div>';
+  bindPartners(origin);
+}
+function bindPartners(origin){
+  document.querySelectorAll("#ptList .post").forEach(card=>{
+    const slug=card.dataset.slug, extra=card.querySelector(".pt-extra");
+    const acts={
+      qr: async()=>{ const url=await apiBlob(`/temples/partners/${encodeURIComponent(slug)}/qr.png`);
+        extra.innerHTML=`<img src="${url}" style="width:160px;border-radius:10px;background:#fff;padding:6px">
+          <div><a class="btn sm ghost" href="${url}" download="${slug}-qr.png">Download QR</a></div>`; },
+      embed: ()=>{ const code=`<iframe src="${origin}/widget/panchangam?temple=${slug}" width="320" height="200" frameborder="0"></iframe>`;
+        extra.innerHTML=`<div class="muted" style="font-size:12px;margin-bottom:6px">Paste on the temple's website:</div>
+          <pre class="out">${esc(code)}</pre><button class="btn sm ghost" id="cp-${slug}">Copy</button>`;
+        const b=document.getElementById(`cp-${slug}`); if(b) b.onclick=()=>{navigator.clipboard.writeText(code);toast("Copied");}; },
+      festival: ()=>{ extra.innerHTML=`
+        <div class="row" style="align-items:flex-end">
+          <div style="flex:1;min-width:140px"><label class="muted" style="font-size:12px">Festival (English)</label><input class="fName" placeholder="Utsavam"></div>
+          <div style="flex:1;min-width:140px"><label class="muted" style="font-size:12px">Malayalam</label><input class="fNameMl" placeholder="ഉത്സവം"></div>
+          <div style="min-width:150px"><label class="muted" style="font-size:12px">Date</label><input class="fDay" type="date"></div>
+          <button class="btn sm fAdd">Add</button></div>`;
+        extra.querySelector(".fAdd").onclick=async()=>{
+          try{ await api(`/temples/partners/${encodeURIComponent(slug)}/festivals`,{method:"POST",
+            headers:{"Content-Type":"application/json"},body:JSON.stringify({
+              name:extra.querySelector(".fName").value.trim(),
+              name_ml:extra.querySelector(".fNameMl").value.trim(),
+              day:extra.querySelector(".fDay").value})});
+            toast("Festival added"); extra.innerHTML=""; }
+          catch(e){toast(e.message);} }; },
+    };
+    card.querySelectorAll("[data-act]").forEach(b=> b.onclick=()=>{
+      try { const r = acts[b.dataset.act](); if (r && r.catch) r.catch(e=>toast(e.message)); }
+      catch(e){ toast(e.message); }
+    });
+  });
+}
+
+PANELS.notifications = async () => {
+  $("psub").textContent = "Festival updates to opted-in subscribers (consent + cap enforced)";
+  $("panel").innerHTML = `
+    <div class="card">
+      <h3>Festival notifications</h3>
+      <p class="hint">Sends a one-time WhatsApp update to subscribers of temples with a festival exactly 3 days out. WhatsApp is mocked for now — this shows who <em>would</em> be notified. Idempotent: re-running never double-sends.</p>
+      <button class="btn sm" id="runFest">Run festival notifications now</button>
+      <div id="festOut" style="margin-top:14px"></div>
+    </div>
+    <div class="card"><h3>How it works</h3>
+      <p class="hint" style="margin:0">Subscribers opt in on a temple microsite (/t/{slug}). The daily cron (POST /notifications/run-festivals) picks up festivals at T-3 days and sends via the WhatsApp module's compliant path (opt-in, 3/day cap, opt-out). No real BSP is wired yet.</p></div>`;
+  $("runFest").onclick = async () => {
+    try{ const s = await api("/notifications/run-festivals",{method:"POST"});
+      $("festOut").innerHTML = `<pre class="out">${esc(JSON.stringify(s,null,2))}</pre>
+        <div class="muted" style="margin-top:6px">Target day ${esc(s.target_day)}: ${s.festivals} festival(s), ${s.sent} sent, ${s.skipped} skipped.</div>`; }
+    catch(e){ toast(e.message); }
+  };
+};
+PANELS.referrals = async () => {
+  $("psub").textContent = "Referral funnel — share cards carry each user's code; N activations unlock a premium report";
+  let ref = {}; try { const o = await api("/admin/overview"); ref = (o.users && o.users.referrals) || {}; } catch(_) {}
+  const stat = (n,l)=>`<div class="stat"><div class="n">${esc(n??0)}</div><div class="l">${esc(l)}</div></div>`;
+  $("panel").innerHTML = `
+    <div class="grid" style="margin-bottom:16px">
+      ${stat(ref.codes_issued, "Codes issued")}
+      ${stat(ref.referred_signups, "Referred signups")}
+      ${stat(ref.rewards_granted, "Rewards unlocked")}
+    </div>
+    <div class="card"><h3>How the loop works</h3>
+      <p class="hint" style="margin:0 0 6px">Every user gets a code (minted on first share). Share cards and the feed "invite" panel carry a link (<code>/auth?ref=CODE</code>). A friend who registers <em>and</em> completes onboarding (chart computed) counts as an activation; reaching the threshold unlocks a premium-report entitlement.</p>
+    </div>
+    <div class="launch"><div class="ic">🖼️</div>
+      <div><div class="t">Share cards</div><div class="d">Personal + daily nakshatra cards with /s landing pages carry the referral code.</div></div>
+      <div class="go"><a class="btn sm" href="#cards">Open ↗</a></div></div>
+    <div class="launch"><div class="ic">🏠</div>
+      <div><div class="t">Invite panel</div><div class="d">Live on the user feed — code, progress bar, and share button.</div></div>
+      <div class="go"><a class="btn sm" href="/feed" target="_blank">Open feed ↗</a></div></div>`;
+};
+PANELS.astrologers = async () => launcher("Astrologer Platform","White-label AI assistant, bookings, CRM",[
+  {ic:"🧑‍🏫",t:"Astrologer directory",d:"Live: browse the consult directory.",href:"/ui/astrologers",blank:true,cta:"Open ↗"},
+  {ic:"🏢",t:"Org dashboard",d:"Live preview: the white-label org console.",href:"/ui/org-dashboard",blank:true,cta:"Open ↗"},
+  {ic:"📅",t:"Bookings & CRM",d:"Planned: multi-tenant booking + customer management (GROWTH_PLAN Part 4)."}]);
+PANELS.commerce = async () => {
+  $("psub").textContent = "Payments, entitlements & premium reports (Razorpay — mock mode)";
+  // Pull commerce.* counters from the metrics snapshot in the overview payload.
+  let counters = {};
+  try {
+    const o = await api("/admin/overview");
+    const snap = (o.llm && o.llm.counters) || o.llm || {};
+    for (const [k,v] of Object.entries(snap)) if (k.startsWith("commerce.")) counters[k]=v;
+  } catch(_) {}
+  const c = (k)=>counters["commerce."+k] ?? 0;
+  const stat = (n,l)=>`<div class="stat"><div class="n">${esc(n)}</div><div class="l">${esc(l)}</div></div>`;
+  $("panel").innerHTML = `
+    <div class="card" style="border-color:rgba(232,182,76,.35)">
+      <h3>Mock mode <span class="pill-badge soon">no real charges</span></h3>
+      <p class="hint" style="margin:0">Razorpay is mocked (<code>mock_razorpay=true</code>). Orders get <code>order_mock_*</code> ids and the user's "Unlock" button simulates the capture, so the whole flow works with zero keys. Flip the flag + add keys to go live (payments are a human-approval gate in AGENTS.md).</p>
+    </div>
+    <div class="grid" style="margin-bottom:16px">
+      ${stat(c("orders_created"),"Orders created")}
+      ${stat(c("payments_captured"),"Payments captured")}
+      ${stat(c("entitlements_granted"),"Entitlements granted")}
+      ${stat(c("reports_generated"),"Reports generated")}
+    </div>
+    <div class="card"><h3>Product catalog</h3>
+      <div class="post"><div class="head"><strong>Premium ജാതക റിപ്പോർട്ട്</strong>
+        <span class="tag" style="margin-left:auto">₹199 · one-time</span></div>
+        <div class="muted" style="font-size:13px">product key <code>premium_report</code> — detailed PDF (graha, dasha). Unlocks via purchase OR 3 referral activations.</div></div>
+    </div>
+    <div class="launch"><div class="ic">🏠</div>
+      <div><div class="t">Test the purchase flow</div><div class="d">The user feed shows the premium card with the mock "Unlock" button and download.</div></div>
+      <div class="go"><a class="btn sm" href="/feed" target="_blank">Open feed ↗</a></div></div>
+    <div class="launch"><div class="ic">🎁</div>
+      <div><div class="t">Referral rewards land here</div><div class="d">Reaching the referral threshold grants a premium_report entitlement (granted_by=referral).</div></div>
+      <div class="go"><a class="btn sm" href="#referrals">Referrals ↗</a></div></div>`;
+};
+
+// ---------- Sidebar mobile ----------
+function closeSidebar(){ $("sidebar").classList.remove("open"); $("backdrop").classList.remove("open"); }
+$("ham").onclick = () => { $("sidebar").classList.add("open"); $("backdrop").classList.add("open"); };
+$("backdrop").onclick = closeSidebar;
+
+// ---------- Boot ----------
+function boot(){ $("login").style.display="none"; $("shell").style.display="block"; renderNav(); route(); }
+if (TOKEN) {
+  // Validate the stored token with a cheap admin call. api() already calls
+  // logout() on a 401; any OTHER error (e.g. a flaky overview) should NOT sign
+  // the owner out — boot the console anyway.
+  api("/admin/overview")
+    .then(boot)
+    .catch(e => { if (!String(e.message).includes("unauthorized")) boot(); });
+} else { $("login").style.display="flex"; }
+</script>
+</body>
+</html>
