@@ -45,6 +45,16 @@ def test_seed_temple_ids_unique():
     assert len(ids) == len(set(ids))
 
 
+def test_list_temples_directory_rows_cover_every_seed():
+    # The admin partner-picker directory: one light row per seed temple.
+    rows = TemplesService().list_temples()
+    assert len(rows) == len(SEED_TEMPLES)
+    assert {r["id"] for r in rows} == {t["id"] for t in SEED_TEMPLES}
+    for r in rows:
+        assert set(r) == {"id", "name", "name_ml", "district", "town", "deity"}
+        assert r["id"] and r["name"]
+
+
 def test_seed_temples_reference_known_deities_and_districts():
     for t in SEED_TEMPLES:
         assert t["deity"] in DEITIES, t["id"]
