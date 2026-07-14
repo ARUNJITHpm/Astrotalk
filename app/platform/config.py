@@ -41,6 +41,23 @@ class Settings(BaseSettings):
     admin_email: str = "arunjithpm1999@gmail.com"
     admin_password: str = "tara@admin"
 
+    # Mobile numbers (comma-separated) whose signed-in users are treated as app
+    # administrators — the web app reveals the admin/console nav links for them.
+    # Matched on the trailing 10 digits, so "8089397344", "918089397344" and
+    # "+918089397344" are the same person. NOTE: the admin *pages/APIs* stay
+    # separately gated by ``admin_token``; this flag only drives nav visibility.
+    admin_phones: str = "8089397344"
+
+    @property
+    def admin_phone_cores(self) -> set[str]:
+        """The admin numbers reduced to their trailing 10 digits."""
+        cores: set[str] = set()
+        for raw in self.admin_phones.split(","):
+            digits = "".join(c for c in raw if c.isdigit())
+            if digits:
+                cores.add(digits[-10:])
+        return cores
+
     # Shared secret gating the scheduled "cron endpoints" (e.g. POST
     # /content/run-daily), sent as ``X-Cron-Token`` by an external scheduler
     # (GitHub Actions cron / cron-job.org). Same policy as admin_token:
@@ -200,3 +217,16 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
+
+
+def is_admin_phone(phone: str | None) -> bool:
+    """Whether ``phone`` belongs to an app administrator (see ``admin_phones``).
+
+    Compared on the trailing 10 digits so country-code/`+` variants of the same
+    number all match. Drives admin/console nav visibility only — never used to
+    authorize an admin API call.
+    """
+    if not phone:
+        return False
+    core = "".join(c for c in phone if c.isdigit())[-10:]
+    return bool(core) and core in get_settings().admin_phone_cores

@@ -802,6 +802,7 @@
     localStorage.removeItem("tara_phone");
     localStorage.removeItem("tara_name");
     localStorage.removeItem("tara_profile");
+    localStorage.removeItem("tara_is_admin");
     window.location.href = "/auth";
   }
 
@@ -1100,16 +1101,29 @@
     if (e.target === poruthamModal) closePorutham();
   });
 
+  // Reveal the admin/console nav links for administrators. Reads the cached
+  // flag first (instant, no flicker) and is refreshed from /identity/me below.
+  function applyAdminNav() {
+    const isAdmin = localStorage.getItem("tara_is_admin") === "1";
+    document.querySelectorAll(".admin-only").forEach((el) =>
+      el.classList.toggle("admin-hidden", !isAdmin)
+    );
+  }
+
   // Fill in the display name for sessions that logged in before the name was
   // cached locally, so the greeting/header still show it (no re-login needed).
+  // Also refreshes the admin flag so older sessions gain the admin nav.
   async function ensureUserName() {
-    if (userName || !userId) return;
+    if (!userId) return;
     try {
       const res = await fetch("/identity/me", { headers: authHeaders() });
       if (res.status === 401) return sessionExpired();
       if (!res.ok) return;
       const profile = await res.json();
-      if (profile.name) {
+      if (profile.is_admin) localStorage.setItem("tara_is_admin", "1");
+      else localStorage.removeItem("tara_is_admin");
+      applyAdminNav();
+      if (profile.name && !userName) {
         userName = profile.name;
         localStorage.setItem("tara_name", userName);
         updateAccountControl();
@@ -1126,6 +1140,7 @@
   // load history + durable memory.
   if (userId && authToken) {
     updateAccountControl();
+    applyAdminNav(); // instant reveal from the cached admin flag
     renderWelcome(); // show the personalized greeting first
     ensureUserName();
     loadHistory();

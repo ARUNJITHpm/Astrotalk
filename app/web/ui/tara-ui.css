@@ -986,6 +986,12 @@ body {
   .messages-inner, .composer-inner { padding-left: 14px; }
 }
 
+/* Room for the fixed app-style bottom nav (shown below 760px, see
+   .tara-bottomnav further down) so the composer never hides behind it. */
+@media (max-width: 759px) {
+  .chat-app { height: calc(100dvh - 58px - env(safe-area-inset-bottom, 0px)); }
+}
+
 /* ============ astrologer directory + booking page ============ */
 .astro-page { position: relative; z-index: 2; max-width: 1080px; margin: 0 auto; padding: 32px 22px 80px; }
 .astro-head { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 16px 20px; margin-bottom: 28px; }
@@ -1088,4 +1094,56 @@ body {
 @media (max-width: 640px) {
   .astro-head { grid-template-columns: 1fr; }
   .astro-select { justify-self: start; }
+}
+
+/* Admin/console links stay hidden until the page confirms the user is an
+   admin. !important beats the flex display set on nav items. */
+.admin-hidden { display: none !important; }
+
+/* ============================================================
+   Shared primary navigation — sections for normal users.
+   Desktop (>=760px): pill buttons in a top bar.
+   Mobile (<760px): fixed bottom nav bar.
+   ============================================================ */
+.tara-topnav {
+  display: none;
+  gap: 6px;
+  justify-content: center;
+  margin: 4px auto 22px;
+}
+.tara-topnav a {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 9px 18px; border-radius: 999px;
+  font-size: 14px; font-weight: 600; color: var(--muted);
+  border: 1px solid var(--line); background: var(--glass);
+  text-decoration: none; transition: color .15s, background .15s, border-color .15s;
+}
+.tara-topnav a:hover { color: var(--ink); border-color: rgba(233,185,104,.4); }
+.tara-topnav a.active {
+  color: #1a1408; font-weight: 700; border-color: transparent;
+  background: linear-gradient(115deg, var(--gold-soft), var(--gold) 55%, #d99a3e);
+}
+
+.tara-bottomnav {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 60;
+  display: flex; justify-content: space-around; align-items: stretch;
+  background: rgba(6, 6, 18, .94); backdrop-filter: blur(14px);
+  border-top: 1px solid var(--line);
+  padding: 6px 6px calc(6px + env(safe-area-inset-bottom, 0px));
+}
+.tara-bottomnav a {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 7px 4px; font-size: 11px; font-weight: 600; color: var(--muted);
+  text-decoration: none;
+}
+.tara-bottomnav a .ic { font-size: 21px; line-height: 1; }
+.tara-bottomnav a.active { color: var(--gold); }
+
+@media (max-width: 759px) {
+  /* room for the fixed bottom nav */
+  .astro-page { padding-bottom: 88px; }
+}
+@media (min-width: 760px) {
+  .tara-topnav { display: flex; }
+  .tara-bottomnav { display: none; }
 }

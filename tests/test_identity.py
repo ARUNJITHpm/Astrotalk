@@ -641,3 +641,67 @@ async def test_login_self_heals_mock_chart(monkeypatch):
     finally:
         app.dependency_overrides.clear()
         await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_is_admin_flag_in_auth_and_me():
+    """The admin phone (config.admin_phones) gets is_admin=True in both the
+    login/register AuthResponse and /identity/me; a normal number gets False.
+    Matched on the trailing 10 digits, so a +91 prefix still counts as admin."""
+    import httpx
+    from httpx import ASGITransport
+
+    from app.main import app
+    from app.platform.db import get_session
+
+    engine = create_async_engine(
+        "sqlite+aiosqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+
+    async def _override_get_session():
+        async with factory() as s:
+            yield s
+
+    app.dependency_overrides[get_session] = _override_get_session
+    try:
+        transport = ASGITransport(app=app)
+        async with httpx.AsyncClient(
+            transport=transport, base_url="http://test"
+        ) as client:
+            base = {
+                "password": "secret123",
+                "dob": "1995-04-12",
+                "birth_time": "06:30:00",
+                "birth_place": "Thrissur, Kerala",
+            }
+            # Admin: the default admin number carried with a +91 country code.
+            admin = await client.post(
+                "/identity/users",
+                json={**base, "phone": "+918089397344", "name": "Owner"},
+            )
+            assert admin.status_code == 201, admin.text
+            assert admin.json()["is_admin"] is True
+            admin_headers = {"Authorization": f"Bearer {admin.json()['token']}"}
+            me = await client.get("/identity/me", headers=admin_headers)
+            assert me.status_code == 200
+            assert me.json()["is_admin"] is True
+
+            # Normal user: not in admin_phones → False everywhere.
+            normal = await client.post(
+                "/identity/users",
+                json={**base, "phone": "+919876543210", "name": "Arya"},
+            )
+            assert normal.status_code == 201, normal.text
+            assert normal.json()["is_admin"] is False
+            normal_headers = {"Authorization": f"Bearer {normal.json()['token']}"}
+            me2 = await client.get("/identity/me", headers=normal_headers)
+            assert me2.status_code == 200
+            assert me2.json()["is_admin"] is False
+    finally:
+        app.dependency_overrides.clear()
+        await engine.dispose()

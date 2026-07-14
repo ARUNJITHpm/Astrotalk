@@ -37,6 +37,8 @@
     background: rgba(232,182,76,.12); color: var(--gold);
     border: 1px solid rgba(232,182,76,.35); padding: 6px 12px; border-radius: 999px;
   }
+  /* Admin/console links stay hidden until the user is confirmed an admin. */
+  .admin-hidden { display: none !important; }
   /* Desktop top nav (hidden on mobile) */
   nav.topnav { display: none; gap: 4px; }
   nav.topnav a {
@@ -164,6 +166,8 @@
       <a href="/feed" class="active">ഇന്ന്</a>
       <a href="/">ചാറ്റ്</a>
       <a href="/ui/astrologers">ജ്യോതിഷർ</a>
+      <a href="/admin" class="admin-only admin-hidden">📊 അഡ്മിൻ</a>
+      <a href="/console" class="admin-only admin-hidden">🛠️ കൺസോൾ</a>
     </nav>
     <div class="top-actions">
       <span class="streak" id="streak" style="display:none">🔥 <span id="streakN">0</span></span>
@@ -184,6 +188,8 @@
     <a href="/feed" class="active"><span class="ic">🏠</span>ഇന്ന്</a>
     <a href="/"><span class="ic">💬</span>ചാറ്റ്</a>
     <a href="/ui/astrologers"><span class="ic">🧑‍🏫</span>ജ്യോതിഷർ</a>
+    <a href="/admin" class="admin-only admin-hidden"><span class="ic">📊</span>അഡ്മിൻ</a>
+    <a href="/console" class="admin-only admin-hidden"><span class="ic">🛠️</span>കൺസോൾ</a>
   </nav>
 
   <div class="toast" id="toast"></div>
@@ -203,6 +209,24 @@
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
   if (!authed) $("signinHint").style.display = "block";
+
+  // Reveal the admin/console nav for administrators (cache first, then verify).
+  function applyAdminNav(on) {
+    document.querySelectorAll(".admin-only").forEach((el) =>
+      el.classList.toggle("admin-hidden", !on));
+  }
+  applyAdminNav(localStorage.getItem("tara_is_admin") === "1");
+  if (authed) {
+    fetch("/identity/me", { headers: authHeaders() })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((p) => {
+        if (!p) return;
+        if (p.is_admin) localStorage.setItem("tara_is_admin", "1");
+        else localStorage.removeItem("tara_is_admin");
+        applyAdminNav(!!p.is_admin);
+      })
+      .catch(() => {});
+  }
 
   // ---- Feed ----
   async function loadFeed() {

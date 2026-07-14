@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>താര ✦ — ജ്യോതിഷ സംഭാഷണം</title>
-  <link rel="stylesheet" href="/static/ui/tara-ui.css?v=20260711b" />
+  <link rel="stylesheet" href="/static/ui/tara-ui.css?v=20260714a" />
 </head>
 <body data-case="default">
   <canvas id="starfield"></canvas>
@@ -23,6 +23,13 @@
       </div>
       <button class="btn new-chat" id="new-chat">＋ &nbsp;പുതിയ സംഭാഷണം</button>
       <a class="btn new-chat" href="/ui/astrologers" style="text-decoration:none">📿 &nbsp;ജ്യോതിഷ വിദഗ്ധരെ കാണാം</a>
+
+      <!-- Cross-nav to the user feed, chat, and admin/console (desktop). -->
+      <nav class="side-nav" style="display:flex;flex-direction:column;gap:2px;margin:2px 0 4px">
+        <a href="/feed" style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:9px;color:var(--muted);text-decoration:none;font-size:14px">🏠 &nbsp;ഇന്ന് · ഫീഡ്</a>
+        <a href="/admin" class="admin-only admin-hidden" style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:9px;color:var(--muted);text-decoration:none;font-size:14px">📊 &nbsp;അഡ്മിൻ ഡാഷ്‌ബോർഡ്</a>
+        <a href="/console" class="admin-only admin-hidden" style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:9px;color:var(--muted);text-decoration:none;font-size:14px">🛠️ &nbsp;കൺസോൾ</a>
+      </nav>
 
       <div class="side-section">സംഭാഷണങ്ങൾ</div>
       <div class="history" id="history"></div>
@@ -84,6 +91,15 @@
       </div>
     </main>
   </div>
+
+  <!-- Mobile primary navigation (desktop uses the sidebar links above) -->
+  <nav class="tara-bottomnav" aria-label="വിഭാഗങ്ങൾ">
+    <a href="/feed"><span class="ic" aria-hidden="true">🏠</span>ഇന്ന്</a>
+    <a href="/ui" class="active"><span class="ic" aria-hidden="true">💬</span>ചാറ്റ്</a>
+    <a href="/ui/astrologers"><span class="ic" aria-hidden="true">🧑‍🏫</span>ജ്യോതിഷർ</a>
+    <a href="/admin" class="admin-only admin-hidden"><span class="ic" aria-hidden="true">📊</span>അഡ്മിൻ</a>
+    <a href="/console" class="admin-only admin-hidden"><span class="ic" aria-hidden="true">🛠️</span>കൺസോൾ</a>
+  </nav>
 
   <!-- ============ CHART DRAWER ============ -->
   <div class="drawer-backdrop" id="chart-backdrop" hidden></div>
@@ -220,8 +236,31 @@
     </div>
   </div>
 
+  <!-- Reveal admin/console nav for administrators (cache first, then verify). -->
+  <script>
+    (function () {
+      function apply(on) {
+        document.querySelectorAll(".admin-only").forEach(function (el) {
+          el.classList.toggle("admin-hidden", !on);
+        });
+      }
+      apply(localStorage.getItem("tara_is_admin") === "1");
+      var token = localStorage.getItem("tara_token");
+      if (!token) return;
+      fetch("/identity/me", { headers: { Authorization: "Bearer " + token } })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (p) {
+          if (!p) return;
+          if (p.is_admin) localStorage.setItem("tara_is_admin", "1");
+          else localStorage.removeItem("tara_is_admin");
+          apply(!!p.is_admin);
+        })
+        .catch(function () {});
+    })();
+  </script>
+
   <script src="/static/ui/starfield.js"></script>
-  <script src="/static/ui/chart.js?v=20260711b"></script>
-  <script src="/static/ui/chat.js?v=20260711b"></script>
+  <script src="/static/ui/chart.js?v=20260714a"></script>
+  <script src="/static/ui/chat.js?v=20260714a"></script>
 </body>
 </html>

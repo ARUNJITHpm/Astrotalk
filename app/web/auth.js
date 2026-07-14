@@ -31,10 +31,13 @@
     el.hidden = false;
   }
 
-  function enter(phone, user, token) {
+  function enter(phone, user, token, isAdmin) {
     localStorage.setItem("tara_phone", phone);
     // Bearer session token (47h TTL) — sent on every user-scoped API call.
     if (token) localStorage.setItem("tara_token", token);
+    // Admin flag drives the extra admin/console nav links across the app.
+    if (isAdmin) localStorage.setItem("tara_is_admin", "1");
+    else localStorage.removeItem("tara_is_admin");
     // Remember the display name so the chat can greet the user by name.
     if (user && user.name) localStorage.setItem("tara_name", user.name);
     else localStorage.removeItem("tara_name");
@@ -163,7 +166,7 @@
       }
       if (!res.ok) throw new Error("reset failed");
       const data = await res.json(); // AuthResponse — {user, token, expires_at}
-      enter(phone, data.user, data.token);
+      enter(phone, data.user, data.token, data.is_admin);
     } catch (err) {
       showError(resetError, "ക്ഷമിക്കണം, എന്തോ പിശക്. വീണ്ടും ശ്രമിക്കൂ.");
     } finally {
@@ -204,7 +207,7 @@
       }
       if (!res.ok) throw new Error("login failed");
       const data = await res.json(); // AuthResponse — {user, token, expires_at}
-      enter(phone, data.user, data.token);
+      enter(phone, data.user, data.token, data.is_admin);
     } catch (err) {
       showError(loginError, "ക്ഷമിക്കണം, എന്തോ പിശക്. വീണ്ടും ശ്രമിക്കൂ.");
     } finally {
@@ -253,7 +256,7 @@
       }
       if (!res.ok) throw new Error("register failed");
       const data = await res.json(); // AuthResponse — {user, token, expires_at}
-      enter(phone, data.user, data.token);
+      enter(phone, data.user, data.token, data.is_admin);
     } catch (err) {
       showError(regError, "ക്ഷമിക്കണം, എന്തോ പിശക്. വീണ്ടും ശ്രമിക്കൂ.");
     } finally {

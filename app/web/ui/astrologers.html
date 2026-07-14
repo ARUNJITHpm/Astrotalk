@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>താര ✦ — ജ്യോതിഷ വിദഗ്ധരെ കാണാം</title>
-  <link rel="stylesheet" href="/static/ui/tara-ui.css?v=20260711b" />
+  <link rel="stylesheet" href="/static/ui/tara-ui.css?v=20260714a" />
 </head>
 <body data-case="default">
   <canvas id="starfield"></canvas>
@@ -12,6 +12,15 @@
   <div class="grain"></div>
 
   <main class="astro-page">
+    <!-- Primary sections (desktop pills; mobile bottom bar below) -->
+    <nav class="tara-topnav" aria-label="വിഭാഗങ്ങൾ">
+      <a href="/feed"><span aria-hidden="true">🏠</span> ഇന്ന്</a>
+      <a href="/"><span aria-hidden="true">💬</span> ചാറ്റ്</a>
+      <a href="/ui/astrologers" class="active"><span aria-hidden="true">🧑‍🏫</span> ജ്യോതിഷർ</a>
+      <a href="/admin" class="admin-only admin-hidden"><span aria-hidden="true">📊</span> അഡ്മിൻ</a>
+      <a href="/console" class="admin-only admin-hidden"><span aria-hidden="true">🛠️</span> കൺസോൾ</a>
+    </nav>
+
     <header class="astro-head">
       <a class="astro-back" href="/ui">← സംഭാഷണത്തിലേക്ക്</a>
       <div class="astro-title">
@@ -54,6 +63,38 @@
   </aside>
 
   <div class="astro-toast" id="toast" hidden></div>
+
+  <!-- Mobile bottom navigation -->
+  <nav class="tara-bottomnav" aria-label="വിഭാഗങ്ങൾ">
+    <a href="/feed"><span class="ic" aria-hidden="true">🏠</span>ഇന്ന്</a>
+    <a href="/"><span class="ic" aria-hidden="true">💬</span>ചാറ്റ്</a>
+    <a href="/ui/astrologers" class="active"><span class="ic" aria-hidden="true">🧑‍🏫</span>ജ്യോതിഷർ</a>
+    <a href="/admin" class="admin-only admin-hidden"><span class="ic" aria-hidden="true">📊</span>അഡ്മിൻ</a>
+    <a href="/console" class="admin-only admin-hidden"><span class="ic" aria-hidden="true">🛠️</span>കൺസോൾ</a>
+  </nav>
+
+  <!-- Reveal admin/console nav for administrators (cache first, then verify). -->
+  <script>
+    (function () {
+      function apply(on) {
+        document.querySelectorAll(".admin-only").forEach(function (el) {
+          el.classList.toggle("admin-hidden", !on);
+        });
+      }
+      apply(localStorage.getItem("tara_is_admin") === "1");
+      var token = localStorage.getItem("tara_token");
+      if (!token) return;
+      fetch("/identity/me", { headers: { Authorization: "Bearer " + token } })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (p) {
+          if (!p) return;
+          if (p.is_admin) localStorage.setItem("tara_is_admin", "1");
+          else localStorage.removeItem("tara_is_admin");
+          apply(!!p.is_admin);
+        })
+        .catch(function () {});
+    })();
+  </script>
 
   <script src="/static/ui/starfield.js"></script>
   <script src="/static/ui/astrologers.js?v=20260711b"></script>

@@ -80,6 +80,8 @@ class ProfileOut(BaseModel):
 
     phone: str
     name: str
+    # Whether this account is an app administrator (config.admin_phones).
+    is_admin: bool = False
 
 
 class UserOut(BaseModel):
@@ -112,6 +114,9 @@ class AuthResponse(BaseModel):
     user: UserOut
     token: str
     expires_at: datetime
+    # True when the account is an app administrator (see config.admin_phones).
+    # Lets the web app reveal the admin/console nav right after login.
+    is_admin: bool = False
 
 
 class ChartOut(BaseModel):

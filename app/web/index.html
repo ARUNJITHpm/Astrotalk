@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Tara — താര</title>
-  <link rel="stylesheet" href="/static/styles.css?v=13" />
+  <link rel="stylesheet" href="/static/styles.css?v=14" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link
     href="https://fonts.googleapis.com/css2?family=Noto+Sans+Malayalam:wght@400;500;600&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,400&display=swap"
@@ -27,6 +27,9 @@
       <nav class="side-nav" style="display:flex;flex-direction:column;gap:2px;margin:6px 0 10px">
         <a href="/feed" style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:9px;color:inherit;text-decoration:none;font-size:14px;opacity:.85">🏠 ഇന്ന് · ഫീഡ്</a>
         <a href="/ui/astrologers" style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:9px;color:inherit;text-decoration:none;font-size:14px;opacity:.85">🧑‍🏫 ജ്യോതിഷർ</a>
+        <!-- Admin-only: revealed by app.js when the signed-in user is an administrator -->
+        <a href="/admin" class="admin-only admin-hidden" style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:9px;color:inherit;text-decoration:none;font-size:14px;opacity:.85">📊 അഡ്മിൻ ഡാഷ്‌ബോർഡ്</a>
+        <a href="/console" class="admin-only admin-hidden" style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:9px;color:inherit;text-decoration:none;font-size:14px;opacity:.85">🛠️ കൺസോൾ</a>
       </nav>
 
       <div class="side-section history-section">
@@ -106,6 +109,15 @@
       </div>
     </main>
   </div>
+
+  <!-- Mobile primary navigation (desktop uses the sidebar links above) -->
+  <nav class="tara-bottomnav" aria-label="വിഭാഗങ്ങൾ">
+    <a href="/feed"><span class="ic" aria-hidden="true">🏠</span>ഇന്ന്</a>
+    <a href="/" class="active"><span class="ic" aria-hidden="true">💬</span>ചാറ്റ്</a>
+    <a href="/ui/astrologers"><span class="ic" aria-hidden="true">🧑‍🏫</span>ജ്യോതിഷർ</a>
+    <a href="/admin" class="admin-only admin-hidden"><span class="ic" aria-hidden="true">📊</span>അഡ്മിൻ</a>
+    <a href="/console" class="admin-only admin-hidden"><span class="ic" aria-hidden="true">🛠️</span>കൺസോൾ</a>
+  </nav>
 
   <!-- Developer debug: right-side drawer, shown only while Debug is on -->
   <aside id="debug-drawer" class="debug-drawer" hidden>
@@ -251,7 +263,7 @@
 
   <script src="/static/vendor/gsap.min.js"></script>
   <script src="/static/ui/chart.js?v=1"></script>
-  <script src="/static/app.js?v=14"></script>
+  <script src="/static/app.js?v=15"></script>
   <script src="/static/motion.js?v=2"></script>
 </body>
 </html>

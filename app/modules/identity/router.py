@@ -26,7 +26,7 @@ from app.modules.identity.schemas import (
     UserOut,
 )
 from app.modules.identity.service import IdentityService
-from app.platform.config import get_settings
+from app.platform.config import get_settings, is_admin_phone
 from app.platform.db import get_session
 
 router = APIRouter(prefix="/identity", tags=["identity"])
@@ -105,6 +105,7 @@ async def _auth_response(session: AsyncSession, user: User) -> AuthResponse:
         user=UserOut.model_validate(user),
         token=login.token,
         expires_at=login.expires_at,
+        is_admin=is_admin_phone(user.phone),
     )
 
 
@@ -211,9 +212,13 @@ async def logout(
 
 
 @router.get("/me", response_model=ProfileOut)
-async def me(user: CurrentUser) -> User:
+async def me(user: CurrentUser) -> ProfileOut:
     """The logged-in user's display profile (name only, no birth data)."""
-    return user
+    return ProfileOut(
+        phone=user.phone,
+        name=user.name,
+        is_admin=is_admin_phone(user.phone),
+    )
 
 
 @router.post("/transcript-consent", status_code=status.HTTP_204_NO_CONTENT)

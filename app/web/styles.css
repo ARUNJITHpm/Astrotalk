@@ -503,6 +503,34 @@ details.debug-sec[open] > summary { margin-bottom: 7px; }
   .sidebar-backdrop { display: none !important; }
 }
 
+/* Admin/console links stay hidden until app.js confirms the user is an admin.
+   !important so it overrides the flex display on nav items and inline styles. */
+.admin-hidden { display: none !important; }
+
+/* Mobile primary navigation — the section bar for normal users.
+   On desktop the always-visible sidebar carries these same links, so the
+   bar only appears on small screens. The app shell is shortened by the
+   bar's height so the chat composer never hides behind it. */
+.tara-bottomnav { display: none; }
+@media (max-width: 720px) {
+  .app { height: calc(100dvh - 58px - env(safe-area-inset-bottom, 0px)); }
+  .tara-bottomnav {
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 90;
+    display: flex; justify-content: space-around; align-items: stretch;
+    height: calc(58px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    background: var(--sidebar); border-top: 1px solid rgba(255,255,255,0.08);
+  }
+  .tara-bottomnav a {
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 2px;
+    font-size: 11px; font-weight: 600; color: var(--sidebar-text);
+    opacity: .68; text-decoration: none;
+  }
+  .tara-bottomnav a .ic { font-size: 20px; line-height: 1; }
+  .tara-bottomnav a.active { opacity: 1; color: #f0b892; }
+}
+
 /* --- Prashnam (Kerala horary): composer button + pick modal --- */
 .prashnam-open {
   border: 1px solid var(--border);
