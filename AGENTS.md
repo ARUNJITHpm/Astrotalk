@@ -55,5 +55,17 @@ Run parallel agents only across **orthogonal** modules. Never run two agents in 
 - Conventional commits. Small, module-scoped PRs.
 - Write the implementation plan as an Artifact first; wait for review on anything touching guardrails, payments, infra, or migrations.
 
+## Commit workflow (commit every change)
+- **Every small change or feature is its own commit** — do not batch unrelated
+  edits. As soon as one logical change is complete and its tests pass, commit it
+  with a Conventional-Commits message (`feat(...)`, `fix(...)`, `chore(...)`,
+  `docs(...)`, `refactor(...)`) whose subject says what changed and why.
+- One concern per commit: a bug fix, a new feature, a copy tweak, and a refactor
+  each get separate commits even when touched in the same session.
+- Keep subjects imperative and scoped to the module (`fix(chat): …`,
+  `feat(astrologers): …`); put the reasoning in the body when it isn't obvious.
+- Commit before switching to an unrelated task, and before pushing to `origin`
+  (GitHub) / `hf` (the Hugging Face Space).
+
 ## Definition of done
 Code runs, `ruff`/`black`/`pytest` pass, the relevant module's public interface is unchanged or documented, and no guardrail above is touched without explicit human sign-off.
