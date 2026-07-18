@@ -100,6 +100,11 @@ def start_keepalive() -> "asyncio.Task | None":
     settings = get_settings()
     if settings.mock_whatsapp or not settings.waha_keepalive_enabled:
         return None
+    # On the Cloud API transport there is no WAHA container to keep awake —
+    # pinging (and auto-restarting) the old Render host is pure waste.
+    if settings.whatsapp_transport.strip().lower() == "cloud":
+        logger.info("waha keepalive: skipped (whatsapp_transport=cloud)")
+        return None
     url = _keepalive_url(settings)
     interval = max(60, settings.waha_keepalive_interval_seconds)
     return asyncio.create_task(_loop(url, interval, settings), name="waha-keepalive")
