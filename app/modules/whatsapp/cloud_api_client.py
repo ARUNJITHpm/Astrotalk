@@ -25,6 +25,8 @@ Cloud API notes:
     sends outside 24h would require an approved template (separate path).
 """
 
+import asyncio
+
 import httpx
 
 from app.modules.whatsapp.waha_client import _with_disclosure
@@ -33,9 +35,20 @@ from app.platform.logging_config import get_logger
 
 logger = get_logger(__name__)
 
+# Network transients we retry (as opposed to an API rejection, which is
+# deterministic and must not be retried). ConnectTimeout dominates from the Space.
+_RETRYABLE = (
+    httpx.ConnectTimeout,
+    httpx.ConnectError,
+    httpx.ReadTimeout,
+    httpx.WriteTimeout,
+    httpx.PoolTimeout,
+    httpx.RemoteProtocolError,
+)
+
 
 def _client(timeout: float) -> httpx.AsyncClient:
-    """An httpx client pinned to IPv4.
+    """An httpx client pinned to IPv4, with connect retries at the transport.
 
     Some container networks (observed on the HF Space) advertise an IPv6 default
     route with no working IPv6 connectivity. ``graph.facebook.com`` is dual-stack,
@@ -43,9 +56,16 @@ def _client(timeout: float) -> httpx.AsyncClient:
     timeout — silently failing every Meta call while IPv4-only hosts (e.g. Sarvam)
     keep working. Binding the source socket to ``0.0.0.0`` forces httpx onto the
     A (IPv4) record, which is reachable.
+
+    Even on IPv4 the Space's outbound path to Meta is intermittently slow to
+    complete the TCP handshake (ConnectTimeout), so ``retries`` re-attempts the
+    connect, and a dedicated 10s ``connect`` timeout gives each attempt room.
     """
-    transport = httpx.AsyncHTTPTransport(local_address="0.0.0.0")
-    return httpx.AsyncClient(timeout=timeout, transport=transport)
+    transport = httpx.AsyncHTTPTransport(local_address="0.0.0.0", retries=3)
+    return httpx.AsyncClient(
+        timeout=httpx.Timeout(timeout, connect=10.0),
+        transport=transport,
+    )
 
 
 def _phone_to_wa_id(phone: str) -> str:
@@ -116,27 +136,49 @@ class CloudAPIClient:
             "type": "text",
             "text": {"preview_url": False, "body": text},
         }
-        try:
-            async with _client(timeout=15) as client:
-                resp = await client.post(
-                    self._url, json=payload, headers=self._headers()
+        # Retry transient network failures (esp. ConnectTimeout from the Space)
+        # with linear backoff. An API rejection (HTTPStatusError) is deterministic,
+        # so it's logged and returned immediately — retrying would only repeat it.
+        last_exc: Exception | None = None
+        for attempt in range(1, 4):
+            try:
+                async with _client(timeout=20) as client:
+                    resp = await client.post(
+                        self._url, json=payload, headers=self._headers()
+                    )
+                    resp.raise_for_status()
+                    if attempt > 1:
+                        logger.info("cloud-api: send to %s succeeded on attempt %d", to, attempt)
+                    return resp.json()
+            except httpx.HTTPStatusError as exc:
+                # Meta returns a JSON error with a diagnostic ``code``/``message``
+                # (131047 = outside 24h window, 190 = bad token) — essential for
+                # triage. Never log the token. Deterministic → do not retry.
+                logger.error(
+                    "cloud-api: send failed for %s (HTTP %s) — %s",
+                    to, exc.response.status_code, exc.response.text[:300],
                 )
-                resp.raise_for_status()
-                return resp.json()
-        except Exception as exc:
-            # Log the response body when present — Meta returns a JSON error with
-            # a diagnostic ``code``/``message`` (e.g. 131047 = outside 24h window,
-            # 190 = bad token) that is essential for triage. Never log the token.
-            # Include the exception TYPE so a network timeout (empty message) is
-            # distinguishable from an API rejection.
-            detail = ""
-            if isinstance(exc, httpx.HTTPStatusError):
-                detail = f" — {exc.response.text[:300]}"
-            logger.error(
-                "cloud-api: send failed for %s (%s: %s)%s",
-                to, type(exc).__name__, exc, detail,
-            )
-            return {"error": f"{type(exc).__name__}: {exc}", "to": to}
+                return {"error": exc.response.text[:300], "to": to}
+            except _RETRYABLE as exc:
+                last_exc = exc
+                logger.warning(
+                    "cloud-api: send attempt %d/3 to %s failed (%s), retrying",
+                    attempt, to, type(exc).__name__,
+                )
+                if attempt < 3:
+                    await asyncio.sleep(attempt)  # 1s, then 2s
+            except Exception as exc:
+                # Unexpected — log with type and stop (don't hammer on an unknown).
+                logger.error(
+                    "cloud-api: send failed for %s (%s: %s)", to, type(exc).__name__, exc
+                )
+                return {"error": f"{type(exc).__name__}: {exc}", "to": to}
+
+        logger.error(
+            "cloud-api: send failed for %s after 3 attempts (%s: %s)",
+            to, type(last_exc).__name__, last_exc,
+        )
+        return {"error": f"{type(last_exc).__name__}: {last_exc}", "to": to}
 
     async def is_healthy(self) -> dict:
         """Check that the configured phone number id is reachable with the token
