@@ -8,6 +8,7 @@ user-initiated messages are processed by ``WhatsappService.handle_inbound_messag
 and replied to via the ``WAHAClient`` adapter.
 """
 
+import asyncio
 import hashlib
 import hmac
 from typing import Annotated
@@ -69,6 +70,47 @@ def _already_processed(event_id: str, msg_id: str) -> bool:
         return True
     _SEEN_EVENTS[key] = now
     return False
+
+
+# Detached background sends kept alive here so asyncio doesn't GC a running task.
+_BG_SENDS: set[asyncio.Task] = set()
+
+# Extra send attempts AFTER the client's own quick retries, spaced out to outlast
+# an egress window. graph.facebook.com is periodically unreachable from the HF
+# Space for a minute or more (ConnectTimeout); since the request never leaves the
+# box, re-sending can't duplicate. ~6 min of coverage total.
+_BG_RETRY_DELAYS = (15, 30, 60, 120, 120)
+
+
+async def _resilient_send(label: str, send) -> None:
+    """Deliver a reply across transient egress outages.
+
+    ``send`` is a zero-arg coroutine factory (a fresh send per attempt). Runs
+    detached from the webhook so Meta still gets its 200 immediately. Retries
+    only while the send keeps failing; stops the instant one succeeds.
+    """
+    attempt = 0
+    while True:
+        try:
+            result = await send()
+            if not (isinstance(result, dict) and result.get("error")):
+                if attempt:
+                    logger.info("cloud-webhook: %s delivered on retry %d", label, attempt)
+                return
+        except Exception as exc:  # never let a background task die loudly
+            logger.warning("cloud-webhook: %s send raised (%s)", label, exc)
+        if attempt >= len(_BG_RETRY_DELAYS):
+            logger.error("cloud-webhook: %s gave up after %d attempts", label, attempt + 1)
+            return
+        await asyncio.sleep(_BG_RETRY_DELAYS[attempt])
+        attempt += 1
+
+
+def _schedule_send(label: str, send) -> None:
+    """Fire-and-forget a resilient send, holding a task ref so it isn't GC'd."""
+    task = asyncio.create_task(_resilient_send(label, send))
+    _BG_SENDS.add(task)
+    task.add_done_callback(_BG_SENDS.discard)
 
 
 def _reply_chat_id(payload: dict, from_field: str) -> str:
@@ -318,30 +360,36 @@ async def cloud_webhook(request: Request, session: SessionDep) -> dict[str, str]
                     # instead of dropping silently so the user isn't left hanging.
                     text = ""
 
+                label = f"reply to ••{phone[-2:] if len(phone) >= 2 else phone}"
                 try:
                     if text:
                         reply = await _service.handle_inbound_message(
                             session, phone, text
                         )
                         await session.commit()
-                        await _service.send_reply(from_digits, reply)
+                        # Send in the background with extended retries so an egress
+                        # window to Meta delays the reply instead of dropping it.
+                        _schedule_send(label, lambda r=reply, f=from_digits: _service.send_reply(f, r))
                     else:
-                        await _service.send_reply_raw(
-                            from_digits,
-                            "ക്ഷമിക്കണം, എനിക്ക് ഇപ്പോൾ ടെക്‌സ്റ്റ് സന്ദേശങ്ങൾ "
-                            "മാത്രമേ വായിക്കാൻ കഴിയൂ. നിങ്ങളുടെ ചോദ്യം ടൈപ്പ് "
-                            "ചെയ്‌ത് അയക്കൂ 🙏",
+                        _schedule_send(
+                            label,
+                            lambda f=from_digits: _service.send_reply_raw(
+                                f,
+                                "ക്ഷമിക്കണം, എനിക്ക് ഇപ്പോൾ ടെക്‌സ്റ്റ് സന്ദേശങ്ങൾ "
+                                "മാത്രമേ വായിക്കാൻ കഴിയൂ. നിങ്ങളുടെ ചോദ്യം ടൈപ്പ് "
+                                "ചെയ്‌ത് അയക്കൂ 🙏",
+                            ),
                         )
                     handled += 1
                 except Exception as exc:
                     logger.error("cloud-webhook: processing failed (%s)", exc)
-                    try:
-                        await _service.send_reply(
-                            from_digits,
+                    _schedule_send(
+                        label,
+                        lambda f=from_digits: _service.send_reply(
+                            f,
                             "❌ ക്ഷമിക്കണം, ഒരു പിശക് സംഭവിച്ചു. ദയവായി വീണ്ടും ശ്രമിക്കൂ.",
-                        )
-                    except Exception:
-                        pass
+                        ),
+                    )
 
     return {"status": "ok", "handled": str(handled)}
 
