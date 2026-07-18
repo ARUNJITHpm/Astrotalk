@@ -38,6 +38,13 @@ _MOCK_REPLY_ML = (
 _MAX_TOKENS = {"sarvam": 4096, "sarvam-fast": 4096, "openai": 1024}
 _DEFAULT_MAX_TOKENS = 1024
 
+# Hard ceiling per provider = the largest max_tokens the subscription tier will
+# accept. Asking for more returns HTTP 400 ("max_tokens exceeds the maximum
+# allowed for your subscription tier"), which crashes the reply. The empty-content
+# retry clamps to this. Sarvam "starter" caps sarvam-105b at 4096; raise these
+# (or the plan) after upgrading.
+_MAX_TOKENS_CAP = {"sarvam": 4096, "sarvam-fast": 4096, "openai": 4096}
+
 # "sarvam-fast" is the same account/endpoint with the lower-latency 30B model.
 PROVIDERS = ("sarvam", "sarvam-fast", "openai")
 
@@ -139,14 +146,19 @@ class LLMClient:
         if not reply.strip():
             # Seen live with sarvam-105b: the model occasionally spends the
             # WHOLE completion budget on internal reasoning and returns empty
-            # content (usage.completion_tokens == max_tokens). One retry with a
-            # doubled budget gives it room to finish thinking AND speak.
+            # content (usage.completion_tokens == max_tokens). Retry with more
+            # room — but clamp to the tier cap, or Sarvam 400s ("max_tokens
+            # exceeds the maximum allowed for your subscription tier") and the
+            # whole reply crashes. On a tier where the cap already equals the
+            # default (starter: 4096), this is simply a second attempt — and the
+            # emptiness is intermittent, so a fresh call often succeeds anyway.
+            retry_tokens = min(max_tokens * 2, _MAX_TOKENS_CAP.get(name, max_tokens))
             logger.warning(
                 "chat.llm: %s returned empty content (usage=%s) — retrying "
-                "with a doubled completion budget.", name, self.last_usage,
+                "with max_tokens=%d.", name, self.last_usage, retry_tokens,
             )
             reply = await self._call(
-                client, name, model, payload, max_tokens * 2, extra
+                client, name, model, payload, retry_tokens, extra
             )
         if not reply.strip():
             # Still nothing — never surface an empty bubble to the user.
