@@ -34,6 +34,20 @@ from app.platform.logging_config import get_logger
 logger = get_logger(__name__)
 
 
+def _client(timeout: float) -> httpx.AsyncClient:
+    """An httpx client pinned to IPv4.
+
+    Some container networks (observed on the HF Space) advertise an IPv6 default
+    route with no working IPv6 connectivity. ``graph.facebook.com`` is dual-stack,
+    so httpx picks its AAAA (IPv6) address and the connection hangs until the
+    timeout — silently failing every Meta call while IPv4-only hosts (e.g. Sarvam)
+    keep working. Binding the source socket to ``0.0.0.0`` forces httpx onto the
+    A (IPv4) record, which is reachable.
+    """
+    transport = httpx.AsyncHTTPTransport(local_address="0.0.0.0")
+    return httpx.AsyncClient(timeout=timeout, transport=transport)
+
+
 def _phone_to_wa_id(phone: str) -> str:
     """Convert a normalized phone (``+919876543210`` or ``919876543210`` or a
     ``…@c.us`` chat id) to the Cloud API recipient form: bare digits
@@ -103,7 +117,7 @@ class CloudAPIClient:
             "text": {"preview_url": False, "body": text},
         }
         try:
-            async with httpx.AsyncClient(timeout=15) as client:
+            async with _client(timeout=15) as client:
                 resp = await client.post(
                     self._url, json=payload, headers=self._headers()
                 )
@@ -113,11 +127,16 @@ class CloudAPIClient:
             # Log the response body when present — Meta returns a JSON error with
             # a diagnostic ``code``/``message`` (e.g. 131047 = outside 24h window,
             # 190 = bad token) that is essential for triage. Never log the token.
+            # Include the exception TYPE so a network timeout (empty message) is
+            # distinguishable from an API rejection.
             detail = ""
             if isinstance(exc, httpx.HTTPStatusError):
                 detail = f" — {exc.response.text[:300]}"
-            logger.error("cloud-api: send failed for %s (%s)%s", to, exc, detail)
-            return {"error": str(exc), "to": to}
+            logger.error(
+                "cloud-api: send failed for %s (%s: %s)%s",
+                to, type(exc).__name__, exc, detail,
+            )
+            return {"error": f"{type(exc).__name__}: {exc}", "to": to}
 
     async def is_healthy(self) -> dict:
         """Check that the configured phone number id is reachable with the token
@@ -135,7 +154,7 @@ class CloudAPIClient:
                 "error": "meta_access_token / meta_phone_number_id not set",
             }
         try:
-            async with httpx.AsyncClient(timeout=10) as client:
+            async with _client(timeout=10) as client:
                 resp = await client.get(
                     f"https://graph.facebook.com/{self._version}"
                     f"/{self._phone_number_id}",
