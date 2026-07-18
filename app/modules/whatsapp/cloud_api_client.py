@@ -58,12 +58,14 @@ def _client(timeout: float) -> httpx.AsyncClient:
     A (IPv4) record, which is reachable.
 
     Even on IPv4 the Space's outbound path to Meta is intermittently slow to
-    complete the TCP handshake (ConnectTimeout), so ``retries`` re-attempts the
-    connect, and a dedicated 10s ``connect`` timeout gives each attempt room.
+    complete the TCP handshake (ConnectTimeout). Retrying is handled by the
+    caller's app-level loop (``_send``), NOT here — stacking transport ``retries``
+    inside that loop meant up to 12 connect attempts and ~2 min hung per failure.
+    A dedicated 8s ``connect`` timeout makes each attempt fail fast.
     """
-    transport = httpx.AsyncHTTPTransport(local_address="0.0.0.0", retries=3)
+    transport = httpx.AsyncHTTPTransport(local_address="0.0.0.0")
     return httpx.AsyncClient(
-        timeout=httpx.Timeout(timeout, connect=10.0),
+        timeout=httpx.Timeout(timeout, connect=8.0),
         transport=transport,
     )
 

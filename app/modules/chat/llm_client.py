@@ -160,6 +160,21 @@ class LLMClient:
             reply = await self._call(
                 client, name, model, payload, retry_tokens, extra
             )
+        if not reply.strip() and name.startswith("sarvam") and self._settings.openai_api_key:
+            # Sarvam still empty — its reasoning ate the whole budget even at low
+            # effort (seen live even on a 924-token prompt). Rather than show the
+            # canned "try again" bubble, get a REAL answer from OpenAI, which
+            # doesn't share this failure mode. Its key must be set on the host.
+            oa_model = self._settings.chat_model
+            logger.warning(
+                "chat.llm: %s empty after retry — falling back to OpenAI (%s).",
+                name, oa_model,
+            )
+            oa_client = AsyncOpenAI(api_key=self._settings.openai_api_key)
+            reply = await self._call(
+                oa_client, "openai", oa_model, payload,
+                _MAX_TOKENS.get("openai", _DEFAULT_MAX_TOKENS), {},
+            )
         if not reply.strip():
             # Still nothing — never surface an empty bubble to the user.
             logger.error("chat.llm: %s empty after retry; sending fallback.", name)
