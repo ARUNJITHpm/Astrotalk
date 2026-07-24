@@ -276,7 +276,7 @@ class TemplesService:
         districts = {
             t["district"]
             for tid in temple_ids
-            if (t := self.get_temple(tid)) is not None
+            if (t := self.get_temple(tid)) is not None and t.get("district")
         }
         return {
             "temples_visited": len(temple_ids),

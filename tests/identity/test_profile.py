@@ -144,11 +144,15 @@ async def test_milestones_track_real_activity(session):
             assert before["ten_temples"]["target"] == 10
 
             await client.post(f"/temples/{_TEMPLE}/checkin", headers=auth)
-            # A booked pooja lights the first_pooja badge.
-            await client.post(
+            # An UNPAID booking must not light the badge yet.
+            created = await client.post(
                 "/bookings", json={"temple_id": _TEMPLE, "pooja_key": "pushpanjali"}, headers=auth
             )
+            unpaid = {m["key"]: m for m in (await client.get("/identity/me/milestones", headers=auth)).json()}
+            assert unpaid["first_pooja"]["got"] is False and unpaid["first_pooja"]["current"] == 0
 
+            # Only a captured payment counts as a pooja.
+            await client.post(f"/commerce/orders/{created.json()['order_id']}/mock-pay", headers=auth)
             after = {m["key"]: m for m in (await client.get("/identity/me/milestones", headers=auth)).json()}
             assert after["first_temple"]["got"] is True
             assert after["first_pooja"]["got"] is True and after["first_pooja"]["current"] == 1

@@ -239,7 +239,10 @@ async def list_members(user: CurrentUser, session: SessionDep) -> list[dict]:
 async def add_member(
     payload: MemberCreate, user: CurrentUser, session: SessionDep
 ) -> dict:
-    out = await _service.add_member(session, user.id, payload)
+    try:
+        out = await _service.add_member(session, user.id, payload)
+    except ValueError:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Family board is full")
     await session.commit()
     return out
 

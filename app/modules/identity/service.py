@@ -550,9 +550,20 @@ class IdentityService:
         ).scalars().all()
         return [self._member_out(m) for m in rows]
 
+    MEMBER_LIMIT = 25  # a family board this large is almost certainly abuse
+
     async def add_member(
         self, session: AsyncSession, user_id: int, data: Any
     ) -> dict:
+        count = (
+            await session.execute(
+                select(func.count(FamilyMember.id)).where(
+                    FamilyMember.user_id == user_id
+                )
+            )
+        ).scalar_one()
+        if count >= self.MEMBER_LIMIT:
+            raise ValueError("member limit reached")
         member = FamilyMember(
             user_id=user_id, name=data.name, rel=data.rel, nak=data.nak, is_self=False
         )

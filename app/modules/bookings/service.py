@@ -85,18 +85,13 @@ class BookingsService:
         return self._to_out(booking, razorpay_key_id=order["razorpay_key_id"])
 
     async def count_for_user(self, session: AsyncSession, user_id: int) -> int:
-        """How many poojas this user has booked (PUBLIC — the profile stat)."""
-        from sqlalchemy import func
+        """How many CONFIRMED poojas this user has (PUBLIC — the profile stat).
 
-        return int(
-            (
-                await session.execute(
-                    select(func.count(PoojaBooking.id)).where(
-                        PoojaBooking.user_id == user_id
-                    )
-                )
-            ).scalar_one()
-        )
+        Only paid bookings count; an unpaid/abandoned 'wait' order must not
+        inflate the stat or unlock a badge. Goes through the same reconcile as
+        the listing so a just-captured payment is reflected."""
+        rows = await self.list_for_user(session, user_id)
+        return sum(1 for b in rows if b["state"] == "ok")
 
     async def list_for_user(self, session: AsyncSession, user_id: int) -> list[dict]:
         rows = list(
