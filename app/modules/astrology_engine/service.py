@@ -11,9 +11,10 @@ I/O (AGENTS.md: don't block the event loop on the ephemeris API). The actual
 provider call is isolated in ephemeris_client.py.
 """
 
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 
 from app.modules.astrology_engine.ephemeris_client import EphemerisClient
+from app.modules.astrology_engine.swiss_ephemeris import NAKSHATRAS
 
 
 class AstrologyEngineService:
@@ -66,6 +67,39 @@ class AstrologyEngineService:
     async def get_panchangam(self, day: date | None = None) -> dict:
         """Panchangam for the day: nakshatram, nalla neram, tithi."""
         return await self._client.panchangam(day or date.today())
+
+    @staticmethod
+    def _panchangam_nak_index(panchangam: dict) -> int:
+        """The day's nakshatra index, from the real field or the name lookup."""
+        idx = panchangam.get("nakshatra_index")
+        if isinstance(idx, int):
+            return idx
+        try:
+            return NAKSHATRAS.index(panchangam.get("nakshatram", ""))
+        except ValueError:
+            return -1
+
+    async def next_nakshatram_day(
+        self,
+        nak_index: int,
+        *,
+        from_day: date | None = None,
+        horizon_days: int = 40,
+    ) -> date | None:
+        """The next calendar day (from ``from_day``, inclusive) on which the Moon
+        sits in nakshatram ``nak_index`` — the real ~27-day cycle, computed from
+        the ephemeris, not a fixed offset. Returns None if no match within the
+        horizon (a nakshatram occasionally skips the noon sample; 40 days covers
+        more than one full cycle). ``from_day`` defaults to today (IST date)."""
+        if not 0 <= nak_index <= 26:
+            raise ValueError(f"nakshatram index out of range: {nak_index}")
+        start = from_day or date.today()
+        for offset in range(horizon_days + 1):
+            day = start + timedelta(days=offset)
+            panchangam = await self._client.panchangam(day)
+            if self._panchangam_nak_index(panchangam) == nak_index:
+                return day
+        return None
 
     def nakshatra_names(self) -> list[str]:
         """The 27 Malayalam nakshatra names, in canonical order.

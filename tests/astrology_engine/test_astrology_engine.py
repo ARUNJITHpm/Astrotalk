@@ -90,3 +90,41 @@ async def test_router_transits_and_panchangam(client):
         body = panchangam.json()
         assert body["date"] == "2026-06-25"
         assert body["nakshatram"] and body["nalla_neram"] and body["tithi"]
+
+
+# ---- nakshatram/next (Part 1: the star-day countdown) ----
+
+
+async def test_mock_panchangam_exposes_nakshatra_index():
+    p = await AstrologyEngineService().get_panchangam(date(2026, 6, 25))
+    assert "nakshatra_index" in p and 0 <= p["nakshatra_index"] <= 26
+
+
+async def test_next_nakshatram_day_lands_on_that_star():
+    svc = AstrologyEngineService()
+    start = date(2026, 7, 25)
+    for idx in range(27):
+        day = await svc.next_nakshatram_day(idx, from_day=start)
+        if day is None:  # a star can skip the noon sample within the horizon
+            continue
+        assert day >= start
+        landed = await svc.get_panchangam(day)
+        assert landed["nakshatra_index"] == idx
+
+
+async def test_next_nakshatram_day_rejects_bad_index():
+    with pytest.raises(ValueError):
+        await AstrologyEngineService().next_nakshatram_day(27)
+
+
+async def test_nakshatram_next_endpoint_sorted_soonest_first(client):
+    async with client:
+        resp = await client.get("/astrology/nakshatram/next", params={"nak": [3, 10, 3]})
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body, "at least one star should resolve within the horizon"
+    idxs = [r["nakshatram_index"] for r in body]
+    assert idxs == list(dict.fromkeys(idxs))  # de-duped
+    assert [r["days_until"] for r in body] == sorted(r["days_until"] for r in body)
+    for r in body:
+        assert r["nakshatram"] and r["days_until"] >= 0

@@ -37,6 +37,7 @@ from fastapi.staticfiles import StaticFiles
 from app.modules.admin.router import router as admin_router
 from app.modules.astrologers.router import router as astrologers_router
 from app.modules.astrology_engine.router import router as astrology_engine_router
+from app.modules.bookings.router import router as bookings_router
 from app.modules.chat.router import router as chat_router
 from app.modules.commerce.router import router as commerce_router
 from app.modules.community.router import router as community_router
@@ -93,6 +94,7 @@ for router in (
     whatsapp_router,
     community_router,
     commerce_router,
+    bookings_router,
     notifications_router,
     orgs_router,
     orgs_whitelabel_router,

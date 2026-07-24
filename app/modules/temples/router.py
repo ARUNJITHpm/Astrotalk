@@ -9,6 +9,7 @@ Three surfaces (GROWTH_PLAN.md Part 3 added the last two):
 """
 
 import html as html_lib
+from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
@@ -22,8 +23,11 @@ from app.modules.temples.schemas import (
     FestivalOut,
     PartnerCreate,
     PartnerOut,
+    PoojaCatalogueOut,
     SubscribePayload,
+    TempleDetailOut,
     TempleDirectoryItem,
+    TempleOut,
     TempleSuggestion,
 )
 from app.modules.temples.service import TemplesService
@@ -141,6 +145,64 @@ async def partner_qr(slug: str, session: SessionDep, request: Request) -> Respon
     base = get_settings().public_base_url.rstrip("/") or str(request.base_url).rstrip("/")
     png = partners.qr_png(f"{base}/t/{partner.slug}?src=qr")
     return Response(content=png, media_type="image/png")
+
+
+# ---- Public app surface (Nithara): list / search / nearby / detail ----
+# Registered AFTER the static routes above (/suggest, /directory, /partners...)
+# so the `/{temple_id}` catch-all never shadows them.
+
+
+@router.get("", response_model=list[TempleOut])
+async def list_temples(
+    q: str | None = Query(default=None, description="search text"),
+    by: str = Query(default="name", pattern="^(name|place)$"),
+    deity: str | None = Query(default=None, description="shiva | devi | vishnu"),
+    lat: float | None = Query(default=None),
+    lng: float | None = Query(default=None),
+    sort: str | None = Query(default=None, pattern="^(near|rating)$"),
+    limit: int = Query(default=50, ge=1, le=200),
+) -> list[dict]:
+    """Public temple list/search/nearby for the app home, search and map."""
+    return _service.list_public(
+        q=q, by=by, deity=deity, lat=lat, lng=lng, sort=sort, limit=limit
+    )
+
+
+@router.get("/by-qr/{token}", response_model=TempleDetailOut)
+async def temple_by_qr(token: str, session: SessionDep) -> dict:
+    """Resolve a scanned temple QR poster (partner slug) to its detail."""
+    partner = await partners.get_partner_by_slug(session, token)
+    temple = _service.get_temple(partner.temple_id) if partner else None
+    if partner is None or temple is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="No temple for that code")
+    return _service.to_detail(temple)
+
+
+@router.get("/{temple_id}/poojas", response_model=PoojaCatalogueOut)
+async def temple_poojas(
+    temple_id: str,
+    nak: int | None = Query(default=None, ge=0, le=26, description="star to book for"),
+) -> dict:
+    """A temple's offering catalogue. With ``nak`` given, each offering is locked
+    when its lead time can't be met before that star's next recurrence."""
+    temple = _service.get_temple(temple_id)
+    if temple is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Temple not found")
+    days_until: int | None = None
+    if nak is not None:
+        star_day = await _engine.next_nakshatram_day(nak)
+        if star_day is not None:
+            days_until = (star_day - date.today()).days
+    return _service.pooja_catalogue(temple, days_until=days_until)
+
+
+@router.get("/{temple_id}", response_model=TempleDetailOut)
+async def temple_detail(temple_id: str) -> dict:
+    """Full detail for one temple (story, timings, offering catalogue)."""
+    temple = _service.get_temple(temple_id)
+    if temple is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Temple not found")
+    return _service.to_detail(temple)
 
 
 # ---- Public microsite + widget ----

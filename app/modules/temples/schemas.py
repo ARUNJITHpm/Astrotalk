@@ -60,6 +60,74 @@ class SubscribePayload(BaseModel):
     phone: str
 
 
+class PoojaCatalogueItem(BaseModel):
+    """One bookable offering at a temple (amount in ₹, lead in days).
+
+    ``locked`` is set when the offering's lead time can no longer be met before
+    the target star day (``lead_days > days_until``); it stays False when no
+    star day is in play (plain catalogue view).
+    """
+
+    key: str
+    name: str
+    name_ml: str
+    amount: int
+    lead_days: int
+    locked: bool = False
+
+
+class PoojaCatalogueOut(BaseModel):
+    """A temple's offering catalogue, optionally resolved against a star day."""
+
+    temple_id: str
+    days_until: int | None = None
+    poojas: list[PoojaCatalogueItem]
+
+
+class TempleTimings(BaseModel):
+    """Darshan windows, as display strings (the app renders them verbatim)."""
+
+    nirmalyam: str
+    morning: str
+    evening: str
+
+
+class TempleOut(BaseModel):
+    """A temple as the Nithara app lists it (field names match the UI).
+
+    ``open`` / ``closes`` are computed from the darshan windows against the
+    current IST wall-clock. ``distance_km`` is present only when the caller
+    supplied a location. ``rating`` / ``reviews`` are optional and stay ``null``
+    until real check-in/review data exists — never fabricated.
+    """
+
+    id: str
+    en: str
+    ml: str
+    place: str
+    mplace: str | None = None
+    deity: str
+    sig: str
+    lat: float
+    lng: float
+    pooja: bool
+    open: bool
+    closes: str | None = None
+    rating: str | None = None
+    reviews: str | None = None
+    distance_km: float | None = None
+
+
+class TempleDetailOut(TempleOut):
+    """Full temple detail for the temple sheet (adds prose, timings, catalogue)."""
+
+    district: str
+    story: str
+    story_ml: str | None = None
+    timings: TempleTimings
+    poojas: list[PoojaCatalogueItem]
+
+
 class TempleSuggestion(BaseModel):
     """One temple suggestion, ready for the LLM to narrate (or the app to render).
 

@@ -10,6 +10,15 @@ from typing import Any
 from pydantic import BaseModel
 
 
+class NakshatramDayOut(BaseModel):
+    """The next date a given nakshatram recurs — the star-day countdown source."""
+
+    nakshatram_index: int
+    nakshatram: str
+    date: str
+    days_until: int
+
+
 class NatalChartOut(BaseModel):
     system: str
     ayanamsa: str

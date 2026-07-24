@@ -13,7 +13,9 @@ Split of responsibilities (same as the rest of the app):
     (GUARDRAILS.md §1).
 """
 
+from datetime import datetime
 from math import asin, cos, radians, sin, sqrt
+from zoneinfo import ZoneInfo
 
 from app.modules.temples.remedy_map import (
     CONCERN_DEITIES,
@@ -27,6 +29,43 @@ from app.modules.temples.schemas import TempleSuggestion
 from app.modules.temples.seed_data import SEED_TEMPLES
 
 _EARTH_RADIUS_KM = 6371.0
+_IST = ZoneInfo("Asia/Kolkata")
+
+# The app draws one of these glyphs per temple. Deities without a dedicated icon
+# fall back to the generic "temple" mark. Family grouping (Krishna → vishnu,
+# Saraswati → devi) also lets the app's three deity chips stay meaningful.
+_SIG_MAP = {
+    "shiva": "shiva",
+    "vishnu": "vishnu",
+    "krishna": "vishnu",
+    "devi": "devi",
+    "saraswati": "devi",
+}
+
+# Standard Kerala darshan windows, applied when a temple seeds none. Windows are
+# (open_minute, close_minute) in IST wall-clock; the display strings mirror them.
+DEFAULT_HOURS: tuple[tuple[int, int], ...] = (
+    (5 * 60, 12 * 60 + 30),   # morning: 5:00 AM – 12:30 PM
+    (16 * 60 + 30, 20 * 60 + 30),  # evening: 4:30 – 8:30 PM
+)
+DEFAULT_TIMINGS = {
+    "nirmalyam": "4:00 – 4:45 AM",
+    "morning": "5:00 AM – 12:30 PM",
+    "evening": "4:30 – 8:30 PM",
+}
+
+# A baseline offering catalogue, applied when a temple seeds none. Amounts in ₹,
+# lead in days (0 = same-day bookable). Part 1 layers nakshatram lead-time locks.
+DEFAULT_POOJAS: list[dict] = [
+    {"key": "pushpanjali", "name": "Pushpanjali", "name_ml": "പുഷ്പാഞ്ജലി",
+     "amount": 101, "lead_days": 0},
+    {"key": "archana", "name": "Archana", "name_ml": "അർച്ചന",
+     "amount": 51, "lead_days": 0},
+    {"key": "neyvilakku", "name": "Neyvilakku", "name_ml": "നെയ്‌വിളക്ക്",
+     "amount": 75, "lead_days": 1},
+    {"key": "ganapathi_homam", "name": "Ganapathi Homam", "name_ml": "ഗണപതി ഹോമം",
+     "amount": 1250, "lead_days": 3},
+]
 
 
 def _haversine_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
@@ -35,6 +74,21 @@ def _haversine_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
     dlng = radians(lng2 - lng1)
     a = sin(dlat / 2) ** 2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlng / 2) ** 2
     return 2 * _EARTH_RADIUS_KM * asin(sqrt(a))
+
+
+def _fmt_ampm(total_min: int) -> str:
+    """Minutes-since-midnight → a display clock like ``12:30 PM``."""
+    hour, minute = divmod(total_min, 60)
+    suffix = "AM" if hour < 12 else "PM"
+    return f"{hour % 12 or 12}:{minute:02d} {suffix}"
+
+
+def _open_state(hours: tuple[tuple[int, int], ...], now_min: int) -> tuple[bool, str | None]:
+    """Whether any darshan window covers ``now_min``; if so, when it closes."""
+    for open_m, close_m in hours:
+        if open_m <= now_min < close_m:
+            return True, _fmt_ampm(close_m)
+    return False, None
 
 
 class TemplesService:
@@ -61,6 +115,115 @@ class TemplesService:
             }
             for t in self._temples
         ]
+
+    # ---- public app surface (Nithara): list / search / nearby / detail ----
+
+    @staticmethod
+    def _sig(deity_key: str) -> str:
+        return _SIG_MAP.get(deity_key, "temple")
+
+    def _public_row(
+        self, t: dict, *, now_min: int, lat: float | None, lng: float | None
+    ) -> dict:
+        """Map a seed temple to the app's list shape (field names match the UI)."""
+        is_open, closes = _open_state(t.get("hours", DEFAULT_HOURS), now_min)
+        info = DEITIES.get(t["deity"], {})
+        distance = (
+            round(_haversine_km(lat, lng, t["lat"], t["lng"]), 1)
+            if lat is not None and lng is not None
+            else None
+        )
+        return {
+            "id": t["id"],
+            "en": t["name"],
+            "ml": t["name_ml"],
+            "place": t["town"],
+            "mplace": t.get("town_ml") or None,
+            "deity": info.get("name", t["deity"].title()),
+            "sig": self._sig(t["deity"]),
+            "lat": t["lat"],
+            "lng": t["lng"],
+            "pooja": bool(t.get("poojas", DEFAULT_POOJAS)),
+            "open": is_open,
+            "closes": closes,
+            "rating": t.get("rating"),
+            "reviews": t.get("reviews"),
+            "distance_km": distance,
+        }
+
+    def list_public(
+        self,
+        *,
+        q: str | None = None,
+        by: str = "name",
+        deity: str | None = None,
+        lat: float | None = None,
+        lng: float | None = None,
+        sort: str | None = None,
+        limit: int | None = None,
+        now: datetime | None = None,
+    ) -> list[dict]:
+        """List/search/nearby temples for the app.
+
+        ``q`` matches name (``by=name``) or town+district (``by=place``).
+        ``deity`` is a glyph family (shiva|devi|vishnu) or a display name.
+        Sorting defaults to nearest-first when a location is given, else the
+        curated order. ``now`` overrides the clock (tests pin open/closed).
+        """
+        ref = now or datetime.now(_IST)
+        now_min = ref.hour * 60 + ref.minute
+
+        rows = list(self._temples)
+        if q:
+            ql = q.strip().lower()
+            if by == "place":
+                rows = [t for t in rows if ql in f"{t['town']} {t['district']}".lower()]
+            else:
+                rows = [t for t in rows if ql in f"{t['name']} {t['name_ml']}".lower()]
+        if deity:
+            dl = deity.strip().lower()
+            rows = [
+                t
+                for t in rows
+                if self._sig(t["deity"]) == dl
+                or t["deity"] == dl
+                or DEITIES.get(t["deity"], {}).get("name", "").lower() == dl
+            ]
+
+        out = [self._public_row(t, now_min=now_min, lat=lat, lng=lng) for t in rows]
+        if sort == "rating":
+            out.sort(key=lambda r: (r["rating"] is None, r["rating"] or ""))
+        elif sort == "near" or (sort is None and lat is not None and lng is not None):
+            out.sort(key=lambda r: (r["distance_km"] is None, r["distance_km"] or 0.0))
+        if limit is not None:
+            out = out[: max(0, limit)]
+        return out
+
+    def pooja_catalogue(self, t: dict, *, days_until: int | None = None) -> dict:
+        """The temple's offering catalogue, with each item's lead-time lock
+        resolved against ``days_until`` (the wait to the target star day). When
+        ``days_until`` is None the catalogue is returned unlocked."""
+        poojas = [
+            {**p, "locked": days_until is not None and p["lead_days"] > days_until}
+            for p in t.get("poojas", DEFAULT_POOJAS)
+        ]
+        return {"temple_id": t["id"], "days_until": days_until, "poojas": poojas}
+
+    def to_detail(self, t: dict, *, now: datetime | None = None) -> dict:
+        """Full detail (prose + timings + catalogue) for the temple sheet."""
+        ref = now or datetime.now(_IST)
+        now_min = ref.hour * 60 + ref.minute
+        row = self._public_row(t, now_min=now_min, lat=None, lng=None)
+        row.update(
+            {
+                "district": t["district"],
+                "story": t.get("story") or t["famous_for"],
+                "story_ml": t.get("story_ml"),
+                "timings": t.get("timings", DEFAULT_TIMINGS),
+                "poojas": t.get("poojas", DEFAULT_POOJAS),
+            }
+        )
+        return row
 
     # ---- partnership data, exposed for the notifications module (Part 3).
     # Plain dicts/strs out — other modules never touch this module's tables.

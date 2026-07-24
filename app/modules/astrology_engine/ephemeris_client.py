@@ -144,9 +144,14 @@ class EphemerisClient:
         # Auspicious window: a stable 1-hour slot between 06:00 and 09:00.
         start_hour = 6 + (base % 3)
         nalla_neram = f"{start_hour:02d}:30–{start_hour + 1:02d}:30"
+        # ``nakshatra_index`` mirrors the real path (compute_panchangam) so
+        # callers like next_nakshatram_day work identically under mock. The
+        # name is unchanged: _NAKSHATRAS here is the same list, same order.
+        nak_index = base % len(_NAKSHATRAS)
         return {
             "date": day.isoformat(),
-            "nakshatram": _pick(_NAKSHATRAS, base),
+            "nakshatram": _NAKSHATRAS[nak_index],
+            "nakshatra_index": nak_index,
             "nalla_neram": nalla_neram,
             "tithi": _pick(_TITHI_NAMES, base // 7),
             "mock": True,

@@ -20,6 +20,7 @@ from app.platform.db import Base, _resolve_async_url, connect_args_for
 # Import ALL module models so autogenerate sees the full schema.
 from app.modules.admin import models as _admin_models  # noqa: F401
 from app.modules.astrology_engine import models as _astro_models  # noqa: F401
+from app.modules.bookings import models as _bookings_models  # noqa: F401
 from app.modules.chat import models as _chat_models  # noqa: F401
 from app.modules.commerce import models as _commerce_models  # noqa: F401
 from app.modules.community import models as _community_models  # noqa: F401

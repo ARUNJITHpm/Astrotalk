@@ -21,7 +21,7 @@ To grow this directory later: OpenStreetMap Overpass (legal, has deity tags) for
 breadth, Google Places API (paid, on-demand + cached) for gap-filling lookups.
 """
 
-from typing import TypedDict
+from typing import NotRequired, TypedDict
 
 
 class TempleSeed(TypedDict):
@@ -36,6 +36,20 @@ class TempleSeed(TypedDict):
     famous_for: str
     vazhipadu: list[str]
     reviewed: bool
+    # --- optional enrichment for the Nithara app (all default in service.py) ---
+    # ``story``/``story_ml``: longer devotional prose for the temple sheet;
+    # falls back to ``famous_for`` when absent. ``hours``: darshan windows as
+    # (open_minute, close_minute) IST tuples, used to compute open/closes;
+    # ``timings``: the display strings; ``poojas``: per-temple catalogue.
+    # ``rating``/``reviews`` stay unset until REAL review data exists — the
+    # service never invents them (GUARDRAILS.md §1: no fabricated claims).
+    story: NotRequired[str]
+    story_ml: NotRequired[str]
+    hours: NotRequired[tuple[tuple[int, int], ...]]
+    timings: NotRequired[dict[str, str]]
+    poojas: NotRequired[list[dict]]
+    rating: NotRequired[str]
+    reviews: NotRequired[str]
 
 
 SEED_TEMPLES: list[TempleSeed] = [
@@ -49,6 +63,16 @@ SEED_TEMPLES: list[TempleSeed] = [
         "famous_for": "Anantha Padmanabha (Vishnu reclining on Anantha); Guru preethi and overall wellbeing",
         "vazhipadu": ["archana", "paal payasam", "thulabharam"],
         "reviewed": True,
+        "story": (
+            "The seat of Anantha Padmanabha — Vishnu reclining on the serpent "
+            "Anantha, seen through three doors across the sanctum. One of the "
+            "108 Divya Desams and long the tutelary shrine of the Travancore "
+            "royal house, its gopuram rises over the East Fort of the capital."
+        ),
+        "story_ml": (
+            "അനന്തശയനത്തിൽ മഹാവിഷ്ണു — അനന്ത പത്മനാഭന്റെ ഇരിപ്പിടം. 108 "
+            "ദിവ്യദേശങ്ങളിൽ ഒന്ന്; തിരുവിതാംകൂർ രാജവംശത്തിന്റെ കുലദൈവ ക്ഷേത്രം."
+        ),
     },
     {
         "id": "tvm-pazhavangadi-ganapathi",
@@ -69,6 +93,17 @@ SEED_TEMPLES: list[TempleSeed] = [
         "famous_for": "Attukal Pongala (world's largest women's gathering); family welfare and protection",
         "vazhipadu": ["pongala", "kadumpayasam", "archana"],
         "reviewed": True,
+        "story": (
+            "Known as the Sabarimala of Women for the Attukal Pongala, when "
+            "lakhs of women line the streets of the capital to offer pongala to "
+            "the Bhagavathy. The devi here is worshipped as the mother who "
+            "guards the family's welfare."
+        ),
+        "story_ml": (
+            "സ്ത്രീകളുടെ ശബരിമല എന്നറിയപ്പെടുന്ന ആറ്റുകാൽ — ലോകത്തിലെ ഏറ്റവും "
+            "വലിയ സ്ത്രീ സംഗമമായ പൊങ്കാലയ്ക്ക് പേരുകേട്ടത്. കുടുംബ ക്ഷേമത്തിന്റെ "
+            "അമ്മയായി ഭഗവതിയെ ഇവിടെ ആരാധിക്കുന്നു."
+        ),
     },
     {
         "id": "tvm-otc-hanuman-palayam",
