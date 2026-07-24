@@ -57,6 +57,28 @@ class User(Base):
     )
 
 
+class FamilyMember(Base):
+    """A person on the account's family board (NITHARA-BUILD-PLAN Part 2).
+
+    Poojas are booked "in whose name" — the self row is the account holder, and
+    additional rows are relatives (mother, spouse, child…). Exactly one row per
+    account has ``is_self=True``; it is created lazily and cannot be deleted.
+    ``nak`` is the janma nakshatram index (0–26) or null until known.
+    """
+
+    __tablename__ = "family_members"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    name: Mapped[str] = mapped_column(default="")
+    rel: Mapped[str] = mapped_column(default="rSelf")  # relation key from the app
+    nak: Mapped[int | None] = mapped_column(nullable=True, default=None)
+    is_self: Mapped[bool] = mapped_column(default=False)
+    created_at: Mapped[datetime] = mapped_column(default=_utcnow)
+
+
 class Session(Base):
     """A bearer login session. The token authenticates every user-scoped API
     call; it expires after ``settings.session_ttl_hours`` and is revoked by

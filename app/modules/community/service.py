@@ -221,6 +221,11 @@ class CommunityService:
         checked_today = date_type.today() in await self._checkin_days(session, user_id)
         return StreakOut(streak=streak, checked_in_today=checked_today)
 
+    async def record_checkin(self, session: AsyncSession, user_id: int) -> None:
+        """Mark the caller present today (idempotent). PUBLIC so other modules —
+        e.g. a temple darshan check-in — can advance the same daily streak."""
+        await self._record_checkin(session, user_id)
+
     # ---- Polls ----
 
     async def create_poll(

@@ -18,10 +18,15 @@ from app.modules.identity.schemas import (
     AuthResponse,
     ChartOut,
     LoginRequest,
+    MemberCreate,
+    MemberOut,
+    MemberUpdate,
+    MilestoneOut,
     PasswordReset,
     PasswordResetVerify,
     ProfileOut,
     ReferralSummary,
+    StatsOut,
     UserCreate,
     UserOut,
 )
@@ -219,6 +224,63 @@ async def me(user: CurrentUser) -> ProfileOut:
         name=user.name,
         is_admin=is_admin_phone(user.phone),
     )
+
+
+@router.get("/me/members", response_model=list[MemberOut])
+async def list_members(user: CurrentUser, session: SessionDep) -> list[dict]:
+    """The account's family board (poojas are booked in a member's name). The
+    account holder's own 'self' row is created on first read."""
+    out = await _service.list_members(session, user)
+    await session.commit()
+    return out
+
+
+@router.post("/me/members", response_model=MemberOut, status_code=status.HTTP_201_CREATED)
+async def add_member(
+    payload: MemberCreate, user: CurrentUser, session: SessionDep
+) -> dict:
+    out = await _service.add_member(session, user.id, payload)
+    await session.commit()
+    return out
+
+
+@router.patch("/me/members/{member_id}", response_model=MemberOut)
+async def update_member(
+    member_id: int, payload: MemberUpdate, user: CurrentUser, session: SessionDep
+) -> dict:
+    out = await _service.update_member(
+        session, user.id, member_id, payload.model_dump(exclude_unset=True)
+    )
+    if out is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Member not found")
+    await session.commit()
+    return out
+
+
+@router.delete("/me/members/{member_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_member(
+    member_id: int, user: CurrentUser, session: SessionDep
+) -> None:
+    result = await _service.delete_member(session, user.id, member_id)
+    if result == "not_found":
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Member not found")
+    if result == "self":
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, detail="Can't remove your own row"
+        )
+    await session.commit()
+
+
+@router.get("/me/stats", response_model=StatsOut)
+async def my_stats(user: CurrentUser, session: SessionDep) -> dict:
+    """Profile header counters: temples visited, poojas, streak, badges."""
+    return await _service.profile_stats(session, user.id)
+
+
+@router.get("/me/milestones", response_model=list[MilestoneOut])
+async def my_milestones(user: CurrentUser, session: SessionDep) -> list[dict]:
+    """Badge progress toward each milestone, from real activity."""
+    return await _service.milestones(session, user.id)
 
 
 @router.post("/transcript-consent", status_code=status.HTTP_204_NO_CONTENT)

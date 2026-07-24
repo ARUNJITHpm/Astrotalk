@@ -17,8 +17,10 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.astrology_engine.service import AstrologyEngineService
+from app.modules.identity.auth import CurrentUser
 from app.modules.temples import partners
 from app.modules.temples.schemas import (
+    CheckinOut,
     FestivalCreate,
     FestivalOut,
     PartnerCreate,
@@ -194,6 +196,25 @@ async def temple_poojas(
         if star_day is not None:
             days_until = (star_day - date.today()).days
     return _service.pooja_catalogue(temple, days_until=days_until)
+
+
+@router.post("/{temple_id}/checkin", response_model=CheckinOut)
+async def temple_checkin(
+    temple_id: str, user: CurrentUser, session: SessionDep
+) -> dict:
+    """Record a darshan at this temple (idempotent per day) and advance the
+    daily streak. Feeds the profile's 'temples visited' counter."""
+    temple = _service.get_temple(temple_id)
+    if temple is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Temple not found")
+    fresh = await _service.record_visit(session, user.id, temple_id)
+    stats = await _service.visit_stats(session, user.id)
+    await session.commit()
+    return {
+        "fresh": fresh,
+        "temple_id": temple_id,
+        "temples_visited": stats["temples_visited"],
+    }
 
 
 @router.get("/{temple_id}", response_model=TempleDetailOut)

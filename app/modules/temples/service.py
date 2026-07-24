@@ -225,6 +225,64 @@ class TemplesService:
         )
         return row
 
+    # ---- temple visits / darshan check-in (Part 2) ----
+
+    async def record_visit(self, session, user_id: int, temple_id: str) -> bool:
+        """Record a darshan for today (idempotent per user/temple/day) and
+        advance the daily streak. Returns True if this was a fresh check-in.
+        The caller has already validated the temple id."""
+        from datetime import date
+
+        from sqlalchemy import select
+
+        from app.modules.temples.models import TempleVisit
+
+        today = date.today()
+        exists = (
+            await session.execute(
+                select(TempleVisit.id).where(
+                    TempleVisit.user_id == user_id,
+                    TempleVisit.temple_id == temple_id,
+                    TempleVisit.day == today,
+                )
+            )
+        ).scalar_one_or_none()
+        fresh = exists is None
+        if fresh:
+            session.add(
+                TempleVisit(user_id=user_id, temple_id=temple_id, day=today)
+            )
+            await session.flush()
+
+        # A darshan counts as a daily check-in — one streak for the whole app.
+        from app.modules.community.service import CommunityService
+
+        await CommunityService().record_checkin(session, user_id)
+        return fresh
+
+    async def visit_stats(self, session, user_id: int) -> dict:
+        """Distinct temples and districts this user has checked into."""
+        from sqlalchemy import select
+
+        from app.modules.temples.models import TempleVisit
+
+        temple_ids = set(
+            (
+                await session.execute(
+                    select(TempleVisit.temple_id).where(TempleVisit.user_id == user_id)
+                )
+            ).scalars().all()
+        )
+        districts = {
+            t["district"]
+            for tid in temple_ids
+            if (t := self.get_temple(tid)) is not None
+        }
+        return {
+            "temples_visited": len(temple_ids),
+            "districts_visited": len(districts),
+        }
+
     # ---- partnership data, exposed for the notifications module (Part 3).
     # Plain dicts/strs out — other modules never touch this module's tables.
 

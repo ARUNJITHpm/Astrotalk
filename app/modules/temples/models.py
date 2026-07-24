@@ -57,6 +57,26 @@ class TempleSubscription(Base):
     created_at: Mapped[datetime] = mapped_column(default=_utcnow)
 
 
+class TempleVisit(Base):
+    """A recorded darshan — the app's temple check-in (Part 2).
+
+    One row per (user, temple, day); the profile's "temples visited" counts
+    distinct temples, and each check-in also advances the daily streak (via the
+    community module). ``user_id`` is a plain int — no cross-module FK.
+    """
+
+    __tablename__ = "temple_visits"
+    __table_args__ = (
+        UniqueConstraint("user_id", "temple_id", "day", name="uq_visit_user_temple_day"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(index=True)
+    temple_id: Mapped[str] = mapped_column(index=True)
+    day: Mapped[date] = mapped_column(index=True)
+    created_at: Mapped[datetime] = mapped_column(default=_utcnow)
+
+
 class TempleFestival(Base):
     __tablename__ = "temple_festivals"
 

@@ -7,7 +7,7 @@ these payloads or place their fields in URLs.
 from datetime import date, datetime, time
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, computed_field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 
 def compute_age(dob: date, today: date | None = None) -> int:
@@ -15,6 +15,52 @@ def compute_age(dob: date, today: date | None = None) -> int:
     age column would silently drift out of date every birthday."""
     today = today or date.today()
     return today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
+
+
+class MemberCreate(BaseModel):
+    """Add someone to the family board (a relative a pooja can be booked for)."""
+
+    name: str = ""
+    rel: str = "rMother"  # relation key from the app (rMother, rSpouse, …)
+    nak: int | None = Field(default=None, ge=0, le=26)
+
+
+class MemberUpdate(BaseModel):
+    """Edit a family member. Only the fields present are changed."""
+
+    name: str | None = None
+    rel: str | None = None
+    nak: int | None = Field(default=None, ge=0, le=26)
+
+
+class MemberOut(BaseModel):
+    """A family-board row. ``self`` marks the account holder's own row."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: int
+    name: str
+    rel: str
+    nak: int | None
+    is_self: bool = Field(serialization_alias="self")
+
+
+class StatsOut(BaseModel):
+    """The profile header counters."""
+
+    temples_visited: int
+    poojas: int
+    streak: int
+    badges: int
+
+
+class MilestoneOut(BaseModel):
+    """One badge: progress toward a target, and whether it's unlocked."""
+
+    key: str
+    current: int
+    target: int
+    got: bool
 
 
 class UserCreate(BaseModel):

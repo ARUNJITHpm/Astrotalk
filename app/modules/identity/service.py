@@ -20,7 +20,14 @@ from typing import Any
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.identity.models import Chart, Referral, ReferralCode, Session, User
+from app.modules.identity.models import (
+    Chart,
+    FamilyMember,
+    Referral,
+    ReferralCode,
+    Session,
+    User,
+)
 from app.modules.identity.schemas import UserCreate
 from app.platform import metrics
 from app.platform.config import get_settings
@@ -507,6 +514,138 @@ class IdentityService:
         if user is None:
             return None
         return await self.get_chart(session, user.id)
+
+    # ---- family board + profile stats (NITHARA-BUILD-PLAN Part 2) ----
+
+    @staticmethod
+    def _member_out(m: FamilyMember) -> dict:
+        return {"id": m.id, "name": m.name, "rel": m.rel, "nak": m.nak, "is_self": m.is_self}
+
+    async def ensure_self_member(
+        self, session: AsyncSession, user: User
+    ) -> FamilyMember:
+        """The account holder's own family-board row, created on first read."""
+        existing = (
+            await session.execute(
+                select(FamilyMember).where(
+                    FamilyMember.user_id == user.id, FamilyMember.is_self.is_(True)
+                )
+            )
+        ).scalars().first()
+        if existing is not None:
+            return existing
+        member = FamilyMember(user_id=user.id, name=user.name, rel="rSelf", is_self=True)
+        session.add(member)
+        await session.flush()
+        return member
+
+    async def list_members(self, session: AsyncSession, user: User) -> list[dict]:
+        await self.ensure_self_member(session, user)
+        rows = (
+            await session.execute(
+                select(FamilyMember)
+                .where(FamilyMember.user_id == user.id)
+                .order_by(FamilyMember.is_self.desc(), FamilyMember.id)
+            )
+        ).scalars().all()
+        return [self._member_out(m) for m in rows]
+
+    async def add_member(
+        self, session: AsyncSession, user_id: int, data: Any
+    ) -> dict:
+        member = FamilyMember(
+            user_id=user_id, name=data.name, rel=data.rel, nak=data.nak, is_self=False
+        )
+        session.add(member)
+        await session.flush()
+        return self._member_out(member)
+
+    async def _get_member(
+        self, session: AsyncSession, user_id: int, member_id: int
+    ) -> FamilyMember | None:
+        return (
+            await session.execute(
+                select(FamilyMember).where(
+                    FamilyMember.id == member_id, FamilyMember.user_id == user_id
+                )
+            )
+        ).scalars().first()
+
+    async def update_member(
+        self, session: AsyncSession, user_id: int, member_id: int, changes: dict
+    ) -> dict | None:
+        member = await self._get_member(session, user_id, member_id)
+        if member is None:
+            return None
+        if "name" in changes and changes["name"] is not None:
+            member.name = changes["name"]
+        # The self row's relation stays rSelf; everything else is editable.
+        if "rel" in changes and changes["rel"] is not None and not member.is_self:
+            member.rel = changes["rel"]
+        if "nak" in changes:
+            member.nak = changes["nak"]
+        await session.flush()
+        return self._member_out(member)
+
+    async def delete_member(
+        self, session: AsyncSession, user_id: int, member_id: int
+    ) -> str:
+        """Returns 'ok', 'self' (can't delete the account row), or 'not_found'."""
+        member = await self._get_member(session, user_id, member_id)
+        if member is None:
+            return "not_found"
+        if member.is_self:
+            return "self"
+        await session.delete(member)
+        await session.flush()
+        return "ok"
+
+    async def _counters(self, session: AsyncSession, user_id: int) -> dict:
+        """Gather the raw activity counters that stats + milestones read from.
+        Cross-module reads go through public services (local import avoids
+        import cycles)."""
+        from app.modules.bookings.service import BookingsService
+        from app.modules.community.service import CommunityService
+        from app.modules.temples.service import TemplesService
+
+        visits = await TemplesService().visit_stats(session, user_id)
+        poojas = await BookingsService().count_for_user(session, user_id)
+        streak = (await CommunityService().get_streak(session, user_id)).streak
+        return {
+            "temples_visited": visits["temples_visited"],
+            "districts_visited": visits["districts_visited"],
+            "poojas": poojas,
+            "streak": streak,
+        }
+
+    @staticmethod
+    def _milestone_list(counters: dict) -> list[dict]:
+        """Badge progress from real counters — no fabricated numbers."""
+        definitions = [
+            ("first_temple", counters["temples_visited"], 1),
+            ("ten_temples", counters["temples_visited"], 10),
+            ("first_pooja", counters["poojas"], 1),
+            ("week_streak", counters["streak"], 7),
+            ("five_districts", counters["districts_visited"], 5),
+        ]
+        return [
+            {"key": key, "current": current, "target": target, "got": current >= target}
+            for key, current, target in definitions
+        ]
+
+    async def milestones(self, session: AsyncSession, user_id: int) -> list[dict]:
+        return self._milestone_list(await self._counters(session, user_id))
+
+    async def profile_stats(self, session: AsyncSession, user_id: int) -> dict:
+        """The profile header: temples visited, poojas booked, streak, badges."""
+        counters = await self._counters(session, user_id)
+        badges = sum(1 for m in self._milestone_list(counters) if m["got"])
+        return {
+            "temples_visited": counters["temples_visited"],
+            "poojas": counters["poojas"],
+            "streak": counters["streak"],
+            "badges": badges,
+        }
 
     # ---- referral loop (GROWTH_PLAN.md Part 2) ----
 

@@ -128,6 +128,14 @@ class TempleDetailOut(TempleOut):
     poojas: list[PoojaCatalogueItem]
 
 
+class CheckinOut(BaseModel):
+    """Result of a darshan check-in: whether it was new + the updated count."""
+
+    fresh: bool
+    temple_id: str
+    temples_visited: int
+
+
 class TempleSuggestion(BaseModel):
     """One temple suggestion, ready for the LLM to narrate (or the app to render).
 

@@ -84,6 +84,20 @@ class BookingsService:
         metrics.increment("bookings.created")
         return self._to_out(booking, razorpay_key_id=order["razorpay_key_id"])
 
+    async def count_for_user(self, session: AsyncSession, user_id: int) -> int:
+        """How many poojas this user has booked (PUBLIC — the profile stat)."""
+        from sqlalchemy import func
+
+        return int(
+            (
+                await session.execute(
+                    select(func.count(PoojaBooking.id)).where(
+                        PoojaBooking.user_id == user_id
+                    )
+                )
+            ).scalar_one()
+        )
+
     async def list_for_user(self, session: AsyncSession, user_id: int) -> list[dict]:
         rows = list(
             (
