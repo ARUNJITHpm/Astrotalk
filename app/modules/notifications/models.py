@@ -17,6 +17,22 @@ def _utcnow() -> datetime:
     return datetime.now(UTC)
 
 
+class DeviceToken(Base):
+    """An app install's FCM push token (NITHARA-BUILD-PLAN Part 4).
+
+    A user may have several (phone, tablet, web). ``token`` is unique — the same
+    token re-registering just updates its owner. ``user_id`` is a plain int.
+    """
+
+    __tablename__ = "device_tokens"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(index=True)
+    token: Mapped[str] = mapped_column(unique=True, index=True)
+    platform: Mapped[str] = mapped_column(default="android")  # android|ios|web
+    created_at: Mapped[datetime] = mapped_column(default=_utcnow)
+
+
 class NotificationLog(Base):
     __tablename__ = "notification_log"
     __table_args__ = (

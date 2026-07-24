@@ -117,19 +117,29 @@ frontend from that existing JSON — no backend restructure.
 Tests: tests/astrology_engine/ (porutham/today/muhurtham routes + bad-index).
 ```
 
-## Part 4 — Feed, promos, and nakshatram reminders (FCM)
+## Part 4 — Feed + nakshatram reminders (promos stay frontend-composed)
 ```
 Read renderFeed()/renderNotices() (articles[]+FEEDML), PROMOS(), and the
 notifications need (nakshatram reminders = the retention loop).
 
-- GET /feed?temple_id=&cat= — public notices/articles from app/modules/content
-  (bilingual title/body/who, likes, comments, live flag, optional temple_id).
-- GET /home/promos — server-computes the promo rail: Pradosham-today, Nithara,
-  featured astrologer, live festival, and per-member kin-star banners inside the
-  4-day window. Mirror the priority logic in PROMOS().
-- Wire app/modules/notifications for FCM push: schedule a reminder N days before
-  each member's nakshatram day (Celery beat, like the existing 05:30 job).
-Tests in tests/content/ and tests/notifications/.
+- GET /feed?temple_id=&cat= — curated bilingual notices/articles seed in
+  app/modules/content (title/body/who both languages, likes, comments, live
+  flag, optional temple_id → a real seed temple). Read-only MVP; admin CRUD +
+  real reaction counts (community already reacts to content) can layer later.
+- FCM push (app/modules/notifications): DeviceToken store +
+  POST /notifications/devices (user registers an FCM token); a mock push client
+  (mock_fcm, logs not dispatches); POST /notifications/run-nakshatram-reminders
+  — a cron endpoint (like run-festivals) that pushes T-3 reminders per family
+  member's star day, idempotent via notification_log. Uses the Part 1
+  nakshatram cycle + Part 2 members.
+
+- GET /home/promos: NOT built server-side. The promo rail is presentation logic
+  the frontend composes from data already exposed — panchangam (today's tithi),
+  astrologers, members, and /astrology/nakshatram/next (kin-star banners) —
+  exactly as the prototype's PROMOS() does client-side. Keeping it out of the
+  backend avoids baking UI banner logic into an endpoint.
+
+Tests in tests/content/ (feed) and tests/notifications/ (reminders).
 ```
 
 ---

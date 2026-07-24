@@ -5,6 +5,25 @@ from datetime import date, datetime
 from pydantic import BaseModel, ConfigDict
 
 
+class FeedItemOut(BaseModel):
+    """One notices/articles card for the app feed (bilingual, read-only)."""
+
+    id: str
+    cat: str
+    image: str
+    glyph: str
+    live: bool
+    title_en: str
+    title_ml: str
+    body_en: str
+    body_ml: str
+    who_en: str
+    who_ml: str
+    likes: int
+    comments: int
+    temple_id: str | None = None
+
+
 class ContentPostOut(BaseModel):
     """One piece of the daily pack, as shown in the /admin Content tab."""
 

@@ -207,6 +207,9 @@ class Settings(BaseSettings):
     mock_razorpay: bool = True
     mock_geocoding: bool = True
     mock_chroma: bool = True
+    # Firebase Cloud Messaging (app push). Mock by default: sends are logged, not
+    # dispatched. Set False + supply Firebase credentials to send real pushes.
+    mock_fcm: bool = True
     # When True (default), generated media is stored on the local disk under
     # ``storage_dir``. Set False + supply the r2_* credentials for Cloudflare R2.
     mock_storage: bool = True

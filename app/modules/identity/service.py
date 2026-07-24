@@ -647,6 +647,32 @@ class IdentityService:
     async def milestones(self, session: AsyncSession, user_id: int) -> list[dict]:
         return self._milestone_list(await self._counters(session, user_id))
 
+    async def members_with_nakshatram(
+        self, session: AsyncSession, user_ids: list[int]
+    ) -> list[dict]:
+        """Family members (of the given users) that have a nakshatram set — the
+        input to notifications' star-day reminders. PUBLIC; plain dicts out."""
+        if not user_ids:
+            return []
+        rows = (
+            await session.execute(
+                select(FamilyMember).where(
+                    FamilyMember.user_id.in_(user_ids),
+                    FamilyMember.nak.is_not(None),
+                )
+            )
+        ).scalars().all()
+        return [
+            {
+                "user_id": m.user_id,
+                "member_id": m.id,
+                "name": m.name,
+                "nak": m.nak,
+                "is_self": m.is_self,
+            }
+            for m in rows
+        ]
+
     async def profile_stats(self, session: AsyncSession, user_id: int) -> dict:
         """The profile header: temples visited, poojas booked, streak, badges."""
         counters = await self._counters(session, user_id)

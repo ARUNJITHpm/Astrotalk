@@ -23,6 +23,7 @@ from app.modules.content.models import STUDIO_KINDS, ShareCard
 from app.modules.content.schemas import (
     ApprovePayload,
     ContentPostOut,
+    FeedItemOut,
     MarkPublishedPayload,
     RunDailySummary,
     ShareCardCreate,
@@ -46,10 +47,21 @@ from app.platform.storage import get_storage
 router = APIRouter(prefix="/content", tags=["content"])
 
 # Root-level share surface (/s/{slug}) — same module, no /content prefix so
-# links stay short enough for a WhatsApp caption.
+# links stay short enough for a WhatsApp caption. Also hosts the public app feed.
 share_router = APIRouter(tags=["content"])
 
 _service = ContentService()
+
+
+@share_router.get("/feed", response_model=list[FeedItemOut])
+async def app_feed(
+    temple_id: str | None = Query(default=None, description="filter to one temple"),
+    cat: str | None = Query(default=None, description="Festival | Darshan | AstroTalk"),
+) -> list[dict]:
+    """The curated notices/articles feed for the app home + feed sheet."""
+    from app.modules.content.feed import list_feed
+
+    return list_feed(temple_id, cat)
 _identity = IdentityService()
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
