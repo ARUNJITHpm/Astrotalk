@@ -27,7 +27,7 @@ def upgrade() -> None:
         sa.Column('rel', sa.String(), nullable=False),
         sa.Column('nak', sa.Integer(), nullable=True),
         sa.Column('is_self', sa.Boolean(), nullable=False),
-        sa.Column('created_at', sa.DateTime(), nullable=False),
+        sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
         sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
         sa.PrimaryKeyConstraint('id'),
     )
@@ -40,7 +40,7 @@ def upgrade() -> None:
         sa.Column('user_id', sa.Integer(), nullable=False),
         sa.Column('temple_id', sa.String(), nullable=False),
         sa.Column('day', sa.Date(), nullable=False),
-        sa.Column('created_at', sa.DateTime(), nullable=False),
+        sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
         sa.PrimaryKeyConstraint('id'),
         sa.UniqueConstraint('user_id', 'temple_id', 'day', name='uq_visit_user_temple_day'),
     )

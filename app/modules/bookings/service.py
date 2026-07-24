@@ -20,7 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.bookings.models import PoojaBooking
 from app.modules.bookings.schemas import BookingCreate
-from app.modules.commerce.service import CommerceService, _mock_mode
+from app.modules.commerce.service import CommerceService
 from app.modules.temples.service import DEFAULT_POOJAS, TemplesService
 from app.platform import metrics
 
@@ -130,7 +130,7 @@ class BookingsService:
             "when": b.when_label,
             "state": b.state,
             "order_id": b.razorpay_order_id,
-            "mock": _mock_mode(),
-            "razorpay_key_id": "" if _mock_mode() else razorpay_key_id,
+            "mock": CommerceService.mock_mode(),
+            "razorpay_key_id": "" if CommerceService.mock_mode() else razorpay_key_id,
             "created_at": b.created_at,
         }

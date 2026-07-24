@@ -60,6 +60,12 @@ def _mock_mode() -> bool:
 
 
 class CommerceService:
+    @staticmethod
+    def mock_mode() -> bool:
+        """Whether payments are mocked (no live Razorpay). PUBLIC — other modules
+        (e.g. bookings) read this instead of the private ``_mock_mode``."""
+        return _mock_mode()
+
     # ---- orders ----
 
     async def create_order(

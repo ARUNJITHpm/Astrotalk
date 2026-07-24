@@ -1,10 +1,12 @@
 """Curated notices/articles feed for the Nithara app (NITHARA-BUILD-PLAN Part 4).
 
-The consumer feed (festival notices, darshan posts, astro talks) is editorial
-content — kept as a curated bilingual seed here, read-only, exactly like the
-temple directory. Real like/comment counts and admin CRUD can layer on later
-(community already has a reaction mechanism keyed to content posts); for now the
-counts are display seed values.
+The consumer feed (festival notices, darshan info, panchangam explainers) is
+editorial content — a curated bilingual seed, read-only, like the temple
+directory. Content is honest: notices come from the temple as source, and the
+educational card speaks in Nithara's own disclosed voice — no fabricated named
+authority making predictions, and no invented engagement counts (GUARDRAILS §1/§4).
+Real reactions (community already reacts to content posts) and admin CRUD layer
+on later; until then like/comment counts are 0.
 
 Categories match the app: Festival · Darshan · AstroTalk. ``temple_id`` (when
 set) points at a real seed temple so the card's "View temple" opens it.
@@ -16,14 +18,16 @@ FEED_ITEMS: list[dict] = [
     {
         "id": "pooram-ilanjithara",
         "cat": "Festival",
-        "image": "i-fest", "glyph": "i-parasol", "live": True,
+        "image": "i-fest", "glyph": "i-parasol", "live": False,
         "title_en": "Thrissur Pooram — Ilanjithara Melam",
         "title_ml": "തൃശ്ശൂർ പൂരം — ഇലഞ്ഞിത്തറ മേളം",
-        "body_en": "250 artists, one rhythm. Kudamattam begins at 5 PM on the eastern side.",
-        "body_ml": "250 കലാകാരന്മാർ, ഒരേ താളം. കുടമാറ്റം വൈകുന്നേരം 5 മണിക്ക്, കിഴക്കേ ഭാഗത്ത്.",
+        "body_en": "The Ilanjithara Melam gathers percussion artists on the eastern "
+        "maidan; the Kudamattam parasol exchange follows in the evening.",
+        "body_ml": "ഇലഞ്ഞിത്തറ മേളം കിഴക്കേ മൈതാനത്ത് വാദ്യകലാകാരന്മാരെ ഒരുമിച്ചു "
+        "ചേർക്കുന്നു; വൈകുന്നേരം കുടമാറ്റം നടക്കുന്നു.",
         "who_en": "Vadakkunnathan Temple",
         "who_ml": "വടക്കുന്നാഥൻ ക്ഷേത്രം",
-        "likes": 18400, "comments": 1200,
+        "likes": 0, "comments": 0,
         "temple_id": "tsr-vadakkunnathan",
     },
     {
@@ -32,24 +36,28 @@ FEED_ITEMS: list[dict] = [
         "image": "i-dars", "glyph": "i-lamp", "live": False,
         "title_en": "Nirmalya darshanam at Guruvayur",
         "title_ml": "ഗുരുവായൂരിൽ നിർമാല്യ ദർശനം",
-        "body_en": "The 3 AM darshan. The queue was already a kilometre — worth every minute.",
-        "body_ml": "പുലർച്ചെ 3 മണിയുടെ ദർശനം. ക്യൂ ഒരു കിലോമീറ്റർ — എന്നിട്ടും വിലപ്പെട്ടത്.",
-        "who_en": "arjun_k",
-        "who_ml": "അർജുൻ",
-        "likes": 2100, "comments": 184,
+        "body_en": "The first darshan of the day begins around 3 AM; queues form well "
+        "before the nada opens.",
+        "body_ml": "ദിവസത്തിലെ ആദ്യ ദർശനം പുലർച്ചെ 3 മണിയോടെ ആരംഭിക്കുന്നു; നട "
+        "തുറക്കുന്നതിന് മുൻപേ ക്യൂ തുടങ്ങും.",
+        "who_en": "Guruvayur Sri Krishna Temple",
+        "who_ml": "ഗുരുവായൂർ ശ്രീകൃഷ്ണ ക്ഷേത്രം",
+        "likes": 0, "comments": 0,
         "temple_id": "tsr-guruvayur",
     },
     {
-        "id": "guru-transit-chothi",
+        "id": "what-is-pradosham",
         "cat": "AstroTalk",
         "image": "i-astr", "glyph": "i-sparkle", "live": False,
-        "title_en": "Guru transit — for Chothi natives",
-        "title_ml": "ഗുരു സംക്രമം — ചോതി നക്ഷത്രക്കാർക്ക്",
-        "body_en": "Jupiter enters Mithunam this week and sits on your seventh house.",
-        "body_ml": "ഈ ആഴ്ച വ്യാഴം മിഥുനത്തിലേക്ക്, നിങ്ങളുടെ ഏഴാം ഭാവത്തിൽ.",
-        "who_en": "Dr. Nandakumar",
-        "who_ml": "ഡോ. നന്ദകുമാർ",
-        "likes": 890, "comments": 212,
+        "title_en": "What is Pradosham?",
+        "title_ml": "പ്രദോഷം എന്നാൽ എന്ത്?",
+        "body_en": "Pradosham falls on the thirteenth lunar day — traditionally a time "
+        "many set aside for Shiva worship in the twilight hour. Guidance only.",
+        "body_ml": "ത്രയോദശി തിഥിയിലാണ് പ്രദോഷം — സന്ധ്യാവേളയിൽ ശിവാരാധനയ്ക്കായി "
+        "പലരും മാറ്റിവയ്ക്കുന്ന സമയം. മാർഗനിർദേശം മാത്രം.",
+        "who_en": "Nithara",
+        "who_ml": "നിതാര",
+        "likes": 0, "comments": 0,
         "temple_id": None,
     },
 ]
