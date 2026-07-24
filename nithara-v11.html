@@ -1,0 +1,2679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#FFFFFF">
+<title>Nithara — your temple, in your pocket</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700;800&family=Anek+Malayalam:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+/* ═══════════════════════════════════════════════════════════════
+   TARA · DIRECTION 1 — "KOVIL"  (light · temple-centric)
+   The home IS your temple. Warm ivory & sandal, saffron & brass,
+   tulsi green. The default temple wears a brass frame — the one
+   thing that marks "this is your temple". Enter it through
+   parting doors. Fraunces serif for devotional voice; Anek
+   Malayalam for the bilingual line.
+   ═══════════════════════════════════════════════════════════════ */
+:root{
+  /* ── THREE COLOURS ─────────────────────────────────────────
+     WHITE  every surface, pure, no ivory
+     ORANGE the brand, every primary action, the home temple
+     BLUE   information, navigation, status, astrology
+     Graphite is the only supporting tone. ───────────────────── */
+  --paper:#FFFFFF; --paper-2:#F7F9FC; --surface:#FFFFFF; --sunk:#F3F6FA;
+  --ink:#0E1319; --ink-2:#48525F; --muted:#78838F; --faint:#9BA5B1;
+  --line:#E9EDF3; --line-2:#D8DEE7;
+  --saffron:#F26A0F; --saffron-600:#C24E06; --saffron-soft:#FFEEE0; --saffron-tint:#FFF7F1;
+  --brass:#E8801A; --brass-600:#AC5A05; --brass-soft:#FFF3E7; --brass-line:#FBD9B4;
+  --blue:#0F63D6; --blue-700:#0B47A0; --blue-soft:#E9F1FE;
+  --tulsi:#0F63D6; --tulsi-soft:#E9F1FE;
+  --kumkum:#2C3743; --kumkum-soft:#EDF0F4;
+  --indigo:#0F63D6; --indigo-soft:#E9F1FE;
+  --night-900:#07172F; --night-700:#0E3068; --night-500:#1B57BC;
+  --e1:0 1px 3px rgba(14,19,25,.06),0 1px 2px rgba(14,19,25,.04);
+  --e2:0 8px 22px rgba(14,19,25,.08),0 2px 6px rgba(14,19,25,.05);
+  --e3:0 20px 44px rgba(14,19,25,.14),0 4px 10px rgba(14,19,25,.06);
+  --r-sm:12px; --r-md:16px; --r-lg:22px; --r-xl:28px; --r-full:999px;
+  --s2:8px; --s3:12px; --s4:16px; --s5:20px; --s6:28px; --s7:40px;
+  --ease:cubic-bezier(.22,.61,.36,1); --spring:cubic-bezier(.34,1.2,.5,1);
+  --ui:"Inter",system-ui,sans-serif; --ml:"Anek Malayalam","Inter",sans-serif; --serif:"Fraunces",Georgia,serif;
+  --tap:48px;
+  /* the floating tab bar is the one thing every scroller must clear.
+     One source of truth so no page can drift out of sync. */
+  --nav-h:72px; --nav-gap:14px;
+  --nav-safe:calc(var(--nav-h) + var(--nav-gap) + env(safe-area-inset-bottom));
+  --nav-space:calc(var(--nav-safe) + 24px);
+}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden}
+body{background:#E9EDF2;color:var(--ink);font-family:var(--ui);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+.ml{font-family:var(--ml)}
+/* headings break on sense, body copy avoids orphans, long proper nouns
+   wrap rather than punch through their container */
+h1,h2,h3,.greet,.mt-name,.dtitle h1{text-wrap:balance}
+p,.prose,.mt-reason,.ob-hero p{text-wrap:pretty}
+.mt-name,.dtitle h1,.mrcard h3,.notice h3,.article h3,.pidrow .pm h1,.sres .m b,.tmini .m b,.ob-pick .m b{overflow-wrap:anywhere}
+button,input{font:inherit;color:inherit}
+button{background:none;border:none;cursor:pointer}
+:focus-visible{outline:3px solid var(--saffron);outline-offset:2px;border-radius:6px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+
+.stage{position:fixed;inset:0;display:flex;justify-content:center;background:#E9EDF2}
+.phone{position:relative;width:100%;max-width:432px;height:100%;overflow:hidden;background:var(--paper);box-shadow:0 0 0 1px rgba(14,19,25,.06),0 0 60px rgba(14,19,25,.16)}
+
+.screen{position:absolute;inset:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;scrollbar-width:none;display:none;padding-bottom:var(--nav-space)}
+.screen::-webkit-scrollbar{display:none}
+.screen[data-active]{display:block;animation:fade .34s var(--ease)}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}}
+
+.ic{width:22px;height:22px;flex:none;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.ic.sm{width:16px;height:16px;stroke-width:2}
+.ic.lg{width:28px;height:28px;stroke-width:1.5}
+.ic.xl{width:40px;height:40px;stroke-width:1.4}
+.ic.fill{fill:currentColor;stroke:none}
+
+/* buttons */
+/* Text links and compact icon buttons keep their visual size but carry an
+   invisible 44px hit area, so nothing on screen is smaller than a fingertip. */
+.hit{position:relative}
+.hit::after{content:"";position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  width:max(100%,44px);height:max(100%,44px);border-radius:12px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:var(--tap);padding:0 18px;border-radius:14px;font-size:14px;font-weight:700;transition:transform .16s var(--spring),background .2s,box-shadow .2s}
+.btn:active{transform:scale(.97)}
+.btn-pri{background:var(--saffron);color:#fff;box-shadow:0 4px 14px rgba(242,106,15,.3)}
+.btn-pri:hover{background:var(--saffron-600)}
+.btn-sec{background:var(--surface);color:var(--ink);border:1.5px solid var(--line-2)}
+.btn-brass{background:var(--brass-soft);color:var(--brass-600)}
+.btn-nav{background:var(--indigo-soft);color:var(--indigo)}
+.btn-tulsi{background:var(--tulsi-soft);color:var(--tulsi)}
+.btn-block{width:100%}
+
+.iconbtn{width:var(--tap);height:var(--tap);flex:none;border-radius:var(--r-full);display:grid;place-items:center;background:var(--surface);color:var(--ink-2);border:1px solid var(--line-2);box-shadow:var(--e1)}
+.iconbtn.lang{width:auto;padding:0 15px;gap:7px;font-size:13px;font-weight:700}
+.iconbtn.lang b{color:var(--saffron)}
+
+/* pills */
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;padding:6px 11px;border-radius:var(--r-full);background:var(--sunk);color:var(--ink-2)}
+.pill .ic{width:13px;height:13px;stroke-width:2.4}
+.pill-open{background:var(--tulsi-soft);color:var(--tulsi)}
+.pill-shut{background:var(--kumkum-soft);color:var(--kumkum)}
+.pill-def{background:var(--brass-soft);color:var(--brass-600)}
+.pill-pooja{background:var(--saffron-soft);color:var(--saffron-600)}
+.pill-dist{background:var(--indigo-soft);color:var(--indigo)}
+.pill-live{background:var(--kumkum);color:#fff}
+
+/* top bar */
+.top{display:flex;align-items:center;gap:12px;padding:calc(var(--s5) + env(safe-area-inset-top)) var(--s5) var(--s3)}
+.mark{width:42px;height:42px;flex:none;border-radius:15px;display:grid;place-items:center;background:linear-gradient(150deg,#FFB264,var(--saffron));color:#fff;box-shadow:var(--e1)}
+.top .g{flex:1;min-width:0}
+.top .g .hi{font-size:12.5px;color:var(--muted);font-weight:600}
+.top .g .nm{font-family:var(--serif);font-size:22px;font-weight:600;line-height:1.05;letter-spacing:-.01em}
+
+/* panchangam strip */
+.panch{display:flex;align-items:center;gap:12px;margin:2px var(--s5) 0;padding:13px 16px;border-radius:var(--r-lg);background:linear-gradient(120deg,var(--brass-soft),var(--saffron-tint));border:1px solid var(--brass-line);text-align:left;width:calc(100% - var(--s5)*2)}
+.panch .moon{width:30px;height:30px;flex:none;border-radius:50%;background:radial-gradient(circle at 62% 38%,#FFF3E7,#FFB264);box-shadow:0 2px 8px rgba(232,128,26,.28);display:grid;place-items:center;color:#AC5A05}
+.panch .pt{flex:1;min-width:0}
+.panch .pt b{display:block;font-size:13px;font-weight:800}
+.panch .pt span{font-size:11.5px;color:var(--ink-2)}
+.panch>.ic{color:var(--brass)}
+
+/* section header */
+.sec{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:0 var(--s5);margin:var(--s6) 0 var(--s4)}
+.sec h2{font-family:var(--serif);font-size:20px;font-weight:600;letter-spacing:-.01em}
+.sec h2 .ml{font-family:var(--ml);display:block;font-size:13px;color:var(--muted);font-weight:500}
+.sec .more{flex:none;font-size:12.5px;font-weight:700;color:var(--saffron-600);display:inline-flex;align-items:center;
+  gap:4px;min-height:44px;padding:0 10px;margin:-8px -10px -8px 0;border-radius:12px;white-space:nowrap}
+.sec .more:hover{background:var(--saffron-tint)}
+
+/* ═══ MY TEMPLE hero — the centre of gravity ═══ */
+.mytemple{position:relative;margin:0 var(--s5);border-radius:var(--r-xl);padding:20px;overflow:hidden;background:linear-gradient(165deg,#FFFFFF,var(--brass-soft));border:1.5px solid var(--brass);box-shadow:var(--e2)}
+.mt-thread{position:absolute;left:0;right:0;top:0;height:4px;background:linear-gradient(180deg,var(--brass) 0 1px,transparent 1px 2px,var(--brass) 2px 3px);opacity:.8}
+.mt-head{display:flex;gap:15px;align-items:center}
+.mt-glyph{width:66px;height:66px;flex:none;border-radius:20px;display:grid;place-items:center;background:#fff;color:var(--brass-600);border:1px solid var(--brass-line);box-shadow:0 3px 10px rgba(232,128,26,.18)}
+.mt-glyph .ic{width:36px;height:36px;stroke-width:1.4}
+.mt-badge{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:800;letter-spacing:.1em;color:var(--brass-600);text-transform:uppercase}
+.mt-badge .ic{width:12px;height:12px;fill:currentColor;stroke:none}
+.mt-name{font-family:var(--serif);font-size:25px;font-weight:600;line-height:1.05;margin-top:5px}
+.mt-ml{font-size:13.5px;color:var(--ink-2);margin-top:2px}
+.mt-rate{display:flex;align-items:center;gap:5px;margin-top:7px;font-size:12px;color:var(--muted)}
+.mt-rate .ic{color:var(--brass);fill:currentColor;stroke:none}
+.mt-rate b{font-weight:800;color:var(--ink)}
+.mt-pills{display:flex;gap:8px;flex-wrap:wrap;margin-top:15px}
+.mt-reason{display:flex;gap:11px;margin-top:15px;padding:14px;border-radius:15px;background:rgba(255,255,255,.7);border:1px solid var(--brass-line);font-size:13px;line-height:1.55;color:var(--ink-2)}
+.mt-reason .ic{flex:none;color:var(--brass)}
+.mt-reason b{color:var(--ink)}
+.mt-cta{display:flex;gap:11px;margin-top:16px}
+.mt-cta .enter{flex:1;min-height:54px;font-size:15px;background:var(--saffron);color:#fff;box-shadow:0 6px 18px rgba(242,106,15,.32);border-radius:16px;display:inline-flex;align-items:center;justify-content:center;gap:9px;font-weight:700;transition:transform .16s var(--spring)}
+.mt-cta .enter:active{transform:scale(.97)}
+.mt-cta .btn-sec{flex:none;padding:0 18px}
+.mt-quick{display:flex;gap:9px;margin-top:12px}
+.mt-quick button{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;padding:13px 4px;border-radius:15px;background:rgba(255,255,255,.65);border:1px solid var(--brass-line);color:var(--ink-2);font-size:11.5px;font-weight:700}
+.mt-quick button .ic{width:20px;height:20px;color:var(--saffron)}
+
+/* today poojas (reuse .pooja) */
+.pooja{display:flex;align-items:center;gap:13px;padding:14px;border-radius:var(--r-md);border:1.5px solid var(--line);background:var(--surface)}
+.pooja+.pooja{margin-top:11px}
+.pooja .pi{width:46px;height:46px;flex:none;border-radius:13px;background:var(--brass-soft);color:var(--brass-600);display:grid;place-items:center;border:1px solid var(--brass-line)}
+.pooja .pm{flex:1;min-width:0}.pooja .pm b{display:block;font-size:14px}.pooja .pm span{font-size:11.5px;color:var(--muted)}
+.pooja .price{font-size:16px;font-weight:800;font-variant-numeric:tabular-nums}
+.pooja .btn{min-height:40px;padding:0 16px;font-size:12.5px}
+
+/* nearby compact rows */
+.tmini{display:flex;align-items:center;gap:13px;width:100%;text-align:left;padding:13px var(--s5);border-bottom:1px solid var(--line)}
+.tmini .glyph{width:48px;height:48px;flex:none;border-radius:14px;display:grid;place-items:center;background:var(--saffron-soft);color:var(--saffron-600);border:1px solid var(--line)}
+.tmini .glyph.shiva{background:var(--brass-soft);color:var(--brass-600)}
+.tmini .glyph.devi{background:var(--kumkum-soft);color:var(--kumkum)}
+.tmini .glyph.vishnu{background:var(--indigo-soft);color:var(--indigo)}
+.tmini .glyph .ic{width:25px;height:25px}
+.tmini .m{flex:1;min-width:0}.tmini .m b{display:block;font-size:14.5px;font-weight:700}.tmini .m span{font-size:12px;color:var(--muted)}
+.tmini .d{font-size:12px;font-weight:800;color:var(--tulsi)}
+
+/* map link */
+.maplink{margin:14px var(--s5) 0}
+
+/* ═══ FEED (light reading cards) ═══ */
+.article{margin:0 var(--s5) 18px;border-radius:var(--r-lg);overflow:hidden;background:var(--surface);border:1.5px solid var(--line);box-shadow:var(--e1);text-align:left;width:calc(100% - var(--s5)*2)}
+.article .img{height:180px;display:grid;place-items:center;position:relative;color:rgba(255,255,255,.6)}
+.i-fest{background:linear-gradient(160deg,#FF9C42,#C24E06)}
+.i-dars{background:linear-gradient(160deg,#3D8BF2,#0B47A0)}
+.i-astr{background:linear-gradient(160deg,#55647A,#232F3D)}
+.article .img .glyph .ic{width:78px;height:78px;stroke-width:1}
+.article .img .badge{position:absolute;top:14px;left:14px}
+.article .img .play{position:absolute;width:62px;height:62px;border-radius:50%;background:rgba(255,255,255,.95);color:var(--ink);display:grid;place-items:center;box-shadow:var(--e2)}
+.article .img .play .ic{width:25px;height:25px;fill:currentColor;stroke:none;margin-left:3px}
+.article .fb{padding:18px}
+.article .cat{font-size:11.5px;font-weight:800;letter-spacing:.06em;color:var(--saffron-600);text-transform:uppercase}
+.article h3{font-family:var(--serif);font-size:19px;font-weight:600;line-height:1.3;margin-top:8px}
+.article p{font-size:14px;color:var(--ink-2);margin-top:8px;line-height:1.55}
+.article .who{font-size:12.5px;font-weight:600;color:var(--muted);margin-top:14px;display:flex;align-items:center;gap:8px}
+.article .who .r{display:flex;gap:14px;margin-left:auto}
+.article .who .r span{display:flex;align-items:center;gap:5px}
+
+/* ═══ ASTRO ═══ */
+.nithara{margin:0 var(--s5);border-radius:var(--r-xl);padding:20px;color:#fff;position:relative;overflow:hidden;background:linear-gradient(150deg,var(--night-900),var(--night-700) 58%,var(--night-500));box-shadow:0 12px 30px rgba(7,23,47,.3)}
+.nithara .stars{position:absolute;inset:0;opacity:.55;pointer-events:none;
+  background-image:radial-gradient(1.4px 1.4px at 18% 26%,#fff,transparent),radial-gradient(1.4px 1.4px at 68% 18%,#fff,transparent),
+    radial-gradient(1px 1px at 44% 62%,#fff,transparent),radial-gradient(1.4px 1.4px at 86% 56%,#fff,transparent),
+    radial-gradient(1px 1px at 28% 82%,#fff,transparent),radial-gradient(1.2px 1.2px at 78% 88%,#fff,transparent)}
+.nithara .r{display:flex;align-items:center;gap:15px;position:relative}
+.nithara .av{width:54px;height:54px;flex:none;border-radius:50%;display:grid;place-items:center;background:linear-gradient(140deg,#FFC48A,var(--saffron));color:#5A2600;box-shadow:0 0 0 3px rgba(255,255,255,.16)}
+.nithara b{font-family:var(--serif);font-size:20px;font-weight:600;display:flex;align-items:center;gap:9px}
+.nithara .free{font-family:var(--ui);font-size:10.5px;font-weight:800;background:#CFE3FF;color:#0B3E86;padding:3px 10px;border-radius:var(--r-full)}
+.nithara p{font-size:14px;opacity:.86;margin-top:13px;line-height:1.55;position:relative}
+.nithara .go{position:relative;width:100%;margin-top:16px;min-height:var(--tap);background:#fff;color:var(--night-700);box-shadow:0 4px 14px rgba(0,0,0,.2)}
+.nithara .go:hover{background:#F5F2FF}
+.today{margin:var(--s4) var(--s5) 0;border-radius:var(--r-lg);padding:18px;background:linear-gradient(160deg,#FFFFFF,var(--brass-soft));border:1.5px solid var(--brass-line)}
+.today .th{display:flex;gap:13px;align-items:center}
+.today .ni{width:46px;height:46px;flex:none;border-radius:13px;background:#fff;color:var(--brass-600);display:grid;place-items:center;border:1px solid var(--brass-line)}
+.today .th b{font-family:var(--serif);font-size:17px;font-weight:600}
+.today .th span{display:block;font-size:12px;color:var(--muted)}
+.today p{font-size:14px;line-height:1.6;color:var(--ink-2);margin-top:12px}
+.astrolist{display:flex;flex-direction:column;gap:13px;padding:0 var(--s5)}
+.astro{display:flex;gap:14px;align-items:center;padding:16px;border-radius:var(--r-lg);background:var(--surface);border:1.5px solid var(--line);box-shadow:var(--e1)}
+.astro .av{width:54px;height:54px;flex:none;border-radius:15px;display:grid;place-items:center;background:var(--night-900);color:#FFC48A;border:1px solid var(--night-700)}
+.astro .m{flex:1;min-width:0}
+.astro .m .n{font-size:14.5px;font-weight:700;display:flex;align-items:center;gap:6px}
+.astro .m .sp{font-size:12px;color:var(--muted);margin-top:2px}
+.astro .m .rt{display:flex;gap:11px;margin-top:5px;font-size:11.5px;font-weight:700;color:var(--ink-2)}
+.astro .m .rt .ic{width:12px;height:12px;color:var(--brass);fill:currentColor;stroke:none}
+.astro .dot{width:8px;height:8px;border-radius:50%;background:var(--tulsi);flex:none}
+.astro .rate{text-align:right;flex:none}
+.astro .rate b{font-size:14.5px;font-weight:800}
+.astro .rate small{display:block;font-size:10.5px;color:var(--muted)}
+.astro .rate .btn{margin-top:8px;min-height:38px;padding:0 14px;font-size:12px}
+
+/* ═══ PROFILE ═══ */
+.phead{position:relative;overflow:hidden;color:#fff;border-radius:0 0 var(--r-xl) var(--r-xl);
+  padding:calc(var(--s6) + env(safe-area-inset-top)) var(--s5) var(--s6);
+  background:linear-gradient(158deg,#FF9C42,var(--saffron) 52%,var(--saffron-600))}
+.phead .silh{position:absolute;right:-40px;top:-12px;width:210px;height:210px;opacity:.15;color:#3A1500}
+.phead .r{display:flex;align-items:center;gap:16px;position:relative}
+.phead .av{width:66px;height:66px;flex:none;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.2);border:2px solid rgba(255,255,255,.42);color:#fff}
+.phead h1{font-family:var(--serif);font-size:24px;font-weight:600}
+.phead .sub{font-size:13px;opacity:.92;margin-top:3px}
+.pstats{display:flex;gap:9px;margin:var(--s5) 0 0;position:relative}
+.pstat{flex:1;text-align:center;padding:12px 6px;border-radius:var(--r-md);background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.2)}
+.pstat b{display:block;font-family:var(--serif);font-size:22px;font-weight:600;color:#fff;line-height:1.1}
+.pstat span{font-size:10px;font-weight:700;opacity:.9;letter-spacing:.05em}
+.pcard{margin:var(--s5) var(--s5) 0;border-radius:var(--r-lg);padding:20px;background:var(--surface);border:1.5px solid var(--line);box-shadow:var(--e1)}
+.pcard h2{font-family:var(--serif);font-size:17px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.pcard h2::before{content:"";width:3px;height:16px;border-radius:2px;background:var(--brass)}
+.pcard h2 .edit{margin:-10px -10px -10px auto;font-family:var(--ui);font-size:12px;font-weight:800;color:var(--saffron-600);
+  display:inline-flex;align-items:center;min-height:44px;padding:0 10px;border-radius:12px;white-space:nowrap}
+.pcard h2 .edit:hover{background:var(--saffron-tint)}
+.frow{display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:14px;padding:12px 14px;background:var(--paper);border:1px solid var(--line);border-radius:var(--r-sm)}
+.frow+.frow{margin-top:8px}
+.frow span{color:var(--muted);font-weight:600}.frow b{font-weight:700}
+.frow .add{color:var(--saffron-600);font-weight:800;font-size:13px}
+
+/* prototype-only state switch: see the profile before & after the chart exists */
+.statesw{display:flex;align-items:center;gap:8px;margin:var(--s5) var(--s5) 0;padding:6px;border-radius:var(--r-full);background:var(--sunk);border:1px dashed var(--line-2)}
+.statesw .lb{font-size:10px;font-weight:800;letter-spacing:.09em;color:var(--faint);padding-left:10px;text-transform:uppercase}
+.statesw .grp{display:flex;gap:4px;margin-left:auto}
+.statesw button{min-height:40px;padding:0 15px;border-radius:var(--r-full);font-size:12px;font-weight:700;color:var(--muted)}
+.statesw button[aria-pressed="true"]{background:var(--ink);color:#fff}
+
+/* dasha progress */
+.dasha{margin-top:12px}
+.dasha .bar{height:8px;border-radius:99px;background:var(--sunk);overflow:hidden}
+.dasha .bar i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--brass),var(--saffron))}
+.dasha .lg{display:flex;justify-content:space-between;font-size:11px;font-weight:700;color:var(--muted);margin-top:7px}
+
+/* bookings */
+.booking{display:flex;align-items:center;gap:12px;border:1px solid var(--line);border-radius:var(--r-md);padding:12px;background:var(--paper)}
+.booking+.booking{margin-top:9px}
+.booking .bi{width:44px;height:44px;flex:none;border-radius:12px;background:#fff;border:1px solid var(--brass-line);display:grid;place-items:center;color:var(--brass-600)}
+.booking .bm{flex:1;min-width:0}
+.booking .bm b{display:block;font-size:13.5px;font-weight:700}
+.booking .bm span{font-size:11.5px;color:var(--muted);font-weight:600}
+.setup{display:flex;gap:14px;align-items:center;padding:16px;border-radius:var(--r-md);background:var(--indigo-soft);border:1px solid #D3E2FB;margin-bottom:14px}
+.setup .si{width:44px;height:44px;flex:none;border-radius:13px;background:#fff;color:var(--indigo);display:grid;place-items:center;border:1px solid #D3E2FB}
+.setup .st{flex:1;min-width:0}.setup .st b{display:block;font-size:14px}.setup .st span{font-size:12px;color:var(--ink-2)}
+.opt-grid{display:flex;gap:11px}
+.opt{flex:1;border:2px solid var(--line-2);background:var(--surface);border-radius:var(--r-md);min-height:60px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:var(--ink-2);font-weight:700;transition:.2s var(--ease)}
+.opt[aria-pressed="true"]{border-color:var(--saffron);background:var(--saffron-tint);color:var(--saffron-600)}
+.opt .a{line-height:1}.opt:nth-child(1) .a{font-size:17px}.opt:nth-child(2) .a{font-size:22px}.opt:nth-child(3) .a{font-size:28px}
+.opt small{font-size:12.5px;font-weight:600}
+.helpstrip{display:flex;align-items:center;gap:15px;margin:var(--s5) var(--s5) 0;padding:18px;border-radius:var(--r-lg);background:var(--tulsi-soft);border:1.5px solid #D3E2FB;text-align:left;width:calc(100% - var(--s5)*2)}
+.helpstrip .ic{color:var(--tulsi)}
+.helpstrip b{display:block;font-family:var(--serif);font-size:16px;font-weight:600}
+.helpstrip span{font-size:12.5px;color:var(--ink-2)}
+
+/* ═══ NAV ═══ */
+.nav{position:absolute;left:16px;right:16px;bottom:calc(var(--nav-gap) + env(safe-area-inset-bottom));z-index:40;height:var(--nav-h);display:flex;justify-content:space-around;padding:9px;border-radius:26px;background:rgba(255,255,255,.94);border:1px solid var(--line-2);backdrop-filter:blur(18px) saturate(1.4);box-shadow:var(--e3);
+  transition:opacity .26s var(--ease),transform .26s var(--ease)}
+/* an open sheet, the onboarding flow or the door reveal owns the bottom of
+   the screen — the tab bar leaves rather than sitting under their footers */
+.phone[data-overlay] .nav{opacity:0;transform:translateY(18px);pointer-events:none}
+.phone[data-overlay] .toast{bottom:calc(20px + env(safe-area-inset-bottom))}
+.nav button{position:relative;flex:1;min-height:54px;height:100%;border-radius:19px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:var(--muted);font-size:10.5px;font-weight:700;transition:.24s var(--ease)}
+.nav button .ic{width:24px;height:24px;transition:.24s var(--spring)}
+.nav button[aria-current="page"]{color:var(--saffron-600)}
+.nav button[aria-current="page"] .ic{transform:translateY(-2px)}
+.nav button[aria-current="page"]::before{content:"";position:absolute;top:4px;width:28px;height:3px;border-radius:3px;background:var(--saffron)}
+
+/* ═══ SHEETS ═══ */
+.scrim{position:absolute;inset:0;z-index:88;background:rgba(15,23,32,.45);opacity:0;visibility:hidden;transition:.34s var(--ease)}
+.scrim[data-open]{opacity:1;visibility:visible}
+.sheet{position:absolute;inset:0;z-index:90;background:var(--paper);display:flex;flex-direction:column;visibility:hidden;transform:translateY(100%);transition:transform .42s var(--spring),visibility .42s}
+.sheet.right{transform:translateX(100%)}
+.sheet.instant{transition:none}
+.sheet[data-open]{transform:none;visibility:visible}
+.sheet-scroll{flex:1;overflow-y:auto;scrollbar-width:none;overscroll-behavior:contain}
+.sheet-scroll::-webkit-scrollbar{display:none}
+.sheet-bar{flex:none;display:flex;align-items:center;gap:13px;background:var(--surface);padding:calc(var(--s4) + env(safe-area-inset-top)) var(--s5) var(--s4);border-bottom:1px solid var(--line)}
+.sheet-bar h2{flex:1;font-family:var(--serif);font-size:18px;font-weight:600}
+
+/* temple doors — 3D swing-open darshan transition */
+.doors{position:absolute;inset:0;z-index:95;pointer-events:none;display:none;perspective:1600px;perspective-origin:50% 42%}
+.doors.run{display:block}
+.doors .dglow{position:absolute;inset:0;background:radial-gradient(circle at 50% 44%,rgba(255,232,203,.95),rgba(255,196,138,.38) 32%,transparent 64%);opacity:0;transition:opacity .6s ease .15s}
+.doors.open .dglow{opacity:1}
+.doors .leaf{position:absolute;top:0;bottom:0;width:50.2%;background:linear-gradient(90deg,#1A222C,#2E3B4A 45%,#1E2732);box-shadow:inset 0 0 90px rgba(0,0,0,.55);transition:transform .95s cubic-bezier(.62,0,.24,1)}
+.doors .leaf::before{content:"";position:absolute;inset:16px;border:2px solid rgba(255,178,100,.36);border-radius:5px;box-shadow:inset 0 0 0 5px rgba(0,0,0,.12)}
+.doors .leaf::after{content:"";position:absolute;top:50%;width:20px;height:20px;border-radius:50%;transform:translateY(-50%);background:radial-gradient(circle at 34% 34%,#FFD9A8,#E8801A);box-shadow:0 0 14px rgba(232,128,26,.85)}
+.doors .leaf.l{left:0;transform-origin:left center;border-right:1.5px solid #0E1319}
+.doors .leaf.l::after{right:15px}
+.doors .leaf.r{right:0;transform-origin:right center;border-left:1.5px solid #0E1319}
+.doors .leaf.r::after{left:15px}
+.doors.open .leaf.l{transform:rotateY(110deg)}
+.doors.open .leaf.r{transform:rotateY(-110deg)}
+
+/* temple detail */
+.dhero{position:relative;min-height:250px;flex:none;display:flex;align-items:flex-end;padding:var(--s5);overflow:hidden;background:linear-gradient(160deg,#FF9C42,var(--saffron) 55%,var(--saffron-600))}
+.dhero .wash{position:absolute;inset:0;background:radial-gradient(120% 90% at 18% 0%,rgba(255,222,190,.42),transparent 60%),linear-gradient(0deg,rgba(120,48,0,.34),transparent 46%)}
+.dhero .silh{position:absolute;right:-22px;bottom:-12px;width:220px;height:220px;opacity:.16;color:#6E2A00}
+.dhero.is-def::after{content:"";position:absolute;left:0;right:0;bottom:0;height:4px;background:linear-gradient(180deg,#FFB264 0 1px,transparent 1px 2px,#FFB264 2px 3px)}
+.dhero .navr{position:absolute;top:calc(var(--s4) + env(safe-area-inset-top));left:var(--s5);right:var(--s5);display:flex;justify-content:space-between}
+.dhero .navr .iconbtn{background:rgba(255,255,255,.92)}
+.dtitle{position:relative;z-index:2;color:#fff}
+.dtitle .k{font-size:11px;font-weight:800;letter-spacing:.15em;text-transform:uppercase;opacity:.92}
+.dtitle h1{font-family:var(--serif);font-size:29px;font-weight:600;line-height:1.08;margin-top:6px;text-shadow:0 2px 12px rgba(90,36,0,.3)}
+.dtitle .ml{font-size:15px;opacity:.92;margin-top:4px}
+.statrow{display:flex;gap:11px;padding:0 var(--s5);margin-top:-28px;position:relative;z-index:3}
+.stat{flex:1;text-align:center;padding:13px 6px;border-radius:var(--r-md);background:var(--surface);border:1.5px solid var(--line);box-shadow:var(--e2)}
+.stat b{display:block;font-size:15px;font-weight:800}.stat span{font-size:10.5px;color:var(--muted);font-weight:700}
+.dtabs{display:flex;gap:6px;padding:0 var(--s5);margin-top:var(--s5)}
+.dtabs button{flex:1;min-height:44px;border-radius:13px;font-size:13px;font-weight:700;color:var(--muted);background:var(--sunk)}
+.dtabs button[aria-selected="true"]{background:var(--ink);color:#fff}
+.block{padding:0 var(--s5);margin-top:var(--s6)}
+.block h3{font-family:var(--serif);font-size:17px;font-weight:600;margin-bottom:11px}
+.prose{font-size:14px;line-height:1.7;color:var(--ink-2)}
+.timings{border-radius:var(--r-md);overflow:hidden;border:1.5px solid var(--line)}
+.trow{display:flex;justify-content:space-between;padding:14px 16px;font-size:14px;background:var(--surface)}
+.trow+.trow{border-top:1px solid var(--line)}
+.trow.now{background:var(--tulsi-soft);color:var(--tulsi);font-weight:700}
+.dcta{position:sticky;bottom:0;display:flex;gap:11px;padding:14px var(--s5) calc(14px + env(safe-area-inset-bottom));background:rgba(255,255,255,.94);backdrop-filter:blur(12px);border-top:1px solid var(--line)}
+.dcta .btn-pri{flex:1}.dcta .btn-nav{flex:none;padding:0 18px}
+
+/* review */
+.rvcard{margin:var(--s5);border-radius:var(--r-lg);overflow:hidden;border:1.5px solid var(--line);background:var(--surface)}
+.rvrow{display:flex;justify-content:space-between;gap:14px;padding:15px 16px;font-size:14px}
+.rvrow+.rvrow{border-top:1px solid var(--line)}
+.rvrow .k{color:var(--muted)}.rvrow .v{font-weight:600;text-align:right}
+.rvrow.total{background:var(--saffron-tint)}
+.rvrow.total .k{color:var(--saffron-600);font-weight:800}
+.rvrow.total .v{font-family:var(--serif);font-size:20px;font-weight:600;color:var(--saffron-600)}
+.rvnote{margin:0 var(--s5);display:flex;gap:11px;padding:15px;border-radius:var(--r-md);background:var(--tulsi-soft);color:var(--tulsi);font-size:13px;line-height:1.55}
+.rvnote .ic{flex:none}
+.done{display:flex;flex-direction:column;align-items:center;text-align:center;padding:var(--s7) var(--s6)}
+.done .lamp{width:62px;height:62px;color:var(--brass);animation:rise .5s var(--spring)}
+@keyframes rise{from{opacity:0;transform:translateY(12px) scale(.9)}}
+.done h2{font-family:var(--serif);font-size:27px;font-weight:600;margin-top:var(--s4)}
+.done p{font-size:14px;color:var(--ink-2);margin-top:10px;max-width:29ch;line-height:1.6}
+.done .ref{margin-top:var(--s5);padding:13px 20px;border-radius:var(--r-md);background:var(--surface);border:1.5px solid var(--line);font-size:13.5px;font-weight:700}
+
+/* search */
+.spin{display:flex;align-items:center;gap:11px;flex:1;min-width:0;min-height:50px;padding:0 16px;border-radius:var(--r-full);background:var(--sunk);border:2px solid var(--line-2);cursor:text;transition:border-color .18s var(--ease),background .18s var(--ease)}
+.spin:focus-within{border-color:var(--saffron);background:var(--surface)}
+/* the input fills the pill so the whole pill is the tap target */
+.spin input{flex:1;min-width:0;align-self:stretch;border:none;outline:none;background:none;font-size:15px;font-weight:600}
+.sres{display:flex;align-items:center;gap:13px;width:100%;text-align:left;padding:15px var(--s5);border-bottom:1px solid var(--line)}
+.sres .glyph{width:50px;height:50px;flex:none;border-radius:14px;display:grid;place-items:center;background:var(--saffron-soft);color:var(--saffron-600)}
+.sres .glyph.shiva{background:var(--brass-soft);color:var(--brass-600)}.sres .glyph.devi{background:var(--kumkum-soft);color:var(--kumkum)}.sres .glyph.vishnu{background:var(--indigo-soft);color:var(--indigo)}
+.sres .glyph .ic{width:25px;height:25px}
+.sres .m{flex:1;min-width:0}.sres .m b{display:block;font-size:15px}.sres .m span{font-size:12px;color:var(--muted)}
+.sres .d{font-size:12.5px;font-weight:800;color:var(--tulsi)}
+
+/* ═══ NITHARA CHAT ═══ */
+.chat{background:#F5F8FC}
+.chtop{flex:none;display:flex;align-items:center;gap:13px;padding:calc(var(--s4) + env(safe-area-inset-top)) var(--s5) var(--s4);background:linear-gradient(135deg,var(--night-900),var(--night-500));color:#fff}
+.chtop .iconbtn{background:rgba(255,255,255,.16);color:#fff;border:0;box-shadow:none}
+.chtop .av{width:46px;height:46px;flex:none;border-radius:15px;display:grid;place-items:center;background:linear-gradient(140deg,#FFB264,var(--saffron));color:#fff}
+.chtop b{font-family:var(--serif);font-size:18px;font-weight:600}
+.chtop .st{display:flex;align-items:center;gap:6px;font-size:11.5px;opacity:.86;margin-top:1px}
+.chtop .st .dot{width:7px;height:7px;border-radius:50%;background:#7FC4FF}
+.chbody{flex:1;overflow-y:auto;padding:var(--s5);display:flex;flex-direction:column;gap:12px;scrollbar-width:none}
+.chbody::-webkit-scrollbar{display:none}
+.bub{max-width:84%;padding:14px 17px;border-radius:20px;font-size:14.5px;line-height:1.55;animation:bub .3s var(--ease)}
+@keyframes bub{from{opacity:0;transform:translateY(6px)}}
+.bub.ai{align-self:flex-start;background:var(--surface);border:1px solid var(--line);border-bottom-left-radius:7px;box-shadow:var(--e1)}
+.bub.me{align-self:flex-end;background:var(--saffron);color:#fff;border-bottom-right-radius:7px}
+.typing{align-self:flex-start;display:flex;gap:5px;padding:16px 18px;background:var(--surface);border:1px solid var(--line);border-radius:20px;border-bottom-left-radius:7px}
+.typing i{width:7px;height:7px;border-radius:50%;background:var(--faint);animation:tp 1.1s ease-in-out infinite}
+.typing i:nth-child(2){animation-delay:.16s}.typing i:nth-child(3){animation-delay:.32s}
+@keyframes tp{0%,60%,100%{opacity:.3;transform:translateY(0)}30%{opacity:1;transform:translateY(-4px)}}
+.sugg{flex:none;display:flex;gap:9px;flex-wrap:wrap;padding:0 var(--s5) var(--s3)}
+.sugg button{border:1.5px solid var(--line-2);background:var(--surface);border-radius:var(--r-full);padding:10px 15px;font-size:13px;font-weight:600;color:var(--ink-2)}
+.sugg button.key{border-color:var(--saffron);background:var(--saffron-tint);color:var(--saffron-600);font-weight:700}
+.chdisc{flex:none;font-size:11px;color:var(--muted);text-align:center;padding:0 var(--s6) 8px}
+.chin{flex:none;display:flex;gap:10px;align-items:center;padding:12px var(--s5) calc(12px + env(safe-area-inset-bottom));background:var(--surface);border-top:1px solid var(--line)}
+.chin .field{flex:1;min-width:0;display:flex;align-items:center;background:var(--sunk);border:1.5px solid var(--line-2);border-radius:var(--r-full);padding:0 16px;min-height:48px;cursor:text;transition:border-color .18s var(--ease),background .18s var(--ease)}
+.chin .field:focus-within{border-color:var(--saffron);background:var(--surface)}
+.chin input{flex:1;min-width:0;align-self:stretch;border:none;outline:none;background:none;font-size:14.5px}
+.chin .snd{width:48px;height:48px;flex:none;border-radius:50%;display:grid;place-items:center;background:var(--saffron);color:#fff}
+
+/* ═══ ONBOARDING ═══ */
+.onboard{position:absolute;inset:0;z-index:200;background:linear-gradient(180deg,var(--paper),var(--paper-2));display:flex;flex-direction:column;transition:opacity .5s var(--ease),transform .5s var(--ease)}
+.onboard.done{opacity:0;transform:scale(1.04);pointer-events:none}
+.ob-scroll{flex:1;overflow-y:auto;scrollbar-width:none;padding:calc(var(--s6) + env(safe-area-inset-top)) var(--s5) 0;display:flex;flex-direction:column}
+.ob-scroll::-webkit-scrollbar{display:none}
+.ob-brand{display:flex;align-items:center;gap:11px}
+.ob-brand .mk{width:40px;height:40px;border-radius:14px;display:grid;place-items:center;background:linear-gradient(150deg,#FFB264,var(--saffron));color:#fff}
+.ob-brand b{font-family:var(--serif);font-size:20px;font-weight:600}
+.ob-hero{margin-top:var(--s7)}
+.ob-hero h1{font-family:var(--serif);font-size:38px;font-weight:600;line-height:1.05;letter-spacing:-.02em}
+.ob-hero p{font-size:15px;color:var(--ink-2);margin-top:14px;line-height:1.6;max-width:34ch}
+.ob-scan{margin-top:var(--s6)}
+.ob-scan-card{border-radius:var(--r-xl);padding:20px;background:linear-gradient(165deg,#FFFFFF,var(--brass-soft));border:1.5px solid var(--brass);box-shadow:var(--e2);position:relative;overflow:hidden}
+.ob-scan-card .thread{position:absolute;left:0;right:0;top:0;height:4px;background:linear-gradient(180deg,var(--brass) 0 1px,transparent 1px 2px,var(--brass) 2px 3px);opacity:.8}
+.ob-scan-badge{display:inline-flex;align-items:center;gap:6px;font-size:10.5px;font-weight:800;letter-spacing:.1em;color:var(--brass-600);text-transform:uppercase}
+.ob-scan-badge .ic{width:14px;height:14px}
+.ob-scan-row{display:flex;gap:14px;align-items:center;margin-top:14px}
+.ob-scan-row .glyph{width:60px;height:60px;flex:none;border-radius:18px;display:grid;place-items:center;background:#fff;color:var(--brass-600);border:1px solid var(--brass-line)}
+.ob-scan-row .glyph .ic{width:32px;height:32px;stroke-width:1.4}
+.ob-scan-row .m{flex:1;min-width:0}
+.ob-scan-row .m b{font-family:var(--serif);font-size:19px;font-weight:600;display:block;line-height:1.1}
+.ob-scan-row .m span{font-size:13px;color:var(--ink-2)}
+.ob-scan-note{font-size:13.5px;color:var(--ink-2);line-height:1.55;margin-top:14px}
+.ob-scan-note b{color:var(--ink)}
+.ob-link{position:relative;margin-top:14px;font-size:13.5px;font-weight:700;color:var(--saffron-600);display:inline-flex;align-items:center;gap:6px}
+.ob-link::after{content:"";position:absolute;inset:-12px -10px}
+.ob-picker{margin-top:12px}
+.ob-picker .spin{background:var(--surface);border-color:var(--line-2)}
+.ob-pick{display:flex;align-items:center;gap:13px;width:100%;text-align:left;padding:13px 4px;border-bottom:1px solid var(--line)}
+.ob-pick .glyph{width:46px;height:46px;flex:none;border-radius:13px;display:grid;place-items:center;background:var(--saffron-soft);color:var(--saffron-600)}
+.ob-pick .glyph.shiva{background:var(--brass-soft);color:var(--brass-600)}.ob-pick .glyph.devi{background:var(--kumkum-soft);color:var(--kumkum)}.ob-pick .glyph.vishnu{background:var(--indigo-soft);color:var(--indigo)}
+.ob-pick .m{flex:1;min-width:0}.ob-pick .m b{display:block;font-size:14.5px}.ob-pick .m span{font-size:12px;color:var(--muted)}
+.ob-pick .d{font-size:12px;font-weight:800;color:var(--tulsi)}
+.ob-foot{flex:none;padding:var(--s5);padding-bottom:calc(var(--s5) + env(safe-area-inset-bottom));background:linear-gradient(0deg,var(--paper) 70%,transparent)}
+.ob-foot .btn{min-height:56px;font-size:16px}
+.ob-fine{font-size:12px;color:var(--muted);text-align:center;margin-top:12px;line-height:1.5}
+
+/* map card (home bottom) */
+.mapcard{margin:0 var(--s5);border-radius:var(--r-lg);overflow:hidden;border:1.5px solid var(--line);background:var(--surface);box-shadow:var(--e1)}
+.mapfilter{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding:14px 14px 12px}
+.mapfilter::-webkit-scrollbar{display:none}
+.mapfilter button{flex:none;display:inline-flex;align-items:center;gap:6px;min-height:38px;padding:0 14px;border-radius:var(--r-full);background:var(--sunk);border:1.5px solid var(--line-2);color:var(--ink-2);font-size:12.5px;font-weight:700}
+.mapfilter button .ic{width:14px;height:14px}
+.mapfilter button[aria-pressed="true"]{background:var(--ink);color:#fff;border-color:var(--ink)}
+.mapfilter button[aria-pressed="true"] .ic{color:#FFB264}
+.mapview{position:relative;height:236px;background:var(--sunk);overflow:hidden}
+.mapcanvas{position:absolute;inset:0;z-index:1}
+.leaflet-container{font-family:var(--ui);background:var(--sunk)}
+.leaflet-control-attribution{font-size:9px!important;background:rgba(255,255,255,.7)!important;color:var(--muted)!important;padding:1px 5px!important}
+.leaflet-control-zoom{display:none}
+.leaflet-control-zoom.show{display:block;border:none!important;box-shadow:var(--e2)!important;border-radius:14px!important;overflow:hidden}
+/* Leaflet ships 30px controls; bring them up to a thumb-sized target */
+.leaflet-control-zoom a{width:44px!important;height:44px!important;line-height:44px!important;
+  font-size:19px!important;color:var(--ink-2)!important;border-color:var(--line)!important}
+.leaflet-control-zoom a:hover{background:var(--sunk)!important}
+/* the zoom stack sits under the top chrome, never over it */
+.mapsheet .leaflet-top.leaflet-left{top:calc(112px + env(safe-area-inset-top));left:6px}
+
+/* teardrop pins (ported from the three-builds map) */
+.pin{width:40px;height:48px;position:relative;transition:transform .16s var(--ease)}
+.pin:hover{transform:translateY(-2px)}
+.pin .disc{position:absolute;inset:0 0 8px 0;border-radius:50% 50% 50% 4px;transform:rotate(-45deg);background:var(--saffron);border:2.5px solid #fff;box-shadow:0 4px 12px rgba(14,19,25,.3);display:grid;place-items:center}
+.pin .disc .ic{transform:rotate(45deg);width:19px;height:19px;color:#fff;stroke-width:2}
+.pin.shiva .disc{background:var(--brass)}
+.pin.devi  .disc{background:var(--kumkum)}
+.pin.vishnu .disc{background:var(--indigo)}
+.pin.def{width:48px;height:56px;z-index:5}
+.pin.def .disc{background:linear-gradient(150deg,#FFB264,var(--brass-600));border-color:#FFFFFF;box-shadow:0 0 0 4px rgba(232,128,26,.2),0 6px 14px rgba(14,19,25,.28)}
+.pin.def .disc .ic{width:22px;height:22px}
+.pin .tag{position:absolute;top:-22px;left:50%;transform:translateX(-50%);white-space:nowrap;background:#fff;border-radius:8px;padding:3px 8px;font-size:10px;font-weight:800;color:var(--brass-600);box-shadow:var(--e2)}
+.me-dot{width:18px;height:18px;border-radius:50%;background:var(--indigo);border:3px solid #fff;box-shadow:0 0 0 6px rgba(15,99,214,.16)}
+
+.maplbl{position:absolute;z-index:5;left:12px;right:12px;bottom:12px;width:fit-content;max-width:calc(100% - 24px);display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;color:var(--ink-2);background:rgba(255,255,255,.92);padding:7px 12px;border-radius:var(--r-full);box-shadow:var(--e1);white-space:nowrap;overflow:hidden}
+.mapexpand{display:flex;flex:none;align-items:center;gap:6px;font-size:11.5px;font-weight:700;color:var(--ink);background:rgba(255,255,255,.94);padding:8px 13px;border-radius:var(--r-full);box-shadow:var(--e2);white-space:nowrap}
+.maprecentre{position:absolute;z-index:5;right:12px;bottom:12px;width:42px;height:42px;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.94);color:var(--saffron-600);box-shadow:var(--e2)}
+
+/* segmented search */
+.seg{display:flex;gap:6px;padding:12px var(--s5);background:var(--surface);border-bottom:1px solid var(--line)}
+.seg button{flex:1;min-height:44px;border-radius:12px;font-size:13px;font-weight:700;color:var(--muted);background:var(--sunk);display:flex;align-items:center;justify-content:center;gap:7px}
+.seg button[aria-selected="true"]{background:var(--ink);color:#fff}
+
+/* full map page */
+.mapsheet{background:var(--sunk)}
+.mfull{position:absolute;inset:0;z-index:1;overflow:hidden}
+/* Top and bottom map chrome are each a single flow column pinned to an edge.
+   Nothing is placed with a magic offset, so a taller card or a longer
+   Malayalam label can never slide under its neighbour. */
+.maptop{position:absolute;z-index:6;top:0;left:0;right:0;display:flex;flex-direction:column;gap:12px;
+  padding-top:calc(var(--s4) + env(safe-area-inset-top));pointer-events:none}
+.maptop>*{pointer-events:auto}
+.mtop{display:flex;gap:11px;align-items:center;padding:0 var(--s5);min-width:0}
+.mtop .spin-lite{flex:1;min-width:0;display:flex;align-items:center;gap:11px;min-height:50px;padding:0 16px;border-radius:var(--r-full);background:var(--surface);border:1px solid var(--line-2);box-shadow:var(--e2);color:var(--muted);font-weight:500;font-size:14px}
+.mtop .spin-lite .ic{color:var(--muted)}
+.mchips{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding:2px var(--s5)}
+.mchips::-webkit-scrollbar{display:none}
+.mchips button{flex:none;display:inline-flex;align-items:center;gap:6px;min-height:38px;padding:0 14px;border-radius:var(--r-full);background:var(--surface);border:1px solid var(--line-2);color:var(--ink-2);font-size:12.5px;font-weight:700;box-shadow:var(--e1)}
+.mchips button .ic{width:14px;height:14px}
+.mchips button[aria-pressed="true"]{background:var(--ink);color:#fff;border-color:var(--ink)}
+.mchips button[aria-pressed="true"] .ic{color:#FFB264}
+.mapbottom{position:absolute;z-index:6;left:0;right:0;bottom:0;display:flex;flex-direction:column;gap:10px;
+  padding-bottom:calc(16px + env(safe-area-inset-bottom));pointer-events:none}
+.mapbottom>*{pointer-events:auto}
+.maptools{display:flex;justify-content:flex-end;align-items:center;gap:10px;padding:0 var(--s5)}
+.maptools .iconbtn{width:46px;height:46px;box-shadow:var(--e2)}
+.maptools .iconbtn.dark{background:var(--ink);color:#fff;border-color:var(--ink)}
+.mrail{display:flex;align-items:stretch;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;padding:0 var(--s5) 4px}
+.mrail::-webkit-scrollbar{display:none}
+.mrcard{flex:0 0 85%;min-width:0;scroll-snap-align:center;display:flex;flex-direction:column;background:var(--surface);border-radius:var(--r-lg);border:1.5px solid var(--line);box-shadow:var(--e3);padding:15px;text-align:left}
+.mrcard .acts{margin-top:auto}
+.mrcard.is-def{border-color:var(--brass);background:linear-gradient(165deg,#FFFFFF,var(--brass-soft))}
+.mrcard.active{outline:2px solid var(--saffron);outline-offset:-2px}
+.mrcard .row{display:flex;gap:13px;align-items:center}
+.mrcard .glyph{width:52px;height:52px;flex:none;border-radius:15px;display:grid;place-items:center;background:var(--saffron-soft);color:var(--saffron-600)}
+.mrcard .glyph.shiva{background:var(--brass-soft);color:var(--brass-600)}.mrcard .glyph.devi{background:var(--kumkum-soft);color:var(--kumkum)}.mrcard .glyph.vishnu{background:var(--indigo-soft);color:var(--indigo)}
+.mrcard .glyph .ic{width:26px;height:26px}
+.mrbadge{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:800;letter-spacing:.08em;color:var(--brass-600);text-transform:uppercase}
+.mrbadge .ic{width:11px;height:11px;fill:currentColor;stroke:none}
+.mrcard h3{font-family:var(--serif);font-size:17px;font-weight:600;line-height:1.1;margin-top:2px}
+.mrml{font-size:12px;color:var(--muted);margin-top:1px}
+.mrcard .acts{display:flex;gap:9px;margin-top:13px}
+.mrcard .acts .btn{flex:1;min-height:42px;font-size:12.5px}
+
+/* jathakam (rasi) grid */
+.rasi{display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:repeat(4,1fr);gap:4px;aspect-ratio:1}
+.rc{background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:6px;font-size:9px;font-weight:600;color:var(--muted);display:flex;flex-direction:column;gap:2px}
+.rc .p{color:var(--brass-600);font-weight:800;font-size:9.5px}
+.rc.center{grid-column:2/4;grid-row:2/4;background:linear-gradient(150deg,#FFFFFF,var(--brass-soft));border-color:var(--brass-line);display:grid;place-items:center;text-align:center}
+.rc.center b{font-family:var(--serif);font-size:15px;color:var(--brass-600)}
+.rc.center span{font-size:9.5px;color:var(--ink-2);margin-top:3px;line-height:1.3}
+
+/* milestones */
+.milestones{display:flex;gap:10px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+.milestones::-webkit-scrollbar{display:none}
+.ms{flex:0 0 110px;border-radius:14px;padding:14px 10px;text-align:center;background:var(--paper);border:1.5px solid var(--line)}
+.ms.got{background:linear-gradient(160deg,#FFFFFF,var(--brass-soft));border-color:var(--brass-line)}
+.ms .ic{width:26px;height:26px;color:var(--brass-600);stroke-width:1.5}
+.ms.lock .ic{color:var(--faint)}
+.ms b{display:block;font-size:12px;font-weight:800;margin-top:8px;line-height:1.2}
+.ms span{font-size:10.5px;color:var(--muted);font-weight:700}
+
+/* toast */
+.toast{position:absolute;z-index:210;left:50%;bottom:calc(var(--nav-safe) + 14px);transform:translate(-50%,12px);max-width:86%;display:flex;align-items:center;gap:10px;padding:13px 20px;border-radius:var(--r-full);background:var(--ink);color:#fff;font-size:13.5px;font-weight:600;box-shadow:var(--e3);opacity:0;pointer-events:none;transition:.3s var(--ease)}
+.toast .ic{color:#FFB264}
+.toast[data-show]{opacity:1;transform:translate(-50%,0)}
+
+/* ═══════════════════════════════════════════════════════════════
+   PALETTE ROLES — orange acts, blue informs, graphite recedes
+   ═══════════════════════════════════════════════════════════════ */
+.pill-open{background:var(--blue-soft);color:var(--blue-700)}
+.pill-shut{background:var(--kumkum-soft);color:var(--kumkum)}
+.pill-dist{background:var(--sunk);color:var(--ink-2)}
+.pill-def{background:var(--saffron-soft);color:var(--saffron-600)}
+.pill-live{background:var(--saffron);color:#fff}
+.pin.shiva .disc{background:var(--brass)}
+.pin.devi .disc{background:var(--kumkum)}
+.pin.vishnu .disc{background:var(--blue)}
+.pin.def .disc{background:linear-gradient(150deg,#FFA24D,var(--saffron-600));border-color:#fff}
+.pin .tag{color:var(--saffron-600)}
+.tmini .d,.sres .d,.ob-pick .d{color:var(--blue-700)}
+.trow.now,.rvnote{background:var(--blue-soft);color:var(--blue-700)}
+.helpstrip{background:var(--blue-soft);border-color:#D3E2FB}
+.helpstrip .ic{color:var(--blue)}
+.btn-nav,.btn-tulsi{background:var(--blue-soft);color:var(--blue-700)}
+.astro .dot,.chtop .st .dot{background:#3D8BF2}
+.setup{background:var(--blue-soft);border-color:#D3E2FB}
+.setup .si{color:var(--blue)}
+.mapfilter button[aria-pressed="true"] .ic{color:#FFB264}
+
+/* ═══════════════════════════════════════════════════════════════
+   HOME HEADER — brand line, then a located, dated greeting
+   ═══════════════════════════════════════════════════════════════ */
+.hometop{padding:calc(var(--s4) + env(safe-area-inset-top)) var(--s5) 0}
+.brandrow{display:flex;align-items:center;gap:10px}
+.brandrow .mark{width:34px;height:34px;border-radius:12px}
+.brandrow .mark .ic{width:18px;height:18px}
+.wordmark{font-family:var(--serif);font-size:19px;font-weight:600;margin-right:auto;letter-spacing:.01em}
+.brandrow .iconbtn{width:40px;height:40px}
+.brandrow .iconbtn.lang{width:auto;height:40px;padding:0 13px}
+.greetrow{display:flex;align-items:flex-end;gap:14px;margin-top:var(--s5)}
+.greetrow .g{flex:1;min-width:0}
+.eyebrow{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;color:var(--muted)}
+.eyebrow .ic{width:13px;height:13px;color:var(--saffron);stroke-width:2.2}
+.eyebrow .dot{width:3px;height:3px;border-radius:50%;background:var(--line-2);flex:none}
+.greet{font-family:var(--serif);font-size:28px;font-weight:600;line-height:1.06;letter-spacing:-.02em;margin-top:7px}
+.greet em{font-style:normal;color:var(--saffron-600)}
+.greet-ml{font-size:14px;color:var(--ink-2);margin-top:4px}
+.avatarbtn{width:46px;height:46px;flex:none;border-radius:50%;display:grid;place-items:center;position:relative;
+  background:var(--saffron-soft);color:var(--saffron-600);border:1.5px solid var(--line-2);
+  font-size:14px;font-weight:800;box-shadow:var(--e1)}
+.avatarbtn .bell{position:absolute;top:-1px;right:-1px;width:12px;height:12px;border-radius:50%;
+  background:var(--blue);border:2px solid #fff}
+.hometop + .panch{margin-top:var(--s5)}
+
+/* ═══════════════════════════════════════════════════════════════
+   MAP CARD — a preview at its original size; the whole thing is
+   one tap target that opens the full map page
+   ═══════════════════════════════════════════════════════════════ */
+.mapview{cursor:pointer}
+.mapview .leaflet-container{pointer-events:none}
+.maphit{position:absolute;inset:0;z-index:6;width:100%;background:none;border-radius:0}
+.mapview:active .mapexpand{transform:scale(.96)}
+.mapexpand{transition:transform .16s var(--spring)}
+.mapchrome{position:absolute;z-index:5;left:12px;right:12px;top:12px;display:flex;align-items:flex-start;
+  justify-content:space-between;gap:8px;pointer-events:none}
+.mapcount{display:inline-flex;align-items:center;gap:6px;min-width:0;
+  font-size:11.5px;font-weight:700;color:var(--ink-2);background:rgba(255,255,255,.94);
+  padding:7px 12px;border-radius:var(--r-full);box-shadow:var(--e1);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mapcount .ic{width:13px;height:13px;color:var(--saffron)}
+
+/* ═══════════════════════════════════════════════════════════════
+   MALAYALAM MODE — swap the type stack, loosen the leading.
+   Anek Malayalam has a taller x-height, so lines need more room.
+   ═══════════════════════════════════════════════════════════════ */
+.phone[data-lang="ml"]{
+  --ui:"Anek Malayalam","Inter",system-ui,sans-serif;
+  --serif:"Anek Malayalam","Fraunces",Georgia,serif;
+  line-height:1.6;
+}
+.phone[data-lang="ml"] .greet,
+.phone[data-lang="ml"] .sec h2,
+.phone[data-lang="ml"] .mt-name,
+.phone[data-lang="ml"] .pcard h2{font-weight:700;letter-spacing:0}
+.phone[data-lang="ml"] .greet{font-size:26px;line-height:1.24}
+.phone[data-lang="ml"] .mt-name{font-size:23px;line-height:1.3}
+.phone[data-lang="ml"] .nav button{font-size:11px}
+.phone[data-lang="ml"] .pstat span{font-size:9.5px;letter-spacing:0}
+.phone[data-lang="ml"] .mt-badge,
+.phone[data-lang="ml"] .cat,
+.phone[data-lang="ml"] .eyebrow{letter-spacing:.02em}
+
+/* ═══════════════════════════════════════════════════════════════
+   FULL MAP PAGE — the three-builds layout: floating search with
+   avatar, deity chips, map tools column, snapping card rail
+   ═══════════════════════════════════════════════════════════════ */
+.searchfield{flex:1;min-width:0;display:flex;align-items:center;gap:11px;min-height:50px;padding:0 8px 0 16px;
+  border-radius:var(--r-full);background:var(--surface);box-shadow:var(--e3);
+  color:var(--muted);font-size:14px;font-weight:500;text-align:left}
+.searchfield .ic{color:var(--muted);flex:none}
+.searchfield .txt{flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:var(--ink-2)}
+.searchfield .avatar{width:34px;height:34px;flex:none;border-radius:50%;display:grid;place-items:center;
+  background:var(--saffron-soft);color:var(--saffron-600);font-size:12px;font-weight:800}
+.railhead{display:flex;padding:0 var(--s5)}
+.railhead span{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.94);
+  border-radius:var(--r-full);padding:6px 12px;box-shadow:var(--e1);
+  font-size:10.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-2)}
+.mrcard .mrpills{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}
+.mrcard .mrdist{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:800;
+  color:var(--blue-700);font-variant-numeric:tabular-nums}
+.mrcard .mrdist .ic{width:12px;height:12px}
+
+/* ═══════════════════════════════════════════════════════════════
+   HOME · place row + promotional rail
+   No name is ever asked for, so the header carries place and date
+   and hands the rest of the space to a Flipkart/BookMyShow-style
+   banner rail: today's panchangam, Nithara, a featured astrologer,
+   a live festival.
+   ═══════════════════════════════════════════════════════════════ */
+.placerow{display:flex;align-items:center;gap:10px;margin-top:var(--s5)}
+.placechip{display:inline-flex;align-items:center;gap:7px;min-height:38px;padding:0 13px 0 11px;
+  border-radius:var(--r-full);background:var(--sunk);border:1px solid var(--line-2);
+  font-size:13px;font-weight:700;color:var(--ink);max-width:62%}
+.placechip .ic{width:15px;height:15px;color:var(--saffron);flex:none;stroke-width:2.2}
+.placechip .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.placechip .cv{width:13px;height:13px;color:var(--muted);flex:none}
+.datechip{margin-left:auto;font-size:12px;font-weight:600;color:var(--muted);white-space:nowrap}
+
+.promowrap{margin-top:var(--s4)}
+.promorail{display:flex;align-items:stretch;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;
+  scrollbar-width:none;padding:0 var(--s5) 2px;scroll-behavior:smooth}
+.promorail::-webkit-scrollbar{display:none}
+.promo{flex:0 0 calc(100% - 52px);scroll-snap-align:center;position:relative;overflow:hidden;
+  min-height:158px;border-radius:20px;padding:16px 17px;color:#fff;text-align:left;
+  display:flex;flex-direction:column;justify-content:flex-end;box-shadow:var(--e2);
+  transition:transform .15s var(--ease)}
+.promo:active{transform:scale(.985)}
+.p-night{background:linear-gradient(135deg,var(--night-900),var(--night-700) 62%,var(--night-500))}
+.p-orange{background:linear-gradient(135deg,#FF8A2B,var(--saffron) 55%,var(--saffron-600))}
+.p-slate{background:linear-gradient(135deg,#33404F,#1B242E)}
+.p-fest{background:linear-gradient(135deg,#FF9C42,#C24E06 70%,#8F3705)}
+.promo .stars{position:absolute;inset:0;opacity:.5;pointer-events:none;
+  background-image:radial-gradient(1.4px 1.4px at 22% 24%,#fff,transparent),radial-gradient(1.4px 1.4px at 72% 16%,#fff,transparent),
+  radial-gradient(1px 1px at 48% 58%,#fff,transparent),radial-gradient(1.3px 1.3px at 88% 52%,#fff,transparent),
+  radial-gradient(1px 1px at 32% 78%,#fff,transparent)}
+.promo .pglyph{position:absolute;right:-16px;top:-12px;opacity:.16;pointer-events:none}
+.promo .pglyph .ic{width:128px;height:128px;stroke-width:1}
+.promo .ptag{position:absolute;top:15px;left:17px;display:inline-flex;align-items:center;gap:5px;
+  font-size:9.5px;font-weight:800;letter-spacing:.12em;padding:5px 9px;border-radius:var(--r-full);
+  background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.26);backdrop-filter:blur(6px)}
+.promo .ptag.hot{background:#fff;color:var(--saffron-600);border-color:#fff}
+.promo .pbody{position:relative;z-index:2;min-width:0}
+.promo .pbody b{display:block;font-family:var(--serif);font-size:20px;font-weight:600;line-height:1.15;letter-spacing:-.01em}
+.promo .pbody span{display:block;font-size:12.5px;opacity:.9;margin-top:4px;line-height:1.4}
+.promo .pcta{position:relative;z-index:2;display:inline-flex;align-items:center;gap:6px;align-self:flex-start;
+  margin-top:12px;font-size:12px;font-weight:800;padding:8px 13px;border-radius:var(--r-full);
+  background:rgba(255,255,255,.94);color:var(--ink)}
+.promo .pcta .ic{width:13px;height:13px}
+.promodots{display:flex;justify-content:center;gap:6px;margin-top:11px}
+.promodots i{width:6px;height:6px;border-radius:var(--r-full);background:var(--line-2);transition:.24s var(--ease)}
+.promodots i.on{width:18px;background:var(--saffron)}
+.phone[data-lang="ml"] .promo .pbody b{font-size:18px;line-height:1.35}
+
+/* ═══════════════════════════════════════════════════════════════
+   ONBOARDING · the temple is the only mandatory choice
+   ═══════════════════════════════════════════════════════════════ */
+.ob-hero h1{font-size:32px}
+.ob-routes{display:flex;flex-direction:column;gap:11px;margin-top:var(--s6)}
+.ob-route{display:flex;align-items:center;gap:14px;padding:16px;border-radius:var(--r-lg);
+  background:var(--surface);border:1.5px solid var(--line-2);text-align:left;box-shadow:var(--e1);
+  transition:.16s var(--ease)}
+.ob-route:active{transform:scale(.99)}
+.ob-route:hover{border-color:var(--saffron);box-shadow:var(--e2)}
+.ob-route .ri{width:48px;height:48px;flex:none;border-radius:15px;display:grid;place-items:center;
+  background:var(--saffron-soft);color:var(--saffron-600)}
+.ob-route.blue .ri{background:var(--blue-soft);color:var(--blue-700)}
+.ob-route.slate .ri{background:var(--kumkum-soft);color:var(--kumkum)}
+.ob-route .rm{flex:1;min-width:0}
+.ob-route .rm b{display:block;font-size:15px;font-weight:700}
+.ob-route .rm span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px;line-height:1.4}
+.ob-route .rc{color:var(--faint);flex:none}
+.ob-step{display:flex;align-items:center;gap:10px;margin-top:var(--s5)}
+.ob-step .back{width:38px;height:38px;flex:none;border-radius:50%;display:grid;place-items:center;
+  background:var(--sunk);border:1px solid var(--line-2);color:var(--ink-2)}
+.ob-step b{font-size:14.5px;font-weight:700}
+.ob-detect{display:flex;align-items:center;gap:12px;margin-top:var(--s4);padding:15px;border-radius:var(--r-md);
+  background:var(--blue-soft);border:1px solid #D3E2FB;color:var(--blue-700);font-size:13px;font-weight:700}
+.ob-detect .spin-dot{width:16px;height:16px;flex:none;border-radius:50%;border:2.5px solid #BBD4FA;
+  border-top-color:var(--blue);animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.ob-pick.sel{background:var(--saffron-tint);border-radius:14px;border-bottom-color:transparent}
+.ob-foot .btn[disabled]{opacity:.42;pointer-events:none}
+
+/* ═══════════════════════════════════════════════════════════════
+   PROFILE HEADER — white, restrained, no gradient panel
+   ═══════════════════════════════════════════════════════════════ */
+.phead2{padding:calc(var(--s6) + env(safe-area-inset-top)) var(--s5) 0}
+.phead2 .eyebrow2{font-size:10.5px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
+.pcardhead{margin-top:12px;border-radius:var(--r-lg);border:1.5px solid var(--line);background:var(--surface);
+  box-shadow:var(--e1);overflow:hidden}
+.pidrow{display:flex;align-items:center;gap:14px;padding:17px}
+.pidrow .pav{width:56px;height:56px;flex:none;border-radius:17px;display:grid;place-items:center;
+  background:var(--saffron-soft);color:var(--saffron-600);border:1px solid var(--brass-line)}
+.pidrow .pav .ic{width:28px;height:28px}
+.pidrow .pm{flex:1;min-width:0}
+.pidrow .pm .kk{font-size:10.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--saffron-600);
+  display:flex;align-items:center;gap:5px}
+.pidrow .pm .kk .ic{width:11px;height:11px;fill:currentColor;stroke:none}
+.pidrow .pm h1{font-family:var(--serif);font-size:19px;font-weight:600;line-height:1.2;margin-top:4px;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+.pidrow .pm .sub{font-size:12.5px;color:var(--muted);margin-top:2px}
+.pidrow .chg{flex:none;font-size:12px;font-weight:800;color:var(--blue-700);padding:9px 12px;border-radius:12px;background:var(--blue-soft)}
+.pstatsrow{display:flex;border-top:1px solid var(--line);background:var(--paper-2)}
+.pstat2{flex:1;padding:14px 4px;text-align:center;position:relative}
+.pstat2+.pstat2::before{content:"";position:absolute;left:0;top:22%;bottom:22%;width:1px;background:var(--line)}
+.pstat2 b{display:block;font-size:19px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.1}
+.pstat2 span{display:block;font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:4px}
+.pnak{display:flex;align-items:center;gap:9px;margin:11px 0 0;padding:12px 14px;border-radius:var(--r-md);
+  background:var(--sunk);border:1px solid var(--line);font-size:12.5px;font-weight:700;color:var(--ink-2)}
+.pnak .ic{width:16px;height:16px;flex:none;color:var(--saffron)}
+.pnak.set{background:var(--blue-soft);border-color:#D3E2FB;color:var(--blue-700)}
+.pnak.set .ic{color:var(--blue)}
+.psync{display:flex;align-items:center;gap:13px;margin:11px 0 0;padding:14px;border-radius:var(--r-md);
+  background:var(--surface);border:1.5px dashed var(--line-2);text-align:left;width:100%}
+.psync .si2{width:38px;height:38px;flex:none;border-radius:12px;display:grid;place-items:center;
+  background:var(--sunk);color:var(--ink-2)}
+.psync .sm{flex:1;min-width:0}
+.psync .sm b{display:block;font-size:13.5px;font-weight:700}
+.psync .sm span{display:block;font-size:11.5px;color:var(--muted);margin-top:1px;line-height:1.35}
+.psync .go2{position:relative;flex:none;font-size:12px;font-weight:800;color:var(--saffron-600)}
+.psync .go2::after{content:"";position:absolute;inset:-14px -12px}
+
+/* ═══════════════════════════════════════════════════════════════
+   STAR DAY — the nakshatram promo takes the first banner slot
+   whenever the star falls inside the booking window
+   ═══════════════════════════════════════════════════════════════ */
+.p-star{background:linear-gradient(135deg,#FFA24D,var(--saffron) 48%,#A83F04)}
+.promo .pcount{position:absolute;top:14px;right:16px;z-index:2;text-align:right}
+.promo .pcount b{display:block;font-size:26px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
+.promo .pcount span{display:block;font-size:9.5px;font-weight:800;letter-spacing:.1em;opacity:.85;margin-top:2px}
+
+/* ═══════════════════════════════════════════════════════════════
+   POOJAS TAB
+   ═══════════════════════════════════════════════════════════════ */
+.starcard{margin:0 var(--s5);border-radius:var(--r-xl);padding:19px;position:relative;overflow:hidden;
+  background:linear-gradient(160deg,#FFFFFF,var(--saffron-soft));border:1.5px solid var(--saffron);box-shadow:var(--e2)}
+.starcard .sg{position:absolute;right:-22px;bottom:-24px;width:150px;height:150px;color:var(--saffron);opacity:.1;pointer-events:none}
+.starcard .kk{display:flex;align-items:center;gap:6px;font-size:10.5px;font-weight:800;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--saffron-600)}
+.starcard .kk .ic{width:12px;height:12px;fill:currentColor;stroke:none}
+.starcard h2{font-family:var(--serif);font-size:23px;font-weight:600;line-height:1.1;margin-top:7px;position:relative}
+.starcard .when{font-size:13px;color:var(--ink-2);margin-top:4px;position:relative}
+.starcard .cd{display:flex;gap:9px;margin-top:15px;position:relative}
+.starcard .cd .box{flex:1;text-align:center;padding:11px 4px;border-radius:13px;background:rgba(255,255,255,.8);
+  border:1px solid var(--brass-line)}
+.starcard .cd .box b{display:block;font-size:17px;font-weight:800;font-variant-numeric:tabular-nums}
+.starcard .cd .box span{display:block;font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin-top:3px}
+.starcard .btn{margin-top:15px;position:relative}
+.starnote{display:flex;gap:9px;align-items:flex-start;margin:11px var(--s5) 0;padding:12px 14px;border-radius:var(--r-md);
+  background:var(--blue-soft);border:1px solid #D3E2FB;color:var(--blue-700);font-size:12.5px;line-height:1.5;font-weight:600}
+.starnote .ic{flex:none;width:16px;height:16px;margin-top:1px}
+
+.pjrow{display:flex;align-items:center;gap:13px;padding:14px;border-radius:var(--r-md);border:1.5px solid var(--line);
+  background:var(--surface);margin:0 var(--s5)}
+.pjrow+.pjrow{margin-top:10px}
+.pjrow.locked{opacity:.62}
+.pjrow .pi{width:46px;height:46px;flex:none;border-radius:13px;background:var(--saffron-soft);color:var(--saffron-600);
+  display:grid;place-items:center;border:1px solid var(--brass-line)}
+.pjrow .pm{flex:1;min-width:0}
+.pjrow .pm b{display:block;font-size:14px}
+.pjrow .pm span{display:block;font-size:11.5px;color:var(--muted);margin-top:2px;line-height:1.35}
+.pjrow .pm .warn{color:var(--kumkum);font-weight:700}
+.pjrow .rt{text-align:right;flex:none}
+.pjrow .rt b{display:block;font-size:15px;font-weight:800;font-variant-numeric:tabular-nums}
+.pjrow .rt .btn{min-height:36px;padding:0 14px;font-size:12px;margin-top:7px}
+.bkrow{display:flex;align-items:center;gap:12px;padding:13px;border-radius:var(--r-md);border:1.5px solid var(--line);
+  background:var(--surface);margin:0 var(--s5)}
+.bkrow+.bkrow{margin-top:10px}
+.bkrow.past{background:var(--paper-2);opacity:.9}
+.bkrow .bi{width:42px;height:42px;flex:none;border-radius:12px;display:grid;place-items:center;
+  background:var(--sunk);color:var(--ink-2);border:1px solid var(--line)}
+.bkrow .bm{flex:1;min-width:0}
+.bkrow .bm b{display:block;font-size:13.5px}
+.bkrow .bm span{display:block;font-size:11.5px;color:var(--muted);margin-top:1px}
+.emptyline{margin:0 var(--s5);padding:22px;border-radius:var(--r-md);border:1.5px dashed var(--line-2);
+  text-align:center;color:var(--muted);font-size:13px}
+
+/* ═══════════════════════════════════════════════════════════════
+   HOME · from your temple (the feed, folded in)
+   ═══════════════════════════════════════════════════════════════ */
+.noticerail{display:flex;align-items:stretch;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;padding:0 var(--s5) 4px}
+.noticerail::-webkit-scrollbar{display:none}
+.notice{flex:0 0 78%;min-width:0;scroll-snap-align:center;display:flex;flex-direction:column;border-radius:var(--r-lg);
+  overflow:hidden;background:var(--surface);border:1.5px solid var(--line);box-shadow:var(--e1);text-align:left}
+.notice .nb{flex:1}
+.notice .nimg{height:112px;position:relative;display:grid;place-items:center;color:rgba(255,255,255,.65)}
+.notice .nimg .ic{width:46px;height:46px;stroke-width:1.2}
+.notice .nimg .badge{position:absolute;top:10px;left:10px}
+.notice .nb{padding:13px}
+.notice .cat{font-size:10.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--saffron-600)}
+.notice h3{font-family:var(--serif);font-size:15.5px;font-weight:600;line-height:1.25;margin-top:5px}
+.notice .who{font-size:11.5px;color:var(--muted);font-weight:600;margin-top:8px;display:flex;align-items:center;gap:6px}
+
+/* ═══════════════════════════════════════════════════════════════
+   ASTRO · the three free tools, above the paid list
+   ═══════════════════════════════════════════════════════════════ */
+.tools{display:flex;gap:10px;margin:var(--s4) var(--s5) 0}
+.tool{flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;padding:15px 7px 13px;
+  border-radius:var(--r-lg);background:var(--surface);border:1.5px solid var(--line);box-shadow:var(--e1);
+  text-align:center;transition:.16s var(--ease)}
+.tool:active{transform:scale(.98)}
+.tool:hover{border-color:var(--saffron)}
+.tool .ti{width:42px;height:42px;border-radius:14px;display:grid;place-items:center;
+  background:var(--saffron-soft);color:var(--saffron-600)}
+.tool.blue .ti{background:var(--blue-soft);color:var(--blue-700)}
+.tool.slate .ti{background:var(--kumkum-soft);color:var(--kumkum)}
+.tool b{font-size:12.5px;font-weight:700;line-height:1.2}
+.tool span{font-size:10.5px;color:var(--muted);font-weight:600;line-height:1.25}
+.toolnote{display:flex;align-items:center;gap:8px;margin:11px var(--s5) 0;padding:11px 14px;border-radius:var(--r-md);
+  background:var(--sunk);border:1px solid var(--line);font-size:12px;font-weight:700;color:var(--ink-2)}
+.toolnote .free2{font-size:10px;font-weight:800;letter-spacing:.06em;background:var(--blue-soft);color:var(--blue-700);
+  padding:3px 8px;border-radius:var(--r-full)}
+.toolnote .go3{position:relative;margin-left:auto;color:var(--saffron-600);font-weight:800;display:inline-flex;align-items:center;gap:4px;text-align:right}
+.toolnote .go3::after{content:"";position:absolute;inset:-12px -10px}
+
+/* tool sheets */
+.tsheet{padding:var(--s5)}
+.tsheet .lb{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:9px}
+.starpick{display:flex;flex-wrap:wrap;gap:7px}
+.starpick button{padding:9px 13px;border-radius:var(--r-full);background:var(--sunk);border:1.5px solid var(--line-2);
+  font-size:12.5px;font-weight:700;color:var(--ink-2)}
+.starpick button[aria-pressed="true"]{background:var(--saffron);border-color:var(--saffron);color:#fff}
+.scorecard{margin-top:var(--s5);border-radius:var(--r-xl);padding:20px;text-align:center;color:#fff;
+  background:linear-gradient(150deg,var(--night-900),var(--night-700) 60%,var(--night-500));position:relative;overflow:hidden}
+.scorecard .stars{position:absolute;inset:0;opacity:.5;background-image:radial-gradient(1.4px 1.4px at 20% 25%,#fff,transparent),radial-gradient(1.3px 1.3px at 70% 18%,#fff,transparent),radial-gradient(1px 1px at 46% 62%,#fff,transparent),radial-gradient(1.2px 1.2px at 84% 58%,#fff,transparent)}
+.scorecard .big{position:relative;font-family:var(--serif);font-size:52px;font-weight:600;line-height:1}
+.scorecard .big small{font-size:20px;opacity:.62}
+.scorecard .verdict{position:relative;font-size:14px;font-weight:700;margin-top:6px}
+.scorecard .pair{position:relative;font-size:12.5px;opacity:.82;margin-top:4px}
+.mline{display:flex;justify-content:space-between;gap:12px;padding:12px 14px;border-radius:12px;background:var(--sunk);
+  font-size:13px;margin-top:9px}
+.mline b{font-weight:700}
+.mline .g{color:var(--blue-700);font-weight:800;font-size:11.5px}
+.upsell{display:flex;gap:12px;align-items:center;margin-top:var(--s5);padding:15px;border-radius:var(--r-lg);
+  background:linear-gradient(150deg,#FFFFFF,var(--saffron-soft));border:1.5px solid var(--brass-line)}
+.upsell .ua{width:44px;height:44px;flex:none;border-radius:14px;background:var(--night-900);color:#FFC48A;display:grid;place-items:center}
+.upsell .um{flex:1;min-width:0}
+.upsell .um b{display:block;font-size:13.5px;font-weight:700}
+.upsell .um span{display:block;font-size:11.5px;color:var(--ink-2);margin-top:2px;line-height:1.35}
+
+/* ═══════════════════════════════════════════════════════════════
+   SHARE — a portrait card built for WhatsApp, not a link
+   ═══════════════════════════════════════════════════════════════ */
+.sharewrap{padding:var(--s5);display:flex;flex-direction:column;align-items:center}
+.sharecard{width:100%;max-width:300px;aspect-ratio:4/5;border-radius:22px;overflow:hidden;position:relative;
+  color:#fff;padding:22px;display:flex;flex-direction:column;box-shadow:var(--e3);
+  background:linear-gradient(160deg,var(--night-900),var(--night-700) 58%,var(--night-500))}
+.sharecard.warm{background:linear-gradient(160deg,#FF9C42,var(--saffron) 52%,#9E3D04)}
+.sharecard .stars{position:absolute;inset:0;opacity:.5;background-image:radial-gradient(1.4px 1.4px at 18% 22%,#fff,transparent),radial-gradient(1.3px 1.3px at 74% 16%,#fff,transparent),radial-gradient(1px 1px at 42% 54%,#fff,transparent),radial-gradient(1.2px 1.2px at 86% 62%,#fff,transparent),radial-gradient(1px 1px at 28% 84%,#fff,transparent)}
+.sharecard .sh-k{position:relative;font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;opacity:.86}
+.sharecard .sh-t{position:relative;font-family:var(--serif);font-size:25px;font-weight:600;line-height:1.1;margin-top:8px}
+.sharecard .sh-s{position:relative;font-size:12.5px;opacity:.88;margin-top:5px}
+.sharecard .sh-body{position:relative;flex:1;display:flex;flex-direction:column;justify-content:center;gap:7px;margin-top:14px}
+.sharecard .sh-row{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;
+  padding:9px 12px;border-radius:11px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.18)}
+.sharecard .sh-row b{font-weight:800}
+.sharecard .sh-foot{position:relative;display:flex;align-items:center;gap:8px;font-size:11px;font-weight:700;opacity:.9}
+.sharecard .sh-foot .mk2{width:22px;height:22px;border-radius:8px;display:grid;place-items:center;
+  background:rgba(255,255,255,.2)}
+.sharecard .sh-foot .ic{width:12px;height:12px}
+.shareacts{display:flex;gap:10px;width:100%;max-width:300px;margin-top:var(--s5)}
+.shareacts .btn{flex:1}
+.sharehint{font-size:11.5px;color:var(--muted);text-align:center;margin-top:11px;max-width:34ch;line-height:1.5}
+.pcard h2 .shbtn{position:relative;margin-left:auto;font-size:11.5px;font-weight:800;color:var(--blue-700);display:inline-flex;
+  align-items:center;gap:5px;padding:9px 12px;border-radius:11px;background:var(--blue-soft)}
+.pcard h2 .shbtn{min-height:38px}
+.pcard h2 .shbtn::after{content:"";position:absolute;inset:-4px -3px}
+.pcard h2 .shbtn .ic{width:13px;height:13px}
+
+/* ═══════════════════════════════════════════════════════════════
+   PEOPLE — one list of names and stars, shared by the booking
+   sheet and the profile. Booking in a new name adds them here.
+   ═══════════════════════════════════════════════════════════════ */
+.whorow{padding:15px var(--s5) 0}
+.whorow .lb{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.whochips{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding:10px 0 2px}
+.whochips::-webkit-scrollbar{display:none}
+.whochip{flex:none;display:inline-flex;align-items:center;gap:8px;padding:8px 14px 8px 8px;border-radius:var(--r-full);
+  background:var(--surface);border:1.5px solid var(--line-2);color:var(--ink-2);font-size:13px;font-weight:700;
+  transition:.16s var(--ease)}
+.whochip .in{width:26px;height:26px;flex:none;border-radius:50%;display:grid;place-items:center;
+  background:var(--sunk);color:var(--ink-2);font-size:11px;font-weight:800}
+.whochip .wn{display:flex;flex-direction:column;align-items:flex-start;line-height:1.15}
+.whochip .wn small{font-size:10.5px;font-weight:600;color:var(--muted)}
+.whochip[aria-pressed="true"]{background:var(--saffron-tint);border-color:var(--saffron);color:var(--saffron-600)}
+.whochip[aria-pressed="true"] .in{background:var(--saffron);color:#fff}
+.whochip[aria-pressed="true"] .wn small{color:var(--saffron-600)}
+.whochip.add{padding:8px 15px;color:var(--blue-700);background:var(--blue-soft);border-color:#D3E2FB;border-style:dashed}
+.whochip.add .ic{width:15px;height:15px}
+
+.mbrow{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
+.mbrow:last-of-type{border-bottom:0}
+.mbrow .mav{width:42px;height:42px;flex:none;border-radius:50%;display:grid;place-items:center;
+  background:var(--saffron-soft);color:var(--saffron-600);font-size:14px;font-weight:800;border:1px solid var(--brass-line)}
+.mbrow.self .mav{background:var(--blue-soft);color:var(--blue-700);border-color:#D3E2FB}
+.mbrow .mm{flex:1;min-width:0}
+.mbrow .mm b{display:block;font-size:14px;font-weight:700}
+.mbrow .mm span{display:block;font-size:11.5px;color:var(--muted);margin-top:2px}
+.mbrow .mnext{flex:none;text-align:right}
+.mbrow .mnext b{display:block;font-size:12px;font-weight:800;color:var(--saffron-600);font-variant-numeric:tabular-nums}
+.mbrow .mnext span{display:block;font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.04em;text-transform:uppercase;margin-top:1px}
+.mbrow .mnext.soon b{color:#fff;background:var(--saffron);border-radius:var(--r-full);padding:3px 9px}
+.mbrow .medit{position:relative;flex:none;width:38px;height:38px;border-radius:11px;display:grid;place-items:center;
+  background:var(--sunk);color:var(--muted);border:1px solid var(--line)}
+.mbrow .medit::after{content:"";position:absolute;inset:-4px}
+.addmember{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:46px;margin-top:12px;
+  border-radius:var(--r-md);border:1.5px dashed var(--line-2);color:var(--saffron-600);font-size:13.5px;font-weight:700}
+.mform{padding:var(--s5)}
+.mform .lb{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 9px}
+.mform .lb+.lb{margin-top:20px}
+.mfield{display:flex;align-items:center;gap:11px;min-height:52px;padding:0 16px;border-radius:var(--r-md);
+  background:var(--sunk);border:1.5px solid var(--line-2);cursor:text;transition:border-color .18s var(--ease),background .18s var(--ease)}
+.mfield:focus-within{border-color:var(--saffron);background:var(--surface)}
+.mfield input{flex:1;min-width:0;align-self:stretch;border:none;outline:none;background:none;font-size:15px;font-weight:600}
+.mfield .ic{color:var(--muted)}
+.relgrid{display:flex;flex-wrap:wrap;gap:8px}
+.relgrid button{padding:10px 14px;border-radius:var(--r-full);background:var(--sunk);border:1.5px solid var(--line-2);
+  font-size:13px;font-weight:700;color:var(--ink-2)}
+.relgrid button[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#fff}
+.mform .starpick{max-height:none}
+
+/* ═══════════════════════════════════════════════════════════════
+   TEMPLE BOARD — everyone attached to your temple, by darshan.
+   Ranked quietly: no medals, no trophies, and the standing line
+   reads as participation rather than competition.
+   ═══════════════════════════════════════════════════════════════ */
+.boardtop{display:flex;align-items:center;gap:11px;padding:13px 14px;border-radius:var(--r-md);
+  background:linear-gradient(150deg,#FFFFFF,var(--saffron-soft));border:1px solid var(--brass-line)}
+.boardtop .bi2{width:40px;height:40px;flex:none;border-radius:13px;display:grid;place-items:center;
+  background:#fff;color:var(--saffron-600);border:1px solid var(--brass-line)}
+.boardtop .bm2{flex:1;min-width:0}
+.boardtop .bm2 b{display:block;font-size:13.5px;font-weight:700}
+.boardtop .bm2 span{display:block;font-size:11.5px;color:var(--ink-2);margin-top:2px;line-height:1.35}
+.boardtop .bpts{flex:none;text-align:right}
+.boardtop .bpts b{display:block;font-size:19px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--saffron-600);line-height:1}
+.boardtop .bpts span{display:block;font-size:9.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:3px}
+
+.bsegs{display:flex;gap:5px;margin-top:13px;padding:4px;background:var(--sunk);border:1px solid var(--line-2);border-radius:13px}
+.bsegs button{flex:1;min-height:36px;border-radius:10px;font-size:12.5px;font-weight:700;color:var(--muted)}
+.bsegs button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:var(--e1)}
+
+/* the table runs to the card edges — at 360px those 40px of padding are the
+   difference between a readable name and three initials */
+.btable{margin:12px -20px 0;border-block:1px solid var(--line);overflow:hidden}
+.bhead{display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--paper-2);border-bottom:1px solid var(--line);
+  font-size:9.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.bhead .hn{flex:1;min-width:0}
+.bhead .hd{width:42px;flex:none;text-align:right}
+.bhead .hp{width:46px;flex:none;text-align:right}
+.brow{display:flex;align-items:center;gap:8px;padding:11px 12px;background:var(--surface);font-size:13px}
+.brow+.brow{border-top:1px solid var(--line)}
+.brow .rk{width:18px;flex:none;text-align:center;font-size:11.5px;font-weight:800;color:var(--muted);font-variant-numeric:tabular-nums}
+.brow.top1 .rk{color:var(--saffron-600)}
+.brow.top2 .rk{color:var(--blue-700)}
+.brow.top3 .rk{color:var(--kumkum)}
+.brow .bav{width:30px;height:30px;flex:none;border-radius:50%;display:grid;place-items:center;
+  background:var(--sunk);color:var(--ink-2);font-size:11px;font-weight:800;border:1px solid var(--line)}
+.brow .bn{flex:1;min-width:0;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bhead .hn,.brow .bn{padding-right:2px}
+.brow .bn small{display:block;font-size:10.5px;color:var(--muted);font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.brow .bd{width:42px;flex:none;text-align:right;font-variant-numeric:tabular-nums;color:var(--ink-2);font-weight:700;font-size:12.5px}
+.brow .bp{width:46px;flex:none;text-align:right;font-variant-numeric:tabular-nums;font-weight:800}
+.brow.you{background:var(--saffron-tint);box-shadow:inset 3px 0 0 var(--saffron)}
+.brow.you .bav{background:var(--saffron);color:#fff;border-color:var(--saffron)}
+.brow.kin{background:var(--blue-soft)}
+.brow.kin .bav{background:var(--blue);color:#fff;border-color:var(--blue)}
+.boardmore{width:100%;min-height:46px;margin-top:12px;border-radius:12px;background:var(--sunk);border:1px solid var(--line-2);
+  font-size:12.5px;font-weight:700;color:var(--ink-2)}
+.boardkey{display:flex;flex-wrap:wrap;gap:7px;margin-top:12px}
+.boardkey span{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;color:var(--ink-2);
+  background:var(--sunk);border:1px solid var(--line);border-radius:var(--r-full);padding:6px 11px}
+.boardkey span b{color:var(--saffron-600)}
+
+/* a family member's star gets a blue banner, so it never reads as your own */
+.p-kin{background:linear-gradient(135deg,#2E7BE8,var(--blue) 52%,#083A85)}
+.whochip.unnamed{border-style:dashed;color:var(--saffron-600);background:var(--saffron-tint);border-color:var(--brass-line)}
+.whochip.unnamed .in{background:var(--saffron-soft);color:var(--saffron-600)}
+.mbrow .mm b.unset{color:var(--saffron-600)}
+.mbrow .mm b.unset::after{content:" ›";font-weight:800}
+
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.001ms!important;transition-duration:.001ms!important}}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></symbol>
+<symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4M9 22h6"/></symbol>
+<symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21.5s-7-5.3-7-10.2A7 7 0 0 1 19 11.3c0 4.9-7 10.2-7 10.2Z"/><circle cx="12" cy="11" r="2.6"/></symbol>
+<symbol id="i-navigate" viewBox="0 0 24 24"><path d="M21.5 2.5 2.8 10.4l8 2.8 2.8 8z"/></symbol>
+<symbol id="i-back" viewBox="0 0 24 24"><path d="M15 19 8 12l7-7"/></symbol>
+<symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+<symbol id="i-home" viewBox="0 0 24 24"><path d="M3 10.6 12 3l9 7.6"/><path d="M5.4 9.6V20h13.2V9.6"/><path d="M9.8 20v-5.2h4.4V20"/></symbol>
+<symbol id="i-feed" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="15" rx="3.2"/><path d="M3 9.4h18"/><path d="m10.8 12.4 4.2 2.6-4.2 2.6z"/></symbol>
+<symbol id="i-sparkle" viewBox="0 0 24 24"><path d="M12 2.8 13.9 9l6.2 1.9-6.2 1.9L12 19l-1.9-6.2L3.9 10.9 10.1 9z"/><path d="M18.6 3.2 19.3 5l1.8.7-1.8.7-.7 1.8-.7-1.8L16.1 5.7 17.9 5z"/></symbol>
+<symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8.4" r="3.9"/><path d="M4.4 20.2c1.2-4.1 4.1-6 7.6-6s6.4 1.9 7.6 6"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.6"/><path d="M12 7.2V12l3.2 2"/></symbol>
+<symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20.4S3.6 15.6 3.6 9.6a4.7 4.7 0 0 1 8.4-2.9 4.7 4.7 0 0 1 8.4 2.9c0 6-8.4 10.8-8.4 10.8Z"/></symbol>
+<symbol id="i-comment" viewBox="0 0 24 24"><path d="M20.5 11.6c0 4.2-3.8 7.6-8.5 7.6a9.7 9.7 0 0 1-2.9-.4L4 20.5l1.5-4.2a7.2 7.2 0 0 1-2-4.7C3.5 7.4 7.3 4 12 4s8.5 3.4 8.5 7.6Z"/></symbol>
+<symbol id="i-share" viewBox="0 0 24 24"><path d="M4 12v6.4A1.6 1.6 0 0 0 5.6 20h12.8a1.6 1.6 0 0 0 1.6-1.6V12"/><path d="M12 3.5v11M8.2 7.3 12 3.5l3.8 3.8"/></symbol>
+<symbol id="i-lamp" viewBox="0 0 24 24"><path d="M12 3.2c1.5 1.7 2.3 2.8 2.3 4a2.3 2.3 0 1 1-4.6 0c0-1.2.8-2.3 2.3-4Z"/><path d="M12 9.6v3.4"/><path d="M8.8 13h6.4l-1.1 2.6H9.9z"/><path d="M6.4 18.4h11.2l-1.5-2.8H7.9z"/><path d="m9.2 18.4-.6 3h6.8l-.6-3"/></symbol>
+<symbol id="i-moon" viewBox="0 0 24 24"><path d="M20.4 14.6A8.7 8.7 0 0 1 9.4 3.6a8.7 8.7 0 1 0 11 11Z"/></symbol>
+<symbol id="i-star" viewBox="0 0 24 24"><path d="m12 3.2 2.65 5.6 5.95.8-4.3 4.25L17.4 20 12 17.05 6.6 20l1.1-6.15L3.4 9.6l5.95-.8z"/></symbol>
+<symbol id="i-temple" viewBox="0 0 24 24"><path d="M12 1.6v2"/><path d="m12 3.6 9 5.6H3z"/><path d="M5 9.2V20.4h14V9.2"/><path d="M9.8 20.4v-5.6h4.4v5.6"/></symbol>
+<symbol id="i-parasol" viewBox="0 0 24 24"><path d="M2.6 10.6a9.4 9.4 0 0 1 18.8 0"/><path d="M2.6 10.6c1.6 0 2.4 1.5 3.1 1.5s1.6-1.5 3.2-1.5 2.4 1.5 3.1 1.5 1.6-1.5 3.2-1.5 2.4 1.5 3.1 1.5 1.6-1.5 3.1-1.5"/><path d="M12 1.4v9.2"/><path d="M12 12.4v6.8a2.2 2.2 0 0 0 2.2 2.2"/></symbol>
+<symbol id="i-gopuram" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 0.8 10.9 3H13zM12 3.8 2 9.6h20zM4 10.8V24h5.2v-6.4h5.6V24H20V10.8z"/></symbol>
+<symbol id="i-shiva" viewBox="0 0 24 24"><path d="M12 3.2v17.6"/><path d="M6.6 9.4V4.6M17.4 9.4V4.6"/><path d="M6.6 9.4a5.4 5.4 0 0 0 10.8 0"/><path d="M10.6 5.6 12 2.6l1.4 3"/><path d="M9.6 19.4h4.8"/></symbol>
+<symbol id="i-devi" viewBox="0 0 24 24"><path d="M12 20.6c-1.9-1.7-2.9-3.9-2.9-6.4S10.1 9.6 12 7.8c1.9 1.8 2.9 4 2.9 6.4s-1 4.7-2.9 6.4Z"/><path d="M12 20.6c-3.5 0-6.4-2.2-7.2-5.4 2.7-1.4 5.5-.8 7.2 1.4"/><path d="M12 20.6c3.5 0 6.4-2.2 7.2-5.4-2.7-1.4-5.5-.8-7.2 1.4"/></symbol>
+<symbol id="i-vishnu" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.4"/><circle cx="12" cy="12" r="2.8"/><path d="M12 3.6v5.6M12 14.8v5.6M3.6 12h5.6M14.8 12h5.6"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="m4.8 12.6 4.7 4.7L19.2 7.6"/></symbol>
+<symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3 19.6 6v5.4c0 4.6-3.1 8.1-7.6 9.6-4.5-1.5-7.6-5-7.6-9.6V6z"/><path d="m9.2 12 2 2 3.6-3.6"/></symbol>
+<symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.4v13.2L19 12z"/></symbol>
+<symbol id="i-phone" viewBox="0 0 24 24"><path d="M6.6 3.5h3.1l1.6 4-2 1.3a11.4 11.4 0 0 0 5.9 5.9l1.3-2 4 1.6v3.1a2 2 0 0 1-2.2 2A16.6 16.6 0 0 1 4.6 5.7a2 2 0 0 1 2-2.2Z"/></symbol>
+<symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.6"/><path d="M3.4 12h17.2M12 3.4c2.2 2.4 3.4 5.4 3.4 8.6S14.2 18.2 12 20.6c-2.2-2.4-3.4-5.4-3.4-8.6S9.8 5.8 12 3.4Z"/></symbol>
+<symbol id="i-qr" viewBox="0 0 24 24"><path d="M4 8.4V5.2A1.2 1.2 0 0 1 5.2 4h3.2M15.6 4h3.2A1.2 1.2 0 0 1 20 5.2v3.2M20 15.6v3.2a1.2 1.2 0 0 1-1.2 1.2h-3.2M8.4 20H5.2A1.2 1.2 0 0 1 4 18.8v-3.2"/><path d="M4.6 12h14.8"/></symbol>
+<symbol id="i-text" viewBox="0 0 24 24"><path d="M3.4 19 8.4 5l5 14M5.2 14.6h6.4M15.4 19l2.8-7.6L21 19M16.4 16.4h3.6"/></symbol>
+<symbol id="i-edit" viewBox="0 0 24 24"><path d="M4 20h4.2L20.4 7.8a2.8 2.8 0 0 0-4-4L4.2 16z"/></symbol>
+</defs></svg>
+
+<div class="stage">
+<div class="phone" id="phone">
+
+  <!-- HOME -->
+  <section class="screen" id="s-home" data-active>
+    <header class="hometop">
+      <div class="brandrow">
+        <span class="mark"><svg class="ic" aria-hidden="true"><use href="#i-lamp"/></svg></span>
+        <span class="wordmark" id="wordmark">Nithara</span>
+        <button class="iconbtn" onclick="openSearch()" aria-label="Search temples"><svg class="ic sm" aria-hidden="true"><use href="#i-search"/></svg></button>
+        <button class="iconbtn lang" onclick="toggleLang()"><svg class="ic sm" aria-hidden="true"><use href="#i-globe"/></svg><b id="langLbl">ML</b></button>
+      </div>
+      <div class="placerow">
+        <button class="placechip" onclick="openLocation()">
+          <svg class="ic" aria-hidden="true"><use href="#i-pin"/></svg>
+          <span class="nm" id="hPlace">Thrissur, Kerala</span>
+          <svg class="cv" aria-hidden="true"><use href="#i-navigate"/></svg>
+        </button>
+        <span class="datechip" id="hDate">Today</span>
+      </div>
+    </header>
+
+    <div class="promowrap">
+      <div class="promorail" id="promorail" aria-label="Highlights"></div>
+      <div class="promodots" id="promodots" aria-hidden="true"></div>
+    </div>
+
+    <!-- panchangam now lives in the promo rail -->
+
+    <div class="sec" style="margin-top:var(--s6)" data-sec="temple"><h2></h2></div>
+    <div id="myTemple"></div>
+
+    <div class="sec" data-sec="poojas"><h2></h2></div>
+    <div id="todayPoojas" style="padding:0 var(--s5)"></div>
+
+    <div class="sec" data-sec="nearby"><h2></h2><button class="more" onclick="openSearch()"><span data-t="seeAll">See all</span><svg class="ic sm" aria-hidden="true"><use href="#i-navigate"/></svg></button></div>
+    <div id="nearby"></div>
+    <div class="sec" data-sec="notices"><h2></h2><button class="more" onclick="openFeed()"><span data-t="seeAll">See all</span><svg class="ic sm" aria-hidden="true"><use href="#i-navigate"/></svg></button></div>
+    <div class="noticerail" id="noticerail"></div>
+
+    <div class="sec" data-sec="map"><h2></h2></div>
+    <div class="mapcard">
+      <div class="mapfilter" id="mapfilter"></div>
+      <div class="mapview">
+        <div class="mapcanvas" id="homeMap"></div>
+        <span class="mapchrome">
+          <span class="mapcount" id="mapCount"></span>
+          <span class="mapexpand"><svg class="ic sm" aria-hidden="true"><use href="#i-navigate"/></svg><span data-t="openMap">Open map</span></span>
+        </span>
+        <span class="maplbl"><svg class="ic sm" aria-hidden="true"><use href="#i-pin"/></svg><span data-t="here">Thekkinkadu, Thrissur</span></span>
+        <button class="maphit" onclick="openMap()" aria-label="Open the full map page"></button>
+      </div>
+    </div>
+  </section>
+
+  <!-- POOJAS -->
+  <section class="screen" id="s-poojas">
+    <header class="top"><div class="g"><div class="hi ml" data-t="poojasSub"></div><div class="nm" data-t="poojasTitle">Poojas</div></div></header>
+    <div id="poojasBody"></div>
+  </section>
+
+  <!-- ASTRO -->
+  <section class="screen" id="s-astro">
+    <header class="top"><div class="g"><div class="hi ml" data-t="astroSub">ജ്യോതിഷം</div><div class="nm" data-t="astroTitle">Jyothisham</div></div></header>
+    <div class="nithara">
+      <div class="stars" aria-hidden="true"></div>
+      <div class="r"><div class="av"><svg class="ic lg" aria-hidden="true"><use href="#i-sparkle"/></svg></div><div><b>Nithara <span class="free" data-t="free">FREE</span></b><div class="ml" style="font-size:12.5px;opacity:.75;margin-top:2px" data-t="alwaysOn">നിതാര · എപ്പോഴും ലഭ്യം</div></div></div>
+      <p data-t="nitharaBlurb">Your Malayalam astrology companion. Ask about your chart, today's panchangam, or which temple suits Rohini — or just tell her your birth details and she'll set up your chart.</p>
+      <button class="btn go" onclick="openChat()"><svg class="ic sm" aria-hidden="true"><use href="#i-sparkle"/></svg><span data-t="chatNithara">Chat with Nithara</span></button>
+    </div>
+    <div class="today">
+      <div class="th"><div class="ni"><svg class="ic" aria-hidden="true"><use href="#i-moon"/></svg></div><div><b data-t="todayFor">Today for Rohini</b><span data-t="todayWhen">23 July · Pradosham</span></div></div>
+      <p data-t="todayBody">A steady day for decisions already thought through. Evening favours a Shiva temple. Hold new financial commitments until after noon.</p>
+    </div>
+    <div class="sec" data-sec="tools"><h2></h2></div>
+    <div class="tools" id="tools"></div>
+    <div class="toolnote">
+      <span class="free2" data-t="allFree">ALL FREE</span>
+      <span data-t="toolNote">No sign-up, no payment</span>
+      <button class="go3" onclick="setActive('astro');document.querySelector('#astro').scrollIntoView({behavior:'smooth'})"><span data-t="confirmAstro">Confirm with an astrologer</span><svg class="ic sm" aria-hidden="true"><use href="#i-navigate"/></svg></button>
+    </div>
+
+    <div class="sec" data-sec="astrologers"><h2></h2><button class="more" onclick="toast(T('online48'))" data-t="all">All</button></div>
+    <div class="astrolist" id="astro"></div>
+  </section>
+
+  <!-- PROFILE -->
+  <section class="screen" id="s-profile">
+    <div class="phead2">
+      <div class="eyebrow2" data-t="profileWord">PROFILE</div>
+      <div class="pcardhead" id="pheadCard"></div>
+      <div id="pheadExtra"></div>
+    </div>
+    <div class="statesw">
+      <span class="lb" data-t="preview">Preview state</span>
+      <div class="grp">
+        <button id="swBefore" aria-pressed="true" onclick="setChart(false)" data-t="beforeChart">Before chart</button>
+        <button id="swAfter" aria-pressed="false" onclick="setChart(true)" data-t="afterChart">After chart</button>
+      </div>
+    </div>
+    <div id="profileBody"></div>
+    <button class="helpstrip" onclick="toast('Call 1800 425 8000')"><svg class="ic lg" aria-hidden="true"><use href="#i-phone"/></svg><span><b class="ml" data-t="helpT">സഹായം വേണോ?</b><span data-t="helpS">Call us — we will book it for you</span></span></button>
+  </section>
+
+  <nav class="nav" id="nav" aria-label="Main"></nav>
+
+  <!-- doors -->
+  <div class="doors" id="doors" aria-hidden="true"><div class="dglow"></div><div class="leaf l"></div><div class="leaf r"></div></div>
+
+  <!-- ONBOARDING -->
+  <div class="onboard" id="onboard">
+    <div class="ob-scroll">
+      <div class="ob-brand"><span class="mk"><svg class="ic sm" aria-hidden="true"><use href="#i-lamp"/></svg></span><b>Nithara</b></div>
+      <div class="ob-hero"><h1 data-t="obH1">Choose your<br>temple.</h1><p data-t="obP">Nithara works around one temple — its timings, its poojas, its festivals. Pick the one closest to your heart. No sign-up, no name needed.</p></div>
+      <div class="ob-scan" id="obScan"></div>
+    </div>
+    <div class="ob-foot">
+      <button class="btn btn-pri btn-block" id="obCta" onclick="finishOnboard()" disabled>Start</button>
+      <p class="ob-fine" data-t="obFine">No sign-up, no personal details. You can change your temple at any time.</p>
+    </div>
+  </div>
+
+  <div class="scrim" id="scrim" onclick="closeAll()"></div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+"use strict";
+const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const ic=(n,c="ic")=>`<svg class="${c}" aria-hidden="true"><use href="#${n}"/></svg>`;
+const money=n=>'₹'+n.toLocaleString('en-IN');
+const REDUCED=matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const ME=[10.5230,76.2160];
+const temples=[
+ {id:1,en:"Vadakkunnathan Temple",ml:"വടക്കുന്നാഥൻ ക്ഷേത്രം",place:"Thrissur",mplace:"തൃശ്ശൂർ",deity:"Shiva",sig:"shiva",lat:10.5246,lng:76.2144,pooja:true,open:true,closes:"12:30 PM",rating:"4.8",reviews:"12.4k",story:"One of Kerala's oldest Shiva temples, ringed by the Thekkinkadu maidan where Thrissur Pooram unfolds each summer. The koothambalam inside is among the finest surviving in the state."},
+ {id:2,en:"Paramekkavu Bhagavathy",ml:"പാറമേക്കാവ് ഭഗവതി",place:"Thrissur",mplace:"തൃശ്ശൂർ",deity:"Devi",sig:"devi",lat:10.5218,lng:76.2179,pooja:true,open:true,closes:"12:00 PM",rating:"4.7",reviews:"6.8k",story:"One of the two great Pooram rivals, home of Paramekkavu Bhagavathy, a short walk from Swaraj Round."},
+ {id:3,en:"Thiruvambadi Sri Krishna",ml:"തിരുവമ്പാടി ശ്രീകൃഷ്ണ",place:"Thrissur",mplace:"തൃശ്ശൂർ",deity:"Vishnu",sig:"vishnu",lat:10.5289,lng:76.2128,pooja:true,open:true,closes:"11:45 AM",rating:"4.7",reviews:"5.2k",story:"The other Pooram principal — Krishna worshipped here as Parthasarathy, charioteer of the Gita."},
+ {id:4,en:"Guruvayur Sri Krishna",ml:"ഗുരുവായൂർ ക്ഷേത്രം",place:"Guruvayur",mplace:"ഗുരുവായൂർ",deity:"Vishnu",sig:"vishnu",lat:10.5946,lng:76.0405,pooja:true,open:true,closes:"1:00 PM",rating:"4.9",reviews:"48.1k",story:"Bhuloka Vaikuntha — the sanctum of Guruvayurappan. Nirmalya darshanam begins at 3 AM and the queue starts well before it."},
+ {id:5,en:"Koodalmanikyam",ml:"കൂടൽമാണിക്യം ക്ഷേത്രം",place:"Irinjalakuda",mplace:"ഇരിഞ്ഞാലക്കുട",deity:"Vishnu",sig:"vishnu",lat:10.3423,lng:76.2116,pooja:true,open:false,closes:"—",rating:"4.8",reviews:"3.1k",story:"The only major temple in India dedicated to Bharata, and one of the few with no subordinate shrines inside."},
+];
+const astros=[
+ {n:"Dr. Nandakumar Sharma",sp:"Prasna · Jathakam · Malayalam",ex:"22",r:"4.9",p:45,on:true},
+ {n:"Sreedevi Antharjanam",sp:"Muhurtham · Marriage matching",ex:"15",r:"4.8",p:35,on:true},
+ {n:"Harikrishnan Namboothiri",sp:"Vastu · Dosha pariharam",ex:"30",r:"4.9",p:60,on:false},
+];
+const articles=[
+ {img:"i-fest",gl:"i-parasol",live:1,cat:"Festival",t:"Thrissur Pooram — Ilanjithara Melam",p:"250 artists, one rhythm. Kudamattam begins at 5 PM on the eastern side.",who:"Vadakkunnathan Temple",lk:"18.4k",cm:"1.2k",id:1},
+ {img:"i-dars",gl:"i-lamp",cat:"Darshan",t:"Nirmalya darshanam at Guruvayur",p:"The 3 AM darshan. The queue was already a kilometre — worth every minute.",who:"arjun_k",lk:"2.1k",cm:"184",id:4},
+ {img:"i-astr",gl:"i-sparkle",cat:"AstroTalk",t:"Guru transit — for Chothi natives",p:"Jupiter enters Mithunam this week and sits on your seventh house.",who:"Dr. Nandakumar",lk:"890",cm:"212",id:null},
+];
+const byId=id=>temples.find(t=>t.id===id);
+const fmt=k=>k<1?`${Math.round(k*1000)} m`:`${k.toFixed(1)} km`;
+const dist=(a,b)=>{const R=6371,dLa=(b[0]-a[0])*Math.PI/180,dLo=(b[1]-a[1])*Math.PI/180;
+ const s=Math.sin(dLa/2)**2+Math.cos(a[0]*Math.PI/180)*Math.cos(b[0]*Math.PI/180)*Math.sin(dLo/2)**2;
+ return 2*R*Math.asin(Math.sqrt(s));};
+temples.forEach(t=>t.d=dist(ME,[t.lat,t.lng]));
+temples.sort((a,b)=>a.d-b.d);
+const TILES='https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
+const ATTR='© OpenStreetMap © CARTO';
+
+let DEFAULT_ID=1;      // the scanned / chosen home temple
+let chartDone=false;   // birth chart completed (via Nithara)
+
+let tT;function toast(m){const el=$('#toast');el.innerHTML=ic('i-check','ic sm')+`<span>${m}</span>`;el.setAttribute('data-show','');clearTimeout(tT);tT=setTimeout(()=>el.removeAttribute('data-show'),2400);}
+let lang='en';
+
+/* ═══════════════════════════════════════════════════════════════
+   ONBOARDING — no name, no sign-up. One mandatory choice: the
+   temple. Three ways in: a scanned poster, a search, or location.
+   ═══════════════════════════════════════════════════════════════ */
+let obRoute='choose';      // choose | scan | search | nearby
+let obPicked=null;         // id of the chosen temple, null until picked
+
+function renderOnboard(){
+  const box=$('#obScan');if(!box)return;
+  if(obPicked){box.innerHTML=obChosenCard();}
+  else if(obRoute==='choose'){box.innerHTML=obRoutes();}
+  else if(obRoute==='scan'){box.innerHTML=obScanning();}
+  else if(obRoute==='search'){box.innerHTML=obSearchUI();obFilter('');setTimeout(()=>$('#obq')?.focus(),120);}
+  else if(obRoute==='nearby'){box.innerHTML=obNearbyUI();}
+  const cta=$('#obCta');
+  cta.textContent=obPicked?T('obStart'):T('obPickPrompt');
+  if(obPicked)cta.removeAttribute('disabled');else cta.setAttribute('disabled','');
+}
+function obRoutes(){
+  return `<div class="ob-routes">
+    <button class="ob-route" onclick="obGo('scan')">
+      <span class="ri">${ic('i-qr')}</span>
+      <span class="rm"><b>${T('obScanT')}</b><span>${T('obScanS')}</span></span>
+      ${ic('i-navigate','ic sm rc')}
+    </button>
+    <button class="ob-route blue" onclick="obGo('search')">
+      <span class="ri">${ic('i-search')}</span>
+      <span class="rm"><b>${T('obSearchT')}</b><span>${T('obSearchS')}</span></span>
+      ${ic('i-navigate','ic sm rc')}
+    </button>
+    <button class="ob-route slate" onclick="obGo('nearby')">
+      <span class="ri">${ic('i-pin')}</span>
+      <span class="rm"><b>${T('obLocT')}</b><span>${T('obLocS')}</span></span>
+      ${ic('i-navigate','ic sm rc')}
+    </button>
+  </div>`;
+}
+function obHead(k){
+  return `<div class="ob-step"><button class="back" onclick="obGo('choose')" aria-label="Back">${ic('i-back','ic sm')}</button><b>${T(k)}</b></div>`;
+}
+function obScanning(){
+  return obHead('obScanH')+`<div class="ob-detect">${ic('i-qr','ic sm')}<span>${T('obDetecting')}</span></div>`;
+}
+function obSearchUI(){
+  return obHead('obSearchH')+`
+    <div class="ob-picker" style="margin-top:12px">
+      <div class="spin">${ic('i-search')}<input id="obq" placeholder="${T('obSearch')}" oninput="obFilter(this.value)" aria-label="${T('obSearch')}" autocomplete="off"></div>
+      <div id="obList" style="margin-top:8px"></div>
+    </div>`;
+}
+function obNearbyUI(){
+  return obHead('obNearbyH')+`
+    <div class="ob-detect" id="obDetect"><span class="spin-dot"></span><span>${T('obDetecting')}</span></div>
+    <div id="obList" style="margin-top:8px"></div>`;
+}
+function obGo(r){
+  obRoute=r;obPicked=null;renderOnboard();
+  if(r==='nearby')setTimeout(()=>{
+    const d=$('#obDetect');
+    if(d)d.innerHTML=ic('i-pin','ic sm')+`<span>${T('placeV')}</span>`;
+    obList(temples);
+  },REDUCED?0:1100);
+  if(r==='scan')setTimeout(()=>{obPick(1);},REDUCED?0:1200);
+}
+function obFilter(q){
+  q=(q||'').trim().toLowerCase();
+  obList(q?temples.filter(t=>(t.en+t.ml+t.place+(t.mplace||'')).toLowerCase().includes(q)):temples);
+}
+function obList(list){
+  const el=$('#obList');if(!el)return;
+  el.innerHTML=list.map(t=>`<button class="ob-pick" onclick="obPick(${t.id})">
+    <span class="glyph ${t.sig}">${ic('i-'+t.sig)}</span>
+    <span class="m"><b>${tName(t)}</b><span>${tName2(t)} · ${tPlace(t)}</span></span>
+    <span class="d">${fmt(t.d)}</span></button>`).join('');
+}
+function obChosenCard(){
+  const t=byId(obPicked);
+  return `<div class="ob-scan-card"><div class="thread"></div>
+    <div class="ob-scan-badge">${ic('i-star','ic sm')} ${T('obChosen')}</div>
+    <div class="ob-scan-row">
+      <span class="glyph">${ic('i-'+t.sig)}</span>
+      <div class="m"><b>${tName(t)}</b><span class="ml">${tName2(t)} · ${tPlace(t)}</span></div>
+      <span class="pill pill-dist">${ic('i-pin')}${fmt(t.d)}</span>
+    </div>
+    <div class="ob-scan-note">${T('obP2')}</div>
+    <button class="ob-link" onclick="obGo('choose')">${ic('i-search','ic sm')}${T('obChangeSel')}</button>
+  </div>`;
+}
+function obPick(id){obPicked=id;DEFAULT_ID=id;renderOnboard();}
+function finishOnboard(){
+  if(!obPicked)return;
+  const ob=$('#onboard');
+  ob.classList.add('done');ob.setAttribute('aria-hidden','true');
+  renderHome();renderProfile();
+  syncOverlay();
+  setTimeout(()=>{ob.style.display='none';$('#nav button[aria-current="page"]')?.focus({preventScroll:true});},600);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   BILINGUAL LAYER
+   Every visible string lives here. Switching language re-renders
+   the whole app, swaps the type stack, and flips the bilingual
+   pairs — Malayalam leads, English becomes the second line.
+   ═══════════════════════════════════════════════════════════════ */
+const STR={
+ /* chrome */
+ nav_home:['Home','ഹോം'], nav_feed:['Feed','വാർത്ത'], nav_poojas:['Poojas','പൂജകൾ'], nav_astro:['Astro','ജ്യോതിഷം'], nav_profile:['You','ഞാൻ'],
+ seeAll:['See all','എല്ലാം കാണുക'], all:['All','എല്ലാം'], here:['Thekkinkadu, Thrissur','തേക്കിൻകാട്, തൃശ്ശൂർ'],
+ /* spoken labels — never rendered, but they are the only label a screen
+    reader gets for the icon-only controls */
+ a11yBack:['Back','തിരികെ'], a11yClose:['Close','അടയ്ക്കുക'],
+ a11yFilter:['Filter temples by deity','ദേവത അനുസരിച്ച് തിരയുക'],
+ a11yScan:['Scan a temple QR code','ക്ഷേത്ര QR സ്കാൻ ചെയ്യുക'],
+ a11yLocate:['Centre on my location','എന്റെ സ്ഥാനത്തേക്ക്'],
+ a11yDialog:['Dialog','ഡയലോഗ്'],
+ here2:['Thrissur','തൃശ്ശൂർ'], openMap:['Open map','ഭൂപടം തുറക്കുക'],
+ /* greeting */
+ gMorning:['Good morning','സുപ്രഭാതം'], gAfternoon:['Good afternoon','നമസ്കാരം'],
+ gEvening:['Good evening','ശുഭസന്ധ്യ'], gNight:['Good night','ശുഭരാത്രി'],
+ panch1:['Today · Pradosham','ഇന്ന് പ്രദോഷം'],
+ panch2:['Auspicious for Shiva darshan · 4:30–6 PM','ശിവ ദർശനത്തിന് ഉത്തമം · 4:30–6 PM'],
+ /* home temple card */
+ yourTemple:['Your temple','എന്റെ ക്ഷേത്രം'],
+ openTill:['Open till','തുറന്നിരിക്കും'], closedNow:['Closed now','ഇപ്പോൾ അടച്ചു'],
+ poojaToday:['Pooja today','ഇന്ന് പൂജയുണ്ട്'], reviews:['reviews','അഭിപ്രായങ്ങൾ'],
+ reason:['Tonight is <b>Pradosham</b> — especially auspicious for Shiva darshan, 4:30–6 PM.',
+         'ഇന്ന് രാത്രി <b>പ്രദോഷം</b> — ശിവ ദർശനത്തിന് ഏറ്റവും ഉത്തമമായ സമയം, 4:30–6 PM.'],
+ enterTemple:['Enter temple','ക്ഷേത്രത്തിലേക്ക്'], bookPooja:['Book pooja','പൂജ ബുക്ക്'],
+ checkIn:['Check in','ദർശനം'], liveDarshan:['Live darshan','തത്സമയ ദർശനം'],
+ /* poojas */
+ pushpanjali:['Pushpanjali','പുഷ്പാഞ്ജലി'], ganapathi:['Ganapathi Homam','ഗണപതി ഹോമം'],
+ nextSlot:['Next slot 6:00 AM','അടുത്ത സമയം 6:00 AM'], book3:['Book 3 days ahead','3 ദിവസം മുൻപ് ബുക്ക് ചെയ്യണം'],
+ book:['Book','ബുക്ക് ചെയ്യുക'],
+ /* map */
+ dShiva:['Shiva','ശിവൻ'], dDevi:['Devi','ദേവി'], dVishnu:['Vishnu','വിഷ്ണു'],
+ templesNearby:['temples nearby','ക്ഷേത്രങ്ങൾ അടുത്ത്'], templeNearby:['temple nearby','ക്ഷേത്രം അടുത്ത്'],
+ temples:['temples','ക്ഷേത്രങ്ങൾ'], temple:['temple','ക്ഷേത്രം'],
+ searchPlaceholder:['Search a temple or place','ക്ഷേത്രമോ സ്ഥലമോ തിരയുക'],
+ nearestFirst:['Nearest first','അടുത്തുള്ളവ ആദ്യം'], noMatch:['No temples match that filter','ആ ഫിൽട്ടറിൽ ക്ഷേത്രങ്ങളില്ല'],
+ directions:['Directions','വഴി'], details:['Details','വിശദാംശങ്ങൾ'],
+ scanQR:['Point the camera at the temple QR board','ക്ഷേത്രത്തിലെ QR ബോർഡിലേക്ക് ക്യാമറ കാണിക്കൂ'],
+ centred:['Centred on Thekkinkadu, Thrissur','തേക്കിൻകാട്, തൃശ്ശൂരിലേക്ക് മാറ്റി'],
+ /* feed */
+ feedTitle:['Feed','വാർത്തകൾ'], feedSub:['വാർത്തകൾ','Feed'], viewTemple:['View temple','ക്ഷേത്രം കാണുക'],
+ catFestival:['Festival','ഉത്സവം'], catDarshan:['Darshan','ദർശനം'], catAstro:['AstroTalk','ജ്യോതിഷം'],
+ /* astro */
+ astroTitle:['Jyothisham','ജ്യോതിഷം'], astroSub:['ജ്യോതിഷം','Jyothisham'],
+ free:['FREE','സൗജന്യം'], alwaysOn:['നിതാര · എപ്പോഴും ലഭ്യം','Nithara · always available'],
+ nitharaBlurb:["Your Malayalam astrology companion. Ask about your chart, today's panchangam, or which temple suits Rohini — or just tell her your birth details and she'll set up your chart.",
+   'നിങ്ങളുടെ മലയാളം ജ്യോതിഷ കൂട്ടുകാരി. ജാതകം, ഇന്നത്തെ പഞ്ചാംഗം, രോഹിണിക്ക് ചേരുന്ന ക്ഷേത്രം — എന്തും ചോദിക്കാം. ജനന വിവരങ്ങൾ പറഞ്ഞാൽ ജാതകവും തയ്യാറാക്കും.'],
+ chatNithara:['Chat with Nithara','നിതാരയോട് സംസാരിക്കൂ'],
+ todayFor:['Today for Rohini','ഇന്ന് രോഹിണിക്ക്'], todayWhen:['23 July · Pradosham','ജൂലൈ 23 · പ്രദോഷം'],
+ todayBody:['A steady day for decisions already thought through. Evening favours a Shiva temple. Hold new financial commitments until after noon.',
+   'നന്നായി ആലോചിച്ച തീരുമാനങ്ങൾക്ക് ഉചിതമായ ദിവസം. വൈകുന്നേരം ശിവക്ഷേത്ര ദർശനം നല്ലത്. പുതിയ സാമ്പത്തിക കരാറുകൾ ഉച്ചയ്ക്ക് ശേഷമാക്കുക.'],
+ astrologers:['Astrologers','ജ്യോതിഷർ'], perMin:['/min','/മിനിറ്റ്'], chat:['Chat','ചാറ്റ്'],
+ yrs:['yrs','വർഷം'], online48:['48 astrologers online','48 ജ്യോതിഷർ ഓൺലൈനിൽ'],
+ /* profile */
+ preview:['Preview state','പ്രിവ്യൂ'], beforeChart:['Before chart','ജാതകത്തിന് മുൻപ്'], afterChart:['After chart','ജാതകത്തിന് ശേഷം'],
+ stTemples:['TEMPLES','ക്ഷേത്രങ്ങൾ'], stPoojas:['POOJAS','പൂജകൾ'], stStreak:['STREAK','തുടർച്ച'], stBadges:['BADGES','ബാഡ്ജ്'],
+ starNotSet:['nakshatram not set','നക്ഷത്രം ചേർത്തിട്ടില്ല'],
+ birthChart:['Birth chart · ജാതകം','ജാതകം'], chartNotSet:['Chart not set up yet','ജാതകം ഇതുവരെ തയ്യാറായിട്ടില്ല'],
+ chartNotSetS:['Three questions — date, time and place of birth — and Nithara builds your jathakam.',
+   'മൂന്ന് ചോദ്യങ്ങൾ — ജനന തീയതി, സമയം, സ്ഥലം — നിതാര ജാതകം തയ്യാറാക്കും.'],
+ completeWith:['Complete with Nithara','നിതാരയുമായി പൂർത്തിയാക്കൂ'],
+ aboutMinute:['Takes about a minute','ഏകദേശം ഒരു മിനിറ്റ്'], freeWord:['Free','സൗജന്യം'],
+ birthDetails:['Birth details · ജനന വിവരങ്ങൾ','ജനന വിവരങ്ങൾ'], edit:['Edit','തിരുത്തുക'],
+ fName:['Name','പേര്'], fDob:['Date of birth','ജനന തീയതി'], fTob:['Time of birth','ജനന സമയം'], fPob:['Birth place','ജനന സ്ഥലം'],
+ vName:['Arjun Krishnan','അർജുൻ കൃഷ്ണൻ'], vDob:['14 May 1996','1996 മെയ് 14'], vPob:['Thrissur, Kerala','തൃശ്ശൂർ, കേരളം'],
+ jathakam:['Jathakam · ജാതകം','ജാതകം'], fNak:['Nakshatram','നക്ഷത്രം'], fRasi:['Rasi','രാശി'], fDasha:['Current dasha','നിലവിലെ ദശ'],
+ vNak:['Rohini · Pada 2','രോഹിണി · പാദം 2'], vRasi:['Idavam (Taurus)','ഇടവം'], vDasha:['Shukra · 4y 2m left','ശുക്രൻ · 4 വർഷം 2 മാസം ബാക്കി'],
+ dashaFrom:['Shukra began 2011','ശുക്രൻ 2011 മുതൽ'], dashaTo:['ends 2030','2030 വരെ'],
+ askAbout:['Ask Nithara about this chart','ഈ ജാതകത്തെക്കുറിച്ച് നിതാരയോട് ചോദിക്കൂ'],
+ bookings:['Pooja bookings · ബുക്കിംഗ്','പൂജ ബുക്കിംഗ്'], confirmed:['Confirmed','സ്ഥിരീകരിച്ചു'], pending:['Pending','കാത്തിരിക്കുന്നു'],
+ milestones:['Milestones · നേട്ടങ്ങൾ','നേട്ടങ്ങൾ'],
+ msFirst:['First darshan','ആദ്യ ദർശനം'], msTen:['10 Shiva temples','10 ശിവക്ഷേത്രം'], msPooram:['Pooram 2026','പൂരം 2026'],
+ msRank:['Bhakta rank','ഭക്ത പദവി'], msDistrict:['Thrissur 38','തൃശ്ശൂർ 38'],
+ unlocked:['Unlocked','നേടി'], twoToGo:['2 to go','2 ബാക്കി'],
+ helpT:['Need help?','സഹായം വേണോ?'], helpS:['Call us — we will book it for you','ഞങ്ങളെ വിളിക്കൂ — ഞങ്ങൾ ബുക്ക് ചെയ്തു തരാം'],
+ /* temple sheet */
+ about:['About','വിവരണം'], timings:['Timings','സമയം'], poojas:['Poojas','പൂജകൾ'],
+ darshanTimings:['Darshan timings','ദർശന സമയം'], bookAPooja:['Book a pooja','പൂജ ബുക്ക് ചെയ്യുക'],
+ nirmalyam:['Nirmalyam','നിർമാല്യം'], morning:['Morning','രാവിലെ'], evening:['Evening','വൈകുന്നേരം'],
+ away:['AWAY','അകലം'], openW:['Open','തുറന്നു'], closedW:['Closed','അടച്ചു'], till:['TILL','വരെ'], opens5:['OPENS 5 AM','5 AM തുറക്കും'],
+ checkinDarshan:['Check in · Darshan','ദർശനം രേഖപ്പെടുത്തുക'], inYourStar:['In your nakshatram · Rohini','നിങ്ങളുടെ നക്ഷത്രത്തിൽ · രോഹിണി'],
+ kshetram:['Kshetram','ക്ഷേത്രം'],
+ kShiva:['Shiva Kshetram','ശിവക്ഷേത്രം'], kDevi:['Devi Kshetram','ദേവീക്ഷേത്രം'], kVishnu:['Vishnu Kshetram','മഹാവിഷ്ണു ക്ഷേത്രം'], savedTemple:['Saved to My temples','എന്റെ ക്ഷേത്രങ്ങളിൽ ചേർത്തു'],
+ isHome:['This is your home temple','ഇതാണ് നിങ്ങളുടെ ക്ഷേത്രം'],
+ darshanRecorded:['Darshan recorded · +50 punya','ദർശനം രേഖപ്പെടുത്തി · +50 പുണ്യം'],
+ openingDir:['Opening directions to','വഴി കാണിക്കുന്നു'],
+ /* booking sheet */
+ reviewBooking:['Review booking','ബുക്കിംഗ് പരിശോധിക്കുക'], rPooja:['Pooja','പൂജ'], rTemple:['Temple','ക്ഷേത്രം'],
+ rDate:['Date','തീയതി'], rFee:['Booking fee','ബുക്കിംഗ് ഫീസ്'], rTotal:['Total','ആകെ'],
+ rDateV:['28 July 2026, 6:00 AM','2026 ജൂലൈ 28, 6:00 AM'],
+ rNote:['Receipt goes to your WhatsApp. Cancel up to 24 h before for a full refund.',
+        'രസീത് വാട്സാപ്പിൽ ലഭിക്കും. 24 മണിക്കൂർ മുൻപ് വരെ റദ്ദാക്കി പൂർണ്ണ തുക തിരികെ വാങ്ങാം.'],
+ payConfirm:['Pay','അടച്ച്'], andConfirm:['& confirm','സ്ഥിരീകരിക്കുക'],
+ confirmedT:['Confirmed','സ്ഥിരീകരിച്ചു'], allSet:['All set','തയ്യാർ'],
+ bookedMsg:['is booked. The receipt is on its way to your WhatsApp.','ബുക്ക് ചെയ്തു. രസീത് വാട്സാപ്പിൽ എത്തും.'],
+ refWord:['Reference','റഫറൻസ്'], done:['Done','കഴിഞ്ഞു'],
+ /* search sheet */
+ byName:['By name','പേര് കൊണ്ട്'], byPlace:['By place','സ്ഥലം കൊണ്ട്'],
+ phName:['Temple name','ക്ഷേത്രത്തിന്റെ പേര്'], phPlace:['Place or town','സ്ഥലം'],
+ results:['RESULTS','ഫലങ്ങൾ'], templesUp:['TEMPLES','ക്ഷേത്രങ്ങൾ'],
+ nothingFound:['Nothing found. Try the other tab.','ഒന്നും കിട്ടിയില്ല. മറ്റേ ടാബ് നോക്കൂ.'],
+ /* onboarding */
+ obH1:['Choose your<br>temple.','നിങ്ങളുടെ ക്ഷേത്രം<br>തിരഞ്ഞെടുക്കൂ.'],
+ obP:['Nithara works around one temple — its timings, its poojas, its festivals. Pick the one closest to your heart. No sign-up, no name needed.','നിതാര ഒരു ക്ഷേത്രത്തെ കേന്ദ്രീകരിച്ചാണ് പ്രവർത്തിക്കുന്നത് — അതിന്റെ സമയം, പൂജകൾ, ഉത്സവങ്ങൾ. ഹൃദയത്തോട് ഏറ്റവും ചേർന്നത് തിരഞ്ഞെടുക്കൂ. സൈൻ അപ്പോ പേരോ വേണ്ട.'],
+ obFine:['No sign-up needed now. Add your birth star later — just chat with Nithara.',
+         'ഇപ്പോൾ സൈൻ അപ്പ് വേണ്ട. നക്ഷത്രം പിന്നീട് ചേർക്കാം — നിതാരയോട് പറഞ്ഞാൽ മതി.'],
+ obScanned:['Scanned poster · invited by this temple','പോസ്റ്റർ സ്കാൻ ചെയ്തു · ഈ ക്ഷേത്രം ക്ഷണിച്ചു'],
+ obHome:['Home','എന്റേത്'], obChange:['Choose a different temple','മറ്റൊരു ക്ഷേത്രം തിരഞ്ഞെടുക്കുക'],
+ /* ── v9: your own name, family star banners ── */
+ addYourName:['Add your name','നിങ്ങളുടെ പേര് ചേർക്കൂ'],
+ yourNameWhy:['Used when the pooja is read out in your name.','പൂജയ്ക്ക് പേര് ചൊല്ലാൻ ഉപയോഗിക്കും.'],
+ yourDetails:['Your details','നിങ്ങളുടെ വിവരങ്ങൾ'],
+ kinStarTag:['Family','കുടുംബം'],
+ onDay:['on','ന്'],
+ starsOf:['nakshatram','നക്ഷത്രം'],
+ /* ── v8: temple devotee board ── */
+ boardT:['Temple board · ക്ഷേത്ര പട്ടിക','ക്ഷേത്ര പട്ടിക'],
+ boardStanding:['Your standing this month','ഈ മാസത്തെ നിങ്ങളുടെ സ്ഥാനം'],
+ boardOf:['of','ൽ'], boardDevotees:['devotees','ഭക്തർ'],
+ boardPoints:['points','പോയിന്റ്'], boardPts:['PTS','പോയിന്റ്'],
+ boardDarshan:['DARSHAN','ദർശനം'], boardName:['DEVOTEE','ഭക്തൻ'], boardRank:['#','#'],
+ segMonth:['This month','ഈ മാസം'], segYear:['This year','ഈ വർഷം'],
+ boardMore:['See the full board','മുഴുവൻ പട്ടിക കാണൂ'],
+ boardMoreT:['128 devotees are on this board','128 ഭക്തർ ഈ പട്ടികയിലുണ്ട്'],
+ keyDarshan:['darshan','ദർശനം'], keyPooja:['pooja','പൂജ'], keyFestival:['festival day','ഉത്സവ ദിനം'],
+ youWord:['You','നിങ്ങൾ'], household:['your family','കുടുംബം'],
+ boardNote:['Points come from checking in at ദർശനം, booking a pooja and being present on a festival day. They are a record of your year, not a race.',
+   'ദർശനത്തിന് ചെക്ക് ഇൻ ചെയ്യുമ്പോഴും പൂജ ബുക്ക് ചെയ്യുമ്പോഴും ഉത്സവ ദിവസങ്ങളിലും പോയിന്റ് ലഭിക്കും. ഇത് ഒരു മത്സരമല്ല, വർഷത്തിന്റെ രേഖയാണ്.'],
+ /* ── v7: people (self + family), shared by booking and profile ── */
+ whoFor:['In whose name?','ആരുടെ പേരിൽ?'],
+ addSomeone:['Add someone','ആളെ ചേർക്കൂ'],
+ family:['Family & nakshatrams · കുടുംബം','കുടുംബവും നക്ഷത്രങ്ങളും'],
+ addMember:['Add a family member','കുടുംബാംഗത്തെ ചേർക്കൂ'],
+ editMember:['Edit person','വിവരം തിരുത്തൂ'],
+ mName:['Name','പേര്'], mNamePh:['As it should be read out','പൂജയ്ക്ക് ചൊല്ലേണ്ട പേര്'],
+ mRelation:['Relation','ബന്ധം'], mNak:['Nakshatram','നക്ഷത്രം'],
+ mSave:['Save','സേവ് ചെയ്യൂ'], mRemove:['Remove','നീക്കം ചെയ്യൂ'],
+ nextStar:['Next star','അടുത്ത നക്ഷത്രം'],
+ inDays:['days','ദിവസം'],
+ rSelf:['Myself','ഞാൻ'], rMother:['Mother','അമ്മ'], rFather:['Father','അച്ഛൻ'],
+ rSpouse:['Spouse','ഇണ'], rSon:['Son','മകൻ'], rDaughter:['Daughter','മകൾ'],
+ rBrother:['Brother','സഹോദരൻ'], rSister:['Sister','സഹോദരി'], rOther:['Other','മറ്റുള്ളവർ'],
+ memberAdded:['Added to your family list','കുടുംബ പട്ടികയിൽ ചേർത്തു'],
+ memberSaved:['Saved','സേവ് ചെയ്തു'],
+ memberRemoved:['Removed','നീക്കം ചെയ്തു'],
+ autoNote:['Anyone you book a pooja for is kept here, so the next booking takes one tap.',
+   'പൂജ ബുക്ക് ചെയ്ത ആരുടെയും പേര് ഇവിടെ സൂക്ഷിക്കും — അടുത്ത തവണ ഒറ്റ ടാപ്പ് മതി.'],
+ nakUnset:['Nakshatram not set','നക്ഷത്രം ചേർത്തിട്ടില്ല'],
+ chartPending:['full chart not set yet','പൂർണ്ണ ജാതകം ചേർത്തിട്ടില്ല'],
+ selfName:['Myself','ഞാൻ'],
+ starOf:['nakshatram','നക്ഷത്രം'],
+ needName:['Add a name to continue','തുടരാൻ പേര് ചേർക്കൂ'],
+ /* ── v6: poojas tab, star day, free tools, sharing ── */
+ poojasTitle:['Poojas','പൂജകൾ'], poojasSub:['പൂജകൾ','Poojas'],
+ starKicker:['Your nakshatram','എന്റെ നക്ഷത്രം'],
+ starIn:['in','ദിവസത്തിനുള്ളിൽ'], starToday:['today','ഇന്ന്'], starTomorrow:['tomorrow','നാളെ'],
+ starDays:['days','ദിവസം'], starDay:['day','ദിവസം'],
+ bookForStar:['Book pushpanjali for that day','അന്നത്തേക്ക് പുഷ്പാഞ്ജലി ബുക്ക് ചെയ്യൂ'],
+ starNote:['Poojas needing three days\u2019 notice must be booked before the window closes. Nithara reminds you four days ahead.',
+   'മൂന്ന് ദിവസം മുൻകൂർ വേണ്ട പൂജകൾ സമയപരിധിക്ക് മുൻപ് ബുക്ക് ചെയ്യണം. നിതാര നാല് ദിവസം മുൻപേ ഓർമ്മിപ്പിക്കും.'],
+ cdDays:['DAYS','ദിവസം'], cdDate:['DATE','തീയതി'], cdWeekday:['DAY','ദിവസം'],
+ bookAt:['Book at','ബുക്ക് ചെയ്യാം'],
+ yourBookings:['Your bookings','എന്റെ ബുക്കിംഗുകൾ'],
+ upcoming:['Upcoming','വരാനുള്ളവ'], past:['Past','കഴിഞ്ഞവ'],
+ noPast:['Nothing booked yet','ഇതുവരെ ബുക്കിംഗുകളില്ല'],
+ sameDay:['Same-day booking','അന്നുതന്നെ ബുക്ക് ചെയ്യാം'],
+ needs3:['Needs 3 days\u2019 notice','3 ദിവസം മുൻകൂർ വേണം'],
+ needs1:['Needs 1 day\u2019s notice','1 ദിവസം മുൻകൂർ വേണം'],
+ windowClosed:['Window closed for this date','ഈ തീയതിക്ക് സമയം കഴിഞ്ഞു'],
+ pArchana:['Archana','അർച്ചന'], pNeyvilakku:['Neyvilakku','നെയ്‌വിളക്ക്'],
+ secNotices:['From your temple','ക്ഷേത്രത്തിൽ നിന്ന്'],
+ secTools:['Free tools','സൗജന്യ സേവനങ്ങൾ'],
+ allFree:['ALL FREE','എല്ലാം സൗജന്യം'],
+ toolNote:['No sign-up, no payment','സൈൻ അപ്പില്ല, പണമില്ല'],
+ confirmAstro:['Confirm with an astrologer','ജ്യോതിഷരോട് ഉറപ്പിക്കൂ'],
+ tJathakam:['Jathakam','ജാതകം'], tJathakamS:['Create your chart','ജാതകം ഉണ്ടാക്കൂ'],
+ tPorutham:['Porutham','പൊരുത്തം'], tPoruthamS:['Match two stars','രണ്ട് നക്ഷത്രം നോക്കൂ'],
+ tMuhurtham:['Muhurtham','മുഹൂർത്തം'], tMuhurthamS:['Find a good time','നല്ല സമയം കണ്ടെത്തൂ'],
+ poruthamH:['Porutham · പൊരുത്തം','പൊരുത്തം · Porutham'],
+ muhurthamH:['Muhurtham · മുഹൂർത്തം','മുഹൂർത്തം · Muhurtham'],
+ brideStar:['Bride\u2019s nakshatram','വധുവിന്റെ നക്ഷത്രം'],
+ groomStar:['Groom\u2019s nakshatram','വരന്റെ നക്ഷത്രം'],
+ checkMatch:['Check porutham','പൊരുത്തം നോക്കൂ'],
+ outOf:['out of 10','10ൽ'],
+ vGood:['A strong match','നല്ല പൊരുത്തം'], vOk:['Workable, with care','ശ്രദ്ധയോടെ ചേരും'], vWeak:['Difficult match','പൊരുത്തം കുറവ്'],
+ poruthamNote:['Ten porutham are counted in Kerala. This is the traditional count only — a full reading also weighs the dasha and the doshas.',
+   'കേരളത്തിൽ പത്ത് പൊരുത്തങ്ങളാണ് നോക്കുന്നത്. ഇത് പരമ്പരാഗത എണ്ണം മാത്രം — പൂർണ്ണ പരിശോധനയിൽ ദശയും ദോഷങ്ങളും കൂടി നോക്കണം.'],
+ occasion:['What is the muhurtham for?','എന്തിനുള്ള മുഹൂർത്തം?'],
+ oMarriage:['Marriage','വിവാഹം'], oHouse:['House warming','ഗൃഹപ്രവേശം'], oVehicle:['New vehicle','വാഹനം'],
+ oBusiness:['New business','പുതിയ സംരംഭം'], oTravel:['Travel','യാത്ര'],
+ goodWindows:['Good windows this month','ഈ മാസത്തെ നല്ല സമയങ്ങൾ'],
+ muhurthamNote:['Windows are calculated from the panchangam for your place. Confirm the final time with an astrologer before you fix anything.',
+   'നിങ്ങളുടെ സ്ഥലത്തെ പഞ്ചാംഗം അനുസരിച്ചാണ് സമയം. ഉറപ്പിക്കും മുൻപ് ജ്യോതിഷരോട് സ്ഥിരീകരിക്കൂ.'],
+ upsellT:['Have an astrologer confirm this','ഇത് ജ്യോതിഷരോട് ഉറപ്പിക്കൂ'],
+ upsellS:['Dr. Nandakumar Sharma · Malayalam · ₹45 a minute','ഡോ. നന്ദകുമാർ ശർമ്മ · മലയാളം · മിനിറ്റിന് ₹45'],
+ consultNow:['Consult','സംസാരിക്കൂ'],
+ share:['Share','പങ്കിടൂ'],
+ shareChartH:['Share your chart','ജാതകം പങ്കിടൂ'],
+ shareBookH:['Share this booking','ബുക്കിംഗ് പങ്കിടൂ'],
+ shareWA:['Share on WhatsApp','വാട്ട്‌സ്ആപ്പിൽ പങ്കിടൂ'],
+ saveImg:['Save image','ചിത്രം സേവ് ചെയ്യൂ'],
+ shareHint:['A picture is sent, not a link — it opens for everyone, on any phone.','ലിങ്കല്ല, ചിത്രമാണ് പോകുന്നത് — ഏത് ഫോണിലും തുറക്കും.'],
+ shareKChart:['My jathakam','എന്റെ ജാതകം'],
+ shareKBook:['Pooja booked','പൂജ ബുക്ക് ചെയ്തു'],
+ sharedToast:['Image ready to share','ചിത്രം പങ്കിടാൻ തയ്യാർ'],
+ savedToast:['Saved to your gallery','ഗാലറിയിൽ സേവ് ചെയ്തു'],
+ poojaOn:['Pooja on','പൂജ'],
+ /* ── v5: place row, promo rail, temple-first onboarding, profile ── */
+ placeV:['Thrissur, Kerala','തൃശ്ശൂർ, കേരളം'],
+ changePlace:['Change location','സ്ഥലം മാറ്റുക'],
+ tagToday:['TODAY','ഇന്ന്'], tagFree:['FREE','സൗജന്യം'],
+ tagFeatured:['FEATURED','പ്രത്യേകം'], tagLive:['LIVE','തത്സമയം'],
+ promoPradT:['Pradosham today','ഇന്ന് പ്രദോഷം'],
+ promoPradS:['Auspicious for Shiva darshan · 4:30–6 PM','ശിവ ദർശനത്തിന് ഉത്തമം · 4:30–6 PM'],
+ promoPradC:['Ask Nithara','നിതാരയോട് ചോദിക്കൂ'],
+ promoNitT:['Ask Nithara anything','നിതാരയോട് എന്തും ചോദിക്കാം'],
+ promoNitS:['Your Malayalam astrology companion — free, any hour','മലയാളം ജ്യോതിഷ കൂട്ടുകാരി — സൗജന്യം, എപ്പോഴും'],
+ promoNitC:['Start chat','ചാറ്റ് തുടങ്ങൂ'],
+ promoAstS:['Prasna · Jathakam · ₹45 a minute','പ്രശ്നം · ജാതകം · മിനിറ്റിന് ₹45'],
+ promoAstC:['Consult','സംസാരിക്കൂ'],
+ promoFestT:['Ilanjithara Melam','ഇലഞ്ഞിത്തറ മേളം'],
+ promoFestS:['Thrissur Pooram · Vadakkunnathan, 5 PM','തൃശ്ശൂർ പൂരം · വടക്കുന്നാഥൻ, വൈകിട്ട് 5'],
+ promoFestC:['View','കാണുക'],
+ obScanT:['Scan a temple QR','ക്ഷേത്ര QR സ്കാൻ ചെയ്യുക'],
+ obScanS:['From a poster or the notice board at the temple','ക്ഷേത്രത്തിലെ പോസ്റ്ററിൽ നിന്നോ നോട്ടീസ് ബോർഡിൽ നിന്നോ'],
+ obSearchT:['Search by name','പേര് ഉപയോഗിച്ച് തിരയുക'],
+ obSearchS:['If you already know which temple','ഏത് ക്ഷേത്രമെന്ന് അറിയാമെങ്കിൽ'],
+ obLocT:['Use my location','എന്റെ ലൊക്കേഷൻ ഉപയോഗിക്കുക'],
+ obLocS:['See the temples nearest to you','ഏറ്റവും അടുത്തുള്ള ക്ഷേത്രങ്ങൾ കാണാം'],
+ obDetecting:['Finding temples near you…','അടുത്തുള്ള ക്ഷേത്രങ്ങൾ കണ്ടെത്തുന്നു…'],
+ obNearbyH:['Temples near you','അടുത്തുള്ള ക്ഷേത്രങ്ങൾ'],
+ obSearchH:['Search temples','ക്ഷേത്രം തിരയുക'],
+ obScanH:['Scanned poster','സ്കാൻ ചെയ്ത പോസ്റ്റർ'],
+ obPickPrompt:['Choose a temple to continue','തുടരാൻ ഒരു ക്ഷേത്രം തിരഞ്ഞെടുക്കൂ'],
+ obStart:['Start','തുടങ്ങുക'],
+ obChosen:['Your temple','എന്റെ ക്ഷേത്രം'],
+ obP2:['Timings, poojas and festivals for this temple will lead your home screen. You can change it whenever you like.','ഈ ക്ഷേത്രത്തിന്റെ സമയം, പൂജകൾ, ഉത്സവങ്ങൾ ഹോം സ്ക്രീനിൽ വരും. എപ്പോൾ വേണമെങ്കിലും മാറ്റാം.'],
+ obChangeSel:['Choose a different temple','മറ്റൊരു ക്ഷേത്രം തിരഞ്ഞെടുക്കൂ'],
+ profileWord:['Profile','പ്രൊഫൈൽ'],
+ nakNotSet:['Nakshatram not set — add it with Nithara','നക്ഷത്രം ചേർത്തിട്ടില്ല — നിതാരയിൽ ചേർക്കാം'],
+ changeTemple:['Change','മാറ്റുക'],
+ syncT:['Sign in to sync','സിങ്ക് ചെയ്യാൻ സൈൻ ഇൻ ചെയ്യൂ'],
+ syncS:['Keep your bookings and chart on every device','ബുക്കിംഗുകളും ജാതകവും എല്ലാ ഉപകരണങ്ങളിലും സൂക്ഷിക്കാം'],
+ signIn:['Sign in','സൈൻ ഇൻ'],
+ locToast:['Location set to Thrissur, Kerala','സ്ഥലം തൃശ്ശൂർ, കേരളം ആയി'],
+ obContinue:['Continue','അർജുൻ ആയി തുടരുക'], obContinue2:['Continue','തുടരുക'],
+ obSearch:['Search temples','ക്ഷേത്രങ്ങൾ തിരയുക'],
+ langSet:['English','മലയാളം'],
+};
+const SEC={
+ temple:['Your temple','എന്റെ ക്ഷേത്രം'],
+ notices:['From your temple','ക്ഷേത്രത്തിൽ നിന്ന്'],
+ tools:['Free tools','സൗജന്യ സേവനങ്ങൾ'],
+ poojas:["Today's poojas",'ഇന്നത്തെ പൂജകൾ'],
+ nearby:['Explore nearby','അടുത്തുള്ള ക്ഷേത്രങ്ങൾ'],
+ map:['On the map','ഭൂപടത്തിൽ'],
+ astrologers:['Astrologers','ജ്യോതിഷർ'],
+};
+const SECSUB={map:['filter by deity','ദേവത അനുസരിച്ച്'],astrologers:['Malayalam','മലയാളം']};
+/* T('key') → the string in the current language */
+function T(k){const v=STR[k];return v?(lang==='ml'?v[1]:v[0]):k;}
+/* the other language — used for the second line of a bilingual pair */
+function T2(k){const v=STR[k];return v?(lang==='ml'?v[0]:v[1]):k;}
+/* a temple's name / place in the reading order of the current language */
+const tName=t=>lang==='ml'?t.ml:t.en;
+const tName2=t=>lang==='ml'?t.en:t.ml;
+const tPlace=t=>lang==='ml'?(t.mplace||t.place):t.place;
+const tDeity=t=>T('d'+t.deity);
+
+function applyLang(){
+  $('#phone').dataset.lang=lang;
+  $('#langLbl').textContent=lang==='en'?'ML':'EN';
+  document.documentElement.lang=lang==='ml'?'ml':'en';
+  /* flat strings */
+  $$('[data-t]').forEach(el=>{
+    const v=STR[el.dataset.t];if(!v)return;
+    el.innerHTML=lang==='ml'?v[1]:v[0];
+  });
+  /* section headers carry both languages, leading with the active one */
+  $$('[data-sec]').forEach(el=>{
+    const k=el.dataset.sec,pair=SEC[k];if(!pair)return;
+    const main=lang==='ml'?pair[1]:pair[0], sub=lang==='ml'?pair[0]:pair[1];
+    const extra=SECSUB[k]?' · '+(lang==='ml'?SECSUB[k][1]:SECSUB[k][0]):'';
+    el.querySelector('h2').innerHTML=`${main}<span class="ml">${sub}${extra}</span>`;
+  });
+  renderNav();renderGreeting();renderHome();renderNotices();renderTools();renderAstro();renderPoojas();renderProfile();
+}
+function toggleLang(){lang=lang==='en'?'ml':'en';applyLang();if(typeof renderOnboard==='function'&&!$('#onboard').classList.contains('done'))renderOnboard();toast(T('langSet'));}
+
+/* ── NAV ── */
+const NAV=[['home','i-home'],['poojas','i-lamp'],['astro','i-sparkle'],['profile','i-user']];
+function renderNav(){
+  const cur=$('#nav button[aria-current]')?.dataset.s||'home';
+  $('#nav').innerHTML=NAV.map(([k,i])=>
+    `<button data-s="${k}" ${k===cur?'aria-current="page"':''}>${ic(i)}<span>${T('nav_'+k)}</span></button>`).join('');
+}
+renderNav();
+$('#nav').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;$$('#nav button').forEach(x=>x.removeAttribute('aria-current'));b.setAttribute('aria-current','page');$$('.screen').forEach(s=>s.removeAttribute('data-active'));const s=$('#s-'+b.dataset.s);s.setAttribute('data-active','');s.scrollTop=0;if(b.dataset.s==='profile')renderProfile();if(b.dataset.s==='poojas')renderPoojas();if(b.dataset.s==='home')setTimeout(()=>maps.home?.invalidateSize(),90);});
+function setActive(k){$(`#nav button[data-s="${k}"]`)?.click();}
+
+/* ── HOME ── */
+function renderHome(){
+  const t=byId(DEFAULT_ID);
+  $('#myTemple').innerHTML=`
+   <div class="mytemple"><div class="mt-thread"></div>
+     <div class="mt-head"><span class="mt-glyph">${ic('i-'+t.sig)}</span>
+       <div style="min-width:0">
+         <div class="mt-badge">${ic('i-star')}${T('yourTemple')} · ${T2('yourTemple')}</div>
+         <div class="mt-name">${tName(t)}</div>
+         <div class="mt-ml ml">${tName2(t)} · ${tPlace(t)}</div>
+         <div class="mt-rate">${ic('i-star','ic sm')}<b>${t.rating}</b><span>${t.reviews} ${T('reviews')}</span></div>
+       </div></div>
+     <div class="mt-pills">${t.open?`<span class="pill pill-open">${ic('i-clock')}${T('openTill')} ${t.closes}</span>`:`<span class="pill pill-shut">${ic('i-clock')}${T('closedNow')}</span>`}<span class="pill pill-dist">${ic('i-pin')}${fmt(t.d)}</span><span class="pill pill-pooja">${ic('i-lamp')}${T('poojaToday')}</span></div>
+     <div class="mt-reason">${ic('i-moon','ic sm')}<span>${T('reason')}</span></div>
+     <div class="mt-cta"><button class="enter" onclick="openTemple(${t.id})">${ic('i-temple','ic sm')}${T('enterTemple')}</button><button class="btn btn-sec" onclick="toast(T('openingDir')+' '+tName(byId(${t.id})))">${ic('i-navigate','ic sm')}</button></div>
+     <div class="mt-quick"><button onclick="openBook('pushpanjali',101)">${ic('i-lamp')}${T('bookPooja')}</button><button onclick="toast(T('darshanRecorded'))">${ic('i-check')}${T('checkIn')}</button><button onclick="setActive('feed')">${ic('i-feed')}${T('liveDarshan')}</button></div>
+   </div>`;
+  $('#todayPoojas').innerHTML=`
+   <div class="pooja"><div class="pi">${ic('i-lamp')}</div><div class="pm"><b>${T('pushpanjali')} · ${T('vNak').split(' · ')[0]}</b><span>${T('nextSlot')}</span></div><div class="price">₹101</div><button class="btn btn-pri" onclick="openBook('pushpanjali',101)">${T('book')}</button></div>
+   <div class="pooja"><div class="pi">${ic('i-lamp')}</div><div class="pm"><b>${T('ganapathi')}</b><span>${T('book3')}</span></div><div class="price">₹1,250</div><button class="btn btn-pri" onclick="openBook('ganapathi',1250)">${T('book')}</button></div>`;
+  $('#nearby').innerHTML=temples.filter(x=>x.id!==DEFAULT_ID).slice(0,3).map(x=>`<button class="tmini" onclick="openTemple(${x.id})"><span class="glyph ${x.sig}">${ic('i-'+x.sig)}</span><span class="m"><b>${tName(x)}</b><span>${tName2(x)} · ${tPlace(x)}</span></span><span class="d">${fmt(x.d)}</span></button>`).join('');
+  renderMap();
+}
+
+/* ── LEAFLET MAPS (shared) ── */
+const maps={},markers={};
+function pinHtml(t,label){
+  return `<div class="pin ${t.sig} ${t.id===DEFAULT_ID?'def':''}">${label&&t.id===DEFAULT_ID?'<span class="tag">Your temple</span>':''}<span class="disc">${ic('i-'+t.sig)}</span></div>`;
+}
+function makeMap(elId,key,{zoom=false,label=false,onPick,preview=false}={}){
+  if(maps[key])return maps[key];
+  const opts=preview
+    ?{zoomControl:false,attributionControl:true,dragging:false,touchZoom:false,scrollWheelZoom:false,
+      doubleClickZoom:false,boxZoom:false,keyboard:false,tap:false}
+    :{zoomControl:zoom,attributionControl:true};
+  const map=L.map(elId,opts).setView(ME,12);
+  L.tileLayer(TILES,{attribution:ATTR,maxZoom:19}).addTo(map);
+  L.marker(ME,{icon:L.divIcon({className:'',html:'<div class="me-dot"></div>',iconSize:[18,18],iconAnchor:[9,9]}),interactive:false,keyboard:false}).addTo(map);
+  markers[key]={};
+  temples.forEach(t=>{
+    const size=t.id===DEFAULT_ID?[48,56]:[40,48];
+    const m=L.marker([t.lat,t.lng],{icon:L.divIcon({className:'',html:pinHtml(t,label),iconSize:size,iconAnchor:[size[0]/2,size[1]-4]}),
+      title:t.en,alt:t.en,riseOnHover:true,interactive:!preview,keyboard:!preview});
+    if(!preview)m.on('click',()=>onPick&&onPick(t));
+    m.addTo(map);markers[key][t.id]=m;
+  });
+  maps[key]=map;return map;
+}
+function syncPins(key,filter){
+  const mk=markers[key],map=maps[key];if(!mk||!map)return;
+  temples.forEach(t=>{
+    const on=filter==='all'||t.deity===filter;
+    if(on){if(!map.hasLayer(mk[t.id]))mk[t.id].addTo(map);}
+    else if(map.hasLayer(mk[t.id]))map.removeLayer(mk[t.id]);
+  });
+}
+function recentre(key){
+  const m=maps[key];if(!m)return;
+  m.flyTo(ME,13,{duration:REDUCED?0:.7});
+  toast('Centred on Thekkinkadu, Thrissur');
+}
+
+/* ── HOME map card (filter by deity) ── */
+let mapFilter='all';
+const FILTERS=()=>[['all',T('all'),'i-temple'],['Shiva',T('dShiva'),'i-shiva'],['Devi',T('dDevi'),'i-devi'],['Vishnu',T('dVishnu'),'i-vishnu']];
+function renderMap(){
+  const mf=$('#mapfilter');if(!mf)return;
+  mf.innerHTML=FILTERS().map(([f,l,i])=>`<button data-f="${f}" aria-pressed="${f===mapFilter}">${ic(i)}${l}</button>`).join('');
+  mf.onclick=e=>{const b=e.target.closest('button');if(!b)return;mapFilter=b.dataset.f;renderMap();};
+  makeMap('homeMap','home',{label:true,preview:true});
+  syncPins('home',mapFilter);
+  fitPins('home',mapFilter);
+  const n=temples.filter(t=>mapFilter==='all'||t.deity===mapFilter).length;
+  const noun=n===1?T('temple'):T('temples');
+  const lbl=mapFilter==='all'?(n===1?T('templeNearby'):T('templesNearby')):`${T('d'+mapFilter)} ${noun}`;
+  $('#mapCount').innerHTML=ic('i-temple','ic sm')+`<span>${n} ${lbl}</span>`;
+  setTimeout(()=>maps.home?.invalidateSize(),80);
+}
+/* frame whatever is currently filtered in */
+function fitPins(key,filter){
+  const map=maps[key];if(!map)return;
+  const on=temples.filter(t=>filter==='all'||t.deity===filter).map(t=>[t.lat,t.lng]);
+  setTimeout(()=>{
+    if(filter==='all'||!on.length){map.setView(ME,12);return;}
+    map.fitBounds(L.latLngBounds(on.concat([ME])),{padding:[42,42],maxZoom:14,animate:!REDUCED});
+  },90);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   FULL MAP PAGE — the three-builds map: floating search with your
+   avatar, deity chips beneath it, tools on the right, and a
+   snapping rail of temple cards along the bottom.
+   ═══════════════════════════════════════════════════════════════ */
+let fmFilter='all';
+function openMap(){
+  const el=mkSheet('mapsheet','');fmFilter=mapFilter;
+  el.innerHTML=`
+   <div class="mfull" id="fullMap"></div>
+   <div class="maptop">
+     <div class="mtop">
+       <button class="iconbtn" onclick="closeAll()" aria-label="${T('a11yBack')}">${ic('i-back')}</button>
+       <button class="searchfield" onclick="closeAll();setTimeout(openSearch,250)">
+         ${ic('i-search')}<span class="txt">${T('searchPlaceholder')}</span><span class="avatar" aria-hidden="true"><svg class="ic sm" aria-hidden="true"><use href="#i-user"/></svg></span>
+       </button>
+     </div>
+     <div class="mchips" id="fmchips" role="group" aria-label="${T('a11yFilter')}"></div>
+   </div>
+   <div class="mapbottom">
+     <div class="maptools">
+       <button class="iconbtn dark" onclick="toast(T('scanQR'))" aria-label="${T('a11yScan')}">${ic('i-qr')}</button>
+       <button class="iconbtn" onclick="recentre('full')" aria-label="${T('a11yLocate')}">${ic('i-navigate')}</button>
+     </div>
+     <div class="railhead"><span id="fmhint">${T('nearestFirst')}</span></div>
+     <div class="mrail" id="fmrail"></div>
+   </div>`;
+  openSheet(el);
+  setTimeout(()=>{
+    makeMap('fullMap','full',{zoom:true,label:true,onPick:t=>focusTemple(t.id)});
+    $('#fullMap .leaflet-control-zoom')?.classList.add('show');
+    maps.full.invalidateSize();renderFullMap();
+  },140);
+}
+function focusTemple(id){
+  const t=byId(id);
+  maps.full?.flyTo([t.lat,t.lng],15,{duration:REDUCED?0:.6});
+  const card=$(`#fmrail .mrcard[data-id="${id}"]`);
+  card?.scrollIntoView({behavior:REDUCED?'auto':'smooth',inline:'center',block:'nearest'});
+  $$('#fmrail .mrcard').forEach(c=>c.classList.toggle('active',c.dataset.id===String(id)));
+}
+function railCard(t){
+  const isDef=t.id===DEFAULT_ID;
+  return `<article class="mrcard ${isDef?'is-def':''}" data-id="${t.id}" onclick="focusTemple(${t.id})">
+    <div class="row"><span class="glyph ${t.sig}">${ic('i-'+t.sig)}</span>
+      <div style="flex:1;min-width:0">
+        ${isDef?`<div class="mrbadge">${ic('i-star')}${T('yourTemple')}</div>`
+                :`<div class="mrdist">${ic('i-pin','ic sm')}${fmt(t.d)}</div>`}
+        <h3>${tName(t)}</h3>
+        <div class="mrml">${tName2(t)} · ${tPlace(t)}</div>
+      </div></div>
+    <div class="mrpills">
+      ${t.open?`<span class="pill pill-open">${ic('i-clock')}${T('openTill')} ${t.closes}</span>`
+              :`<span class="pill pill-shut">${ic('i-clock')}${T('closedNow')}</span>`}
+      ${t.pooja?`<span class="pill pill-pooja">${ic('i-lamp')}${T('poojaToday')}</span>`:''}
+    </div>
+    <div class="acts">
+      <button class="btn btn-nav" onclick="event.stopPropagation();toast(T('openingDir')+' '+tName(byId(${t.id})))">${ic('i-navigate','ic sm')}${T('directions')}</button>
+      <button class="btn btn-pri" onclick="event.stopPropagation();closeAll();setTimeout(()=>openTemple(${t.id}),260)">${T('details')}</button>
+    </div></article>`;
+}
+function renderFullMap(){
+  const c=$('#fmchips');if(!c)return;
+  c.innerHTML=FILTERS().map(([f,l,i])=>`<button data-f="${f}" aria-pressed="${f===fmFilter}">${ic(i)}${l}</button>`).join('');
+  c.onclick=e=>{const b=e.target.closest('button');if(!b)return;fmFilter=b.dataset.f;renderFullMap();};
+  syncPins('full',fmFilter);
+  const list=temples.filter(t=>fmFilter==='all'||t.deity===fmFilter);
+  $('#fmhint').textContent=fmFilter==='all'
+    ? T('nearestFirst')
+    : `${list.length} ${list.length===1?T('temple'):T('temples')} · ${T('nearestFirst')}`;
+  $('#fmrail').innerHTML=list.length?list.map(railCard).join('')
+    :`<article class="mrcard" style="text-align:center;color:var(--muted)">${T('noMatch')}</article>`;
+}
+
+/* ── FEED ── */
+const CATKEY={Festival:'catFestival',Darshan:'catDarshan',AstroTalk:'catAstro'};
+const FEEDML={
+ 1:['തൃശ്ശൂർ പൂരം — ഇലഞ്ഞിത്തറ മേളം','250 കലാകാരന്മാർ, ഒരേ താളം. കുടമാറ്റം വൈകുന്നേരം 5 മണിക്ക്, കിഴക്കേ ഭാഗത്ത്.','വടക്കുന്നാഥൻ ക്ഷേത്രം'],
+ 2:['ഗുരുവായൂരിൽ നിർമാല്യ ദർശനം','പുലർച്ചെ 3 മണിയുടെ ദർശനം. ക്യൂ ഒരു കിലോമീറ്റർ — എന്നിട്ടും വിലപ്പെട്ടത്.','അർജുൻ'],
+ 3:['ഗുരു സംക്രമം — ചോതി നക്ഷത്രക്കാർക്ക്','ഈ ആഴ്ച വ്യാഴം മിഥുനത്തിലേക്ക്, നിങ്ങളുടെ ഏഴാം ഭാവത്തിൽ.','ഡോ. നന്ദകുമാർ'],
+};
+function renderFeed(){
+  $('#feed').innerHTML=articles.map((a,i)=>{
+    const m=FEEDML[i+1];
+    const title=lang==='ml'?m[0]:a.t, body=lang==='ml'?m[1]:a.p, who=lang==='ml'?m[2]:a.who;
+    return `<article class="article"><div class="img ${a.img}"><span class="glyph">${ic(a.gl)}</span>${a.live?`<span class="pill pill-live badge">● LIVE</span>`:''}<span class="play">${ic('i-play')}</span></div>
+   <div class="fb"><div class="cat">${T(CATKEY[a.cat]||'catDarshan')}</div><h3>${title}</h3><p>${body}</p>
+     <div class="who">${ic('i-user','ic sm')}${who}<span class="r"><span>${ic('i-heart','ic sm')}${a.lk}</span><span>${ic('i-comment','ic sm')}${a.cm}</span></span></div>
+     ${a.id?`<button class="btn btn-sec btn-block" style="margin-top:16px" onclick="openTemple(${a.id})">${T('viewTemple')}</button>`:''}
+   </div></article>`}).join('');
+}
+
+/* ── ASTRO list ── */
+const ASTROML=[
+ ['ഡോ. നന്ദകുമാർ ശർമ്മ','പ്രശ്നം · ജാതകം · മലയാളം'],
+ ['ശ്രീദേവി അന്തർജനം','മുഹൂർത്തം · വിവാഹപ്പൊരുത്തം'],
+ ['ഹരികൃഷ്ണൻ നമ്പൂതിരി','വാസ്തു · ദോഷ പരിഹാരം'],
+];
+function renderAstro(){
+  $('#astro').innerHTML=astros.map((a,i)=>{
+    const nm=lang==='ml'?ASTROML[i][0]:a.n, sp=lang==='ml'?ASTROML[i][1]:a.sp;
+    return `<div class="astro"><div class="av">${ic('i-sparkle','ic lg')}</div>
+   <div class="m"><div class="n">${a.on?'<span class="dot"></span>':''}${nm}</div><div class="sp">${sp}</div><div class="rt"><span>${ic('i-star')} ${a.r}</span><span>${a.ex} ${T('yrs')}</span></div></div>
+   <div class="rate"><b>${money(a.p)}</b><small>${T('perMin')}</small><button class="btn btn-pri" onclick="openBook('astro:${i}',${a.p*15})">${a.on?T('chat'):T('book')}</button></div>
+ </div>`}).join('');
+}
+
+/* ── PROFILE (jathakam appears only once birth details exist) ── */
+const milestones=[
+ {ic:'i-temple',k:'msFirst',s:'unlocked',got:1},
+ {ic:'i-shiva',k:'msTen',s:'unlocked',got:1},
+ {ic:'i-parasol',k:'msPooram',s:'unlocked',got:1},
+ {ic:'i-star',k:'msRank',s:'twoToGo',got:0},
+ {ic:'i-pin',k:'msDistrict',s:null,got:0},
+];
+const RASI_EN=[['Meenam','Ketu'],['Medam',''],['Idavam','Moon'],['Midhunam','Ravi'],['Kumbham','Shani'],['CENTER'],['Karkidakam','Budhan'],['Makaram',''],['Chingam','Guru'],['Dhanu','Rahu'],['Vrischikam',''],['Thulam','Shukran'],['Kanni','Chovva']];
+const RASI_ML=[['മീനം','കേതു'],['മേടം',''],['ഇടവം','ചന്ദ്രൻ'],['മിഥുനം','രവി'],['കുംഭം','ശനി'],['CENTER'],['കർക്കടകം','ബുധൻ'],['മകരം',''],['ചിങ്ങം','ഗുരു'],['ധനു','രാഹു'],['വൃശ്ചികം',''],['തുലാം','ശുക്രൻ'],['കന്നി','ചൊവ്വ']];
+const rasiHtml=()=>{
+  const cells=lang==='ml'?RASI_ML:RASI_EN;
+  const centre=lang==='ml'?['രാശി','ഇടവം ലഗ്നം<br>രോഹിണി · പാദം 2']:['Rasi','Idavam lagnam<br>Rohini · Pada 2'];
+  return `<div class="rasi">`+cells.map(r=>r[0]==='CENTER'
+    ?`<div class="rc center"><b>${centre[0]}</b><span>${centre[1]}</span></div>`
+    :`<div class="rc"><span>${r[0]}</span>${r[1]?`<span class="p">${r[1]}</span>`:''}</div>`).join('')+`</div>`;
+};
+const milestonesHtml=()=>`<div class="milestones">`+milestones.map(m=>
+  `<div class="ms ${m.got?'got':'lock'}">${ic(m.ic)}<b>${T(m.k)}</b><span>${m.s?T(m.s):'12 / 38'}</span></div>`).join('')+`</div>`;
+function setChart(v){chartDone=v;renderProfile();renderPoojas();renderPromos();}
+function renderPhead(){
+  const box=$('#pheadCard');if(!box)return;
+  const t=byId(DEFAULT_ID);
+  box.innerHTML=`
+    <div class="pidrow">
+      <span class="pav">${ic('i-'+t.sig)}</span>
+      <div class="pm">
+        <div class="kk">${ic('i-star')}${T('obChosen')}</div>
+        <h1>${tName(t)}</h1>
+        <div class="sub">${tName2(t)} · ${tPlace(t)}</div>
+      </div>
+      <button class="chg" onclick="openSearch()">${T('changeTemple')}</button>
+    </div>
+    <div class="pstatsrow">
+      <div class="pstat2"><b>23</b><span>${T('stTemples')}</span></div>
+      <div class="pstat2"><b>4</b><span>${T('stPoojas')}</span></div>
+      <div class="pstat2"><b>6</b><span>${T('stStreak')}</span></div>
+      <div class="pstat2"><b>3</b><span>${T('stBadges')}</span></div>
+    </div>`;
+  $('#pheadExtra').innerHTML=`
+    <div class="pnak ${chartDone?'set':''}">${ic(chartDone?'i-star':'i-sparkle')}<span>${(()=>{const k=memberNak(MEMBERS[0]);if(k==null)return T('nakNotSet');return chartDone?T('vNak')+' · '+T('vRasi'):nak(k)+' · '+T('chartPending');})()}</span></div>
+    <button class="psync" onclick="toast(T('syncT'))">
+      <span class="si2">${ic('i-shield')}</span>
+      <span class="sm"><b>${T('syncT')}</b><span>${T('syncS')}</span></span>
+      <span class="go2">${T('signIn')}</span>
+    </button>`;
+}
+function renderProfile(){
+  renderPhead();
+  const _ps=$('#proStar'); if(_ps)_ps.textContent=chartDone?T('vNak').split(' · ')[0]+' · '+T('vRasi').split(' (')[0]:T('starNotSet');
+  $('#swBefore')?.setAttribute('aria-pressed',String(!chartDone));
+  $('#swAfter')?.setAttribute('aria-pressed',String(chartDone));
+  let h='';
+  if(!chartDone){
+    /* ── BEFORE: no birth data, so no jathakam table at all ── */
+    h+=`<div class="pcard"><h2>${T('birthChart')}</h2>
+        <div class="setup"><div class="si">${ic('i-sparkle')}</div><div class="st"><b>${T('chartNotSet')}</b><span>${T('chartNotSetS')}</span></div></div>
+        <button class="btn btn-pri btn-block" onclick="openChat(true)">${ic('i-sparkle','ic sm')}${T('completeWith')}</button>
+        <div class="frow" style="margin-top:14px"><span>${T('aboutMinute')}</span><b>${T('freeWord')}</b></div>
+      </div>`;
+  }else{
+    /* ── AFTER: details exist, so the table and the rasi grid appear ── */
+    h+=`<div class="pcard"><h2>${T('birthDetails')}<button class="edit" onclick="toast(T('edit'))">${T('edit')}</button></h2>
+        <div class="frow"><span>${T('fDob')}</span><b>${T('vDob')}</b></div>
+        <div class="frow"><span>${T('fTob')}</span><b>04:32 AM</b></div>
+        <div class="frow"><span>${T('fPob')}</span><b>${T('vPob')}</b></div>
+      </div>`;
+    h+=`<div class="pcard"><h2>${T('jathakam')}<button class="shbtn" onclick="openShare('chart')">${ic('i-share','ic sm')}${T('share')}</button></h2>${rasiHtml()}
+        <div style="margin-top:14px">
+          <div class="frow"><span>${T('fNak')}</span><b>${T('vNak')}</b></div>
+          <div class="frow"><span>${T('fRasi')}</span><b>${T('vRasi')}</b></div>
+          <div class="frow"><span>${T('fDasha')}</span><b>${T('vDasha')}</b></div>
+        </div>
+        <div class="dasha"><div class="bar"><i style="width:79%"></i></div><div class="lg"><span>${T('dashaFrom')}</span><span>${T('dashaTo')}</span></div></div>
+        <button class="btn btn-sec btn-block" style="margin-top:14px" onclick="openChat()">${ic('i-sparkle','ic sm')}${T('askAbout')}</button>
+      </div>`;
+  }
+  h+=familyCard();
+  h+=`<div class="pcard"><h2>${T('bookings')}</h2>
+      <div class="booking"><div class="bi">${ic('i-lamp')}</div><div class="bm"><b>${T('pushpanjali')}${chartDone?' · '+T('vNak').split(' · ')[0]:''}</b><span>${lang==='ml'?'ഗുരുവായൂർ · ജൂലൈ 28, 6:00 AM':'Guruvayur · 28 Jul, 6:00 AM'}</span></div><span class="pill pill-open">${ic('i-check')}${T('confirmed')}</span></div>
+      <div class="booking"><div class="bi">${ic('i-lamp')}</div><div class="bm"><b>${T('ganapathi')}</b><span>${lang==='ml'?'വടക്കുന്നാഥൻ · ഓഗസ്റ്റ് 2':'Vadakkunnathan · 2 Aug'}</span></div><span class="pill pill-def">${ic('i-clock')}${T('pending')}</span></div>
+    </div>`;
+  h+=`<div class="pcard"><h2>${T('milestones')}</h2>${milestonesHtml()}</div>`;
+  h+=boardCard();
+  $('#profileBody').innerHTML=h;
+}
+
+/* ── SHEETS ── */
+function mkSheet(cls,dir){
+  let el=$('.'+cls,$('#phone'));if(!el){el=document.createElement('div');}
+  el.className=`sheet ${dir} ${cls}`;
+  /* a sheet is a modal layer: announce it as one, and keep it out of the
+     tab order entirely while it is closed */
+  el.setAttribute('role','dialog');el.setAttribute('aria-modal','true');el.setAttribute('aria-hidden','true');
+  /* always move it last so a sheet opened over another sheet stacks on top */
+  $('#phone').appendChild(el);return el;
+}
+/* One switch owns "is something covering the app?". The tab bar reads it and
+   steps aside, so a sheet footer and the tab bar can never share the same
+   strip of screen. */
+let lastFocus=null;
+function syncOverlay(){
+  const on=!!$('.sheet[data-open]')||!$('#onboard').classList.contains('done');
+  $('#phone').toggleAttribute('data-overlay',on);
+  const nav=$('#nav');
+  nav.setAttribute('aria-hidden',String(on));
+  on?nav.setAttribute('inert',''):nav.removeAttribute('inert');
+}
+function openSheet(el){
+  lastFocus=document.activeElement;
+  $('#scrim').setAttribute('data-open','');
+  el.setAttribute('aria-hidden','false');
+  requestAnimationFrame(()=>{el.setAttribute('data-open','');syncOverlay();
+    /* land the caret somewhere sensible instead of leaving it behind the sheet */
+    setTimeout(()=>el.querySelector('input,button,[tabindex]')?.focus({preventScroll:true}),260);});
+}
+function closeAll(){
+  $$('.sheet[data-open]').forEach(s=>{s.removeAttribute('data-open');s.setAttribute('aria-hidden','true');});
+  $('#scrim').removeAttribute('data-open');
+  syncOverlay();
+  if(lastFocus&&document.contains(lastFocus)){lastFocus.focus({preventScroll:true});lastFocus=null;}
+}
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('.sheet[data-open]'))closeAll();});
+
+/* door reveal */
+function revealWithDoors(el){
+  const d=$('#doors');
+  if(REDUCED||!d){openSheet(el);return;}
+  lastFocus=document.activeElement;
+  d.classList.add('run');d.classList.remove('open');
+  requestAnimationFrame(()=>{
+    el.classList.add('instant');$('#scrim').setAttribute('data-open','');
+    el.setAttribute('aria-hidden','false');el.setAttribute('data-open','');syncOverlay();
+    void el.offsetWidth;el.classList.remove('instant');
+    requestAnimationFrame(()=>d.classList.add('open'));
+    setTimeout(()=>d.classList.remove('run','open'),1200);
+  });
+}
+
+function openTemple(id){
+  const t=byId(id),isDef=id===DEFAULT_ID,el=mkSheet('detail','right');
+  const story=lang==='ml'&&t.mstory?t.mstory:t.story;
+  el.innerHTML=`
+   <div class="sheet-scroll">
+     <header class="dhero ${isDef?'is-def':''}">
+       <div class="wash"></div>${ic('i-gopuram','silh')}
+       <div class="navr"><button class="iconbtn" onclick="closeAll()" aria-label="${T('a11yBack')}">${ic('i-back')}</button><button class="iconbtn" onclick="toast(T('${isDef?'isHome':'savedTemple'}'))" aria-label="${T('savedTemple')}">${ic('i-star')}</button></div>
+       <div class="dtitle"><div class="k">${isDef?T('yourTemple')+' · ':''}${T('k'+t.deity)}</div><h1>${tName(t)}</h1><div class="ml">${tName2(t)} · ${tPlace(t)}</div></div>
+     </header>
+     <div class="statrow">
+       <div class="stat"><b>${fmt(t.d)}</b><span>${T('away')}</span></div>
+       <div class="stat"><b style="color:${t.open?'var(--blue-700)':'var(--kumkum)'}">${t.open?T('openW'):T('closedW')}</b><span>${t.open?T('till')+' '+t.closes:T('opens5')}</span></div>
+       <div class="stat"><b>${ic('i-star','ic sm')} ${t.rating}</b><span>${t.reviews}</span></div>
+     </div>
+     <div class="dtabs"><button aria-selected="true">${T('about')}</button><button aria-selected="false">${T('timings')}</button><button aria-selected="false">${T('poojas')}</button></div>
+     <div class="block"><h3>${T('about')}</h3><p class="prose">${story}</p></div>
+     <div class="block"><h3>${T('darshanTimings')}</h3><div class="timings">
+       <div class="trow now"><span>${ic('i-lamp','ic sm')} ${T('nirmalyam')}</span><b>4:00 – 4:45 AM</b></div>
+       <div class="trow"><span>${T('morning')}</span><b>5:00 AM – 12:30 PM</b></div>
+       <div class="trow"><span>${T('evening')}</span><b>4:30 – 8:30 PM</b></div></div></div>
+     <div class="block"><h3>${T('bookAPooja')}</h3>
+       <div class="pooja"><div class="pi">${ic('i-lamp')}</div><div class="pm"><b>${T('pushpanjali')}</b><span>${T('inYourStar')}</span></div><div class="price">₹101</div><button class="btn btn-pri" onclick="openBook('pushpanjali',101)">${T('book')}</button></div>
+       <div class="pooja"><div class="pi">${ic('i-lamp')}</div><div class="pm"><b>${T('ganapathi')}</b><span>${T('book3')}</span></div><div class="price">₹1,250</div><button class="btn btn-pri" onclick="openBook('ganapathi',1250)">${T('book')}</button></div>
+     </div>
+     <div style="height:22px"></div>
+     <div class="dcta"><button class="btn btn-pri" onclick="toast(T('darshanRecorded'))">${T('checkinDarshan')}</button><button class="btn btn-nav" onclick="toast(T('openingDir')+' '+tName(byId(${t.id})))">${ic('i-navigate','ic sm')}</button></div>
+   </div>`;
+  el.querySelectorAll('.dtabs button').forEach(b=>b.onclick=()=>{el.querySelectorAll('.dtabs button').forEach(x=>x.setAttribute('aria-selected','false'));b.setAttribute('aria-selected','true');});
+  revealWithDoors(el);
+}
+
+function openBook(key,amt,when){
+  LAST_BOOK_ARGS=[key,amt,when];
+  const el=mkSheet('review',''),total=amt+15;
+  const who=byMember(whoId), wnak=memberNak(who);
+  const name=key.startsWith('astro:')?(lang==='ml'?ASTROML[+key.split(':')[1]][0]:astros[+key.split(':')[1]].n):T(key);
+  el.innerHTML=`
+   <div class="sheet-bar"><button class="iconbtn" onclick="closeAll()" aria-label="${T('a11yBack')}">${ic('i-back')}</button><h2>${T('reviewBooking')}</h2></div>
+   <div class="sheet-scroll">
+     ${whoStrip()}
+     <div class="rvcard" style="margin-top:14px">
+       <div class="rvrow"><span class="k">${T('mName')}</span><span class="v" id="whoValue">${memberName(who)}${wnak!=null?` <span style="color:var(--muted);font-weight:600">· ${nak(wnak)}</span>`:''}</span></div>
+       <div class="rvrow"><span class="k">${T('rPooja')}</span><span class="v">${name}</span></div>
+       <div class="rvrow"><span class="k">${T('rTemple')}</span><span class="v">${tName(byId(DEFAULT_ID))}</span></div>
+       <div class="rvrow"><span class="k">${T('rDate')}</span><span class="v">${when||T('rDateV')}</span></div>
+       <div class="rvrow"><span class="k">${T('rFee')}</span><span class="v">₹15</span></div>
+       <div class="rvrow total"><span class="k">${T('rTotal')}</span><span class="v">${money(total)}</span></div>
+     </div>
+     <div class="rvnote">${ic('i-shield','ic sm')}<span>${T('rNote')}</span></div>
+   </div>
+   <div class="dcta"><button class="btn btn-pri btn-block" onclick="bookDone('${name.replace(/'/g,'')}','${(when||T('rDateV')).replace(/'/g,'')}',whoId)">${T('payConfirm')} ${money(total)} ${T('andConfirm')}</button></div>`;
+  openSheet(el);
+}
+function bookDone(name,when,forId){
+  const el=$('.review',$('#phone')),ref='NT'+Math.floor(100000+Math.random()*899999);
+  const who=byMember(forId||whoId);
+  LAST_BOOKING={name:name,when:when,ref:ref,who:memberName(who),nak:memberNak(who)};
+  /* the booking joins the list, and so does the person it was made for */
+  BOOKINGS.unshift({k:null,label:name,temple:DEFAULT_ID,when:when,state:'ok',who:who.id});
+  renderPoojas();renderProfile();
+  el.innerHTML=`<div class="sheet-bar"><button class="iconbtn" onclick="closeAll()" aria-label="${T('a11yClose')}">${ic('i-close')}</button><h2>${T('confirmedT')}</h2></div>
+   <div class="sheet-scroll"><div class="done">${ic('i-lamp','ic lamp')}<h2>${T('allSet')}</h2><p>${name} · ${memberName(byMember(forId||whoId))} ${T('bookedMsg')}</p><div class="ref">${T('refWord')} · ${ref}</div></div></div>
+   <div class="dcta">
+     <button class="btn btn-sec" onclick="openShare('booking',LAST_BOOKING)">${ic('i-share','ic sm')}${T('share')}</button>
+     <button class="btn btn-pri" style="flex:1" onclick="closeAll()">${T('done')}</button>
+   </div>`;
+}
+let LAST_BOOKING=null;
+
+let searchMode='name';
+function openSearch(){
+  const el=mkSheet('search-sheet','');searchMode='name';
+  el.innerHTML=`<div class="sheet-bar"><button class="iconbtn" onclick="closeAll()" aria-label="${T('a11yBack')}">${ic('i-back')}</button><div class="spin">${ic('i-search')}<input id="sq" placeholder="${T('phName')}" oninput="doSearch(this.value)" aria-label="${T('phName')}" autocomplete="off"></div></div>
+   <div class="seg" id="seg"><button aria-selected="true" onclick="setSearchMode('name')">${ic('i-search','ic sm')}${T('byName')}</button><button aria-selected="false" onclick="setSearchMode('place')">${ic('i-pin','ic sm')}${T('byPlace')}</button></div>
+   <div class="sheet-scroll" id="sbody"></div>`;
+  openSheet(el);doSearch('');setTimeout(()=>$('#sq')?.focus(),300);
+}
+function setSearchMode(m){
+  searchMode=m;
+  $$('#seg button').forEach((b,i)=>b.setAttribute('aria-selected',String((i===0)===(m==='name'))));
+  const i=$('#sq');if(i){i.placeholder=m==='place'?T('phPlace'):T('phName');doSearch(i.value);i.focus();}
+}
+function doSearch(q){
+  q=(q||'').trim().toLowerCase();
+  const hits=q?temples.filter(t=>searchMode==='place'
+      ?(t.place+' '+(t.mplace||'')).toLowerCase().includes(q)
+      :(t.en+' '+t.ml).toLowerCase().includes(q)):temples;
+  const head=`<div style="padding:16px var(--s5) 6px;font-size:11px;font-weight:800;letter-spacing:.08em;color:var(--muted)">${hits.length} ${searchMode==='place'?T('results'):T('templesUp')}</div>`;
+  $('#sbody').innerHTML=head+(hits.length?hits.map(t=>`<button class="sres" onclick="closeAll();setTimeout(()=>openTemple(${t.id}),260)"><span class="glyph ${t.sig}">${ic('i-'+t.sig)}</span><span class="m"><b>${tName(t)}</b><span>${searchMode==='place'?tPlace(t)+' · '+fmt(t.d):tName2(t)+' · '+tPlace(t)}</span></span><span class="d">${fmt(t.d)}</span></button>`).join('')
+    :`<div style="text-align:center;color:var(--muted);padding:40px">${ic('i-search')}<p style="margin-top:10px">${T('nothingFound')}</p></div>`);
+}
+
+/* ── NITHARA CHAT (with scripted chart setup) ── */
+const CHAT={
+ seed:["Namaskaram \ud83d\ude4f I am Nithara. Ask me about your chart, today's panchangam, or which temple suits your nakshatram. I can also set up your birth chart — just say the word.",
+       "നമസ്കാരം അർജുൻ \ud83d\ude4f ഞാൻ നിതാര. ജാതകം, ഇന്നത്തെ പഞ്ചാംഗം, നിങ്ങളുടെ നക്ഷത്രത്തിന് ചേരുന്ന ക്ഷേത്രം — എന്തും ചോദിക്കാം. ജാതകവും തയ്യാറാക്കാം."],
+ status:["Free · always available","സൗജന്യം · എപ്പോഴും ലഭ്യം"],
+ disc:["Guidance only. For medical, legal or financial decisions, consult a professional.",
+       "മാർഗനിർദേശം മാത്രം. വൈദ്യ, നിയമ, സാമ്പത്തിക കാര്യങ്ങൾക്ക് വിദഗ്ധരെ സമീപിക്കുക."],
+ ph:["Ask Nithara…","നിതാരയോട് ചോദിക്കൂ…"],
+ setup:["Set up my birth chart","എന്റെ ജാതകം തയ്യാറാക്കൂ"],
+ wait:["Let me read that against your chart — one moment.","നിങ്ങളുടെ ജാതകത്തിൽ നോക്കട്ടെ — ഒരു നിമിഷം."],
+};
+const C=k=>lang==='ml'?CHAT[k][1]:CHAT[k][0];
+const chatSeed=()=>C('seed');
+const SUGG=[
+ ["What does Pradosham mean for me?","പ്രദോഷം എനിക്ക് എന്താണ് അർത്ഥമാക്കുന്നത്?"],
+ ["Which temple should I visit today?","ഇന്ന് ഏത് ക്ഷേത്രത്തിൽ പോകണം?"],
+ ["Explain my current dasha","എന്റെ നിലവിലെ ദശ വിശദീകരിക്കൂ"],
+];
+const suggests=()=>SUGG.map(x=>lang==='ml'?x[1]:x[0]);
+const REPLY_ML={
+ "പ്രദോഷം എനിക്ക് എന്താണ് അർത്ഥമാക്കുന്നത്?":"പ്രദോഷം ത്രയോദശി തിഥിയിലാണ് — ശിവാരാധനയ്ക്ക് ഏറ്റവും ഉത്തമമായ സമയം, ഏകദേശം 4:30 മുതൽ 6 വരെ. നിങ്ങളുടെ ക്ഷേത്രമായ വടക്കുന്നാഥൻ ഇന്ന് വൈകുന്നേരം നല്ലതാണ്.",
+ "ഇന്ന് ഏത് ക്ഷേത്രത്തിൽ പോകണം?":"ഇന്നത്തെ പ്രദോഷത്തിന് ശിവക്ഷേത്രമാണ് ഉത്തമം. വടക്കുന്നാഥൻ 250 മീറ്റർ അകലെ, 12:30 വരെ തുറന്നിരിക്കും, പിന്നെ 4:30 മുതൽ.",
+ "എന്റെ നിലവിലെ ദശ വിശദീകരിക്കൂ":"നിങ്ങൾ ശുക്ര ദശയിലാണ്, ഏകദേശം നാല് വർഷം രണ്ട് മാസം ബാക്കി. ശുക്രകാലം ബന്ധങ്ങൾക്കും സർഗാത്മക ജോലിക്കും അനുകൂലമാണ്.",
+};
+const replies={
+ "What does Pradosham mean for me?":"Pradosham falls on the thirteenth lunar day — the most auspicious window for Shiva worship, roughly 4:30 to 6 PM. Vadakkunnathan, your home temple, would suit you well this evening.",
+ "Which temple should I visit today?":"For today's Pradosham a Shiva temple is ideal. Vadakkunnathan is 250 m from you and open till 12:30 PM, then again from 4:30 PM.",
+ "Explain my current dasha":chartDone?"You are in Shukra dasha with about four years two months left. Venus periods favour relationships, creative work and comfort — a steady phase.":"I'd love to — but I don't have your birth details yet. Shall I set up your chart? Just tap 'Set up my birth chart'."
+};
+const chartQ=[
+ {q:"Happy to set up your chart 🙏 What is your date of birth?",chips:["14 May 1996"]},
+ {q:"And your time of birth? As close as you know is fine.",chips:["04:32 AM","I'm not sure"]},
+ {q:"Finally — where were you born?",chips:["Thrissur","Guruvayur","Somewhere else"]},
+];
+let chartStep=-1;
+function chb(){return $('#chb');}
+function addBub(role,txt){chb().insertAdjacentHTML('beforeend',`<div class="bub ${role}">${txt}</div>`);chb().scrollTop=chb().scrollHeight;}
+function setChips(list){$('#sgg').innerHTML=list.map(c=>`<button class="${c.key?'key':''}" onclick="${c.fn}">${c.t}</button>`).join('');}
+function typeThen(txt,cb){chb().insertAdjacentHTML('beforeend',`<div class="typing" id="tp"><i></i><i></i><i></i></div>`);chb().scrollTop=chb().scrollHeight;setTimeout(()=>{$('#tp')?.remove();addBub('ai',txt);cb&&cb();},REDUCED?80:850);}
+function defaultChips(){return [{t:C('setup'),fn:'startChart()',key:!chartDone}].concat(suggests().map(s=>({t:s,fn:`sendSug(${JSON.stringify(s)})`}))); }
+function sendSug(s){addBub('me',s);setChips([]);typeThen((lang==='ml'?REPLY_ML[s]:replies[s])||'Let me read that against your chart — one moment.',()=>setChips(defaultChips()));}
+function startChart(){if(chartDone){sendSug('Explain my current dasha');return;}addBub('me',C('setup'));setChips([]);chartStep=0;askChart();}
+function askChart(){const s=chartQ[chartStep];typeThen(s.q,()=>setChips(s.chips.map(c=>({t:c,fn:`chartAns(${JSON.stringify(c)})`}))));}
+function chartAns(v){addBub('me',v);setChips([]);chartStep++;if(chartStep<chartQ.length){askChart();}else{typeThen("Perfect 🙏 Your chart is ready — Rohini nakshatram, Idavam lagnam (Taurus), currently in Shukra dasha. I've saved it to your profile.",()=>{chartDone=true;renderProfile();renderPoojas();renderPromos();setChips(defaultChips());toast('Birth chart added to your profile');});}}
+function sendInput(v){v=(v||'').trim();if(!v)return;$('#ci').value='';addBub('me',v);setChips([]);typeThen(C('wait'),()=>setChips(defaultChips()));}
+function openChat(setup){
+  const el=mkSheet('chat','');el.classList.add('chat');
+  el.innerHTML=`<div class="chtop"><button class="iconbtn" onclick="closeAll()">${ic('i-back')}</button><div class="av">${ic('i-sparkle')}</div><div style="flex:1"><b>Nithara</b><div class="st"><span class="dot"></span>${C('status')}</div></div></div>
+   <div class="chbody" id="chb"></div>
+   <div class="sugg" id="sgg"></div>
+   <p class="chdisc">${C('disc')}</p>
+   <div class="chin"><div class="field"><input id="ci" placeholder="${C('ph')}" onkeydown="if(event.key==='Enter')sendInput(this.value)"></div><button class="snd" onclick="sendInput($('#ci').value)">${ic('i-navigate')}</button></div>`;
+  addBub('ai',chatSeed());setChips(defaultChips());openSheet(el);
+  if(setup)setTimeout(startChart,400);
+}
+
+/* ── header: place and live date. No name is collected, so none is shown ── */
+function renderGreeting(){
+  const d=new Date();
+  const el=$('#hPlace'); if(el)el.textContent=T('placeV');
+  const dt=$('#hDate');
+  if(dt)dt.textContent=d.toLocaleDateString(lang==='ml'?'ml-IN':'en-IN',{weekday:'short',day:'numeric',month:'short'});
+  renderPromos();
+}
+function openLocation(){toast(T('locToast'));}
+
+/* ═══════════════════════════════════════════════════════════════
+   PROMO RAIL — banner cards in the Flipkart / BookMyShow mould:
+   one screen-width card, next one peeking, snap scrolling, dots,
+   and a slow auto-advance that only runs while Home is on screen.
+   ═══════════════════════════════════════════════════════════════ */
+function PROMOS(){
+ const soon=soonestStar(), star=soon?soon.d:nextStar(), n=daysUntil(star);
+ const list=[
+ {cls:'p-night',stars:1,tag:T('tagToday'),hot:0,gl:'i-moon',
+  t:T('promoPradT'),sub:T('promoPradS'),cta:T('promoPradC'),fn:'openChat()'},
+ {cls:'p-orange',tag:T('tagFree'),hot:1,gl:'i-sparkle',
+  t:T('promoNitT'),sub:T('promoNitS'),cta:T('promoNitC'),fn:'openChat()'},
+ {cls:'p-slate',tag:T('tagFeatured'),hot:0,gl:'i-user',
+  t:(lang==='ml'?ASTROML[0][0]:astros[0].n),sub:T('promoAstS'),cta:T('promoAstC'),fn:"openBook('astro:0',675)"},
+ {cls:'p-fest',tag:T('tagLive'),hot:0,gl:'i-parasol',
+  t:T('promoFestT'),sub:T('promoFestS'),cta:T('promoFestC'),fn:'openTemple(1)'}
+ ];
+ /* a family member's star coming up gets its own banner */
+ MEMBERS.filter(m=>!m.self&&memberNak(m)!=null).forEach(m=>{
+   const d=nextStarFor(memberNak(m)), k=daysUntil(d);
+   if(k<0||k>12)return;
+   if(soon&&soon.m.id===m.id)return;            /* already leading the rail */
+   list.splice(1,0,{
+     cls:'p-kin',tag:T('kinStarTag'),hot:0,gl:'i-star',count:k,
+     t:`${memberName(m)} · ${T(m.rel)}`,
+     sub:`${nak(memberNak(m))} ${T('onDay')} ${fmtLong(d)}`,
+     cta:T('bookPooja'),fn:`bookForMember(${m.id})`});
+ });
+ /* inside the booking window the nakshatram leads — highest intent, best slot */
+ if(starInWindow())list.unshift({
+   cls:'p-star',tag:soon?starOwner(soon.m):T('starKicker'),hot:1,gl:'i-star',count:n,
+   t:`${soon&&memberNak(soon.m)!=null?nak(memberNak(soon.m)):T('vNak').split('·')[0].trim()} · ${starLabel()}`,
+   sub:`${fmtLong(star)} · ${T('bookForStar')}`,
+   cta:T('book'),fn:"setActive('poojas')"});
+ return list;}
+let promoTimer=null;
+function renderPromos(){
+  const rail=$('#promorail');if(!rail)return;
+  const list=PROMOS();
+  rail.innerHTML=list.map(p=>`
+    <button class="promo ${p.cls}" onclick="${p.fn}">
+      ${p.stars?'<span class="stars" aria-hidden="true"></span>':''}
+      <span class="pglyph" aria-hidden="true">${ic(p.gl)}</span>
+      <span class="ptag ${p.hot?'hot':''}">${p.tag}</span>
+      ${p.count!=null?`<span class="pcount"><b>${p.count}</b><span>${T('cdDays')}</span></span>`:''}
+      <span class="pbody"><b>${p.t}</b><span>${p.sub}</span></span>
+      <span class="pcta">${p.cta}${ic('i-navigate','ic sm')}</span>
+    </button>`).join('');
+  $('#promodots').innerHTML=list.map((_,i)=>`<i class="${i?'':'on'}"></i>`).join('');
+  const step=()=>rail.firstElementChild.offsetWidth+12;
+  rail.onscroll=()=>{
+    const i=Math.round(rail.scrollLeft/step());
+    $$('#promodots i').forEach((d,j)=>d.classList.toggle('on',j===i));
+  };
+  clearInterval(promoTimer);
+  if(!REDUCED)promoTimer=setInterval(()=>{
+    if(!$('#s-home').hasAttribute('data-active'))return;
+    if($$('.sheet[data-open]').length)return;
+    const i=Math.round(rail.scrollLeft/step());
+    rail.scrollTo({left:((i+1)%list.length)*step(),behavior:'smooth'});
+  },5400);
+}
+
+/* ── BOOT ── */
+/* ═══════════════════════════════════════════════════════════════
+   NAKSHATRAM DAY
+   The star returns every 27 days. Everything downstream — the
+   banner, the Poojas tab, the reminder — reads from here.
+   The booking window is the longest lead time in the temple's
+   catalogue plus a day, which is why four days is the trigger.
+   ═══════════════════════════════════════════════════════════════ */
+const STAR_CYCLE=27, STAR_WINDOW=4;
+const midnight=d=>{const x=new Date(d);x.setHours(0,0,0,0);return x;};
+/* demo anchor: the next Rohini lands three days out, so the window is visible */
+function nextStar(n=0){
+  const d=midnight(new Date());d.setDate(d.getDate()+3+n*STAR_CYCLE);return d;
+}
+const daysUntil=d=>Math.round((midnight(d)-midnight(new Date()))/864e5);
+function starLabel(){
+  const _s=soonestStar();
+  const n=daysUntil(_s?_s.d:nextStar());
+  if(n===0)return T('starToday');
+  if(n===1)return T('starTomorrow');
+  return lang==='ml'?`${n} ${T('starDays')}`:`${T('starIn')} ${n} ${T('starDays')}`;
+}
+const fmtDate=d=>d.toLocaleDateString(lang==='ml'?'ml-IN':'en-IN',{day:'numeric',month:'short'});
+const fmtWeek=d=>d.toLocaleDateString(lang==='ml'?'ml-IN':'en-IN',{weekday:'short'});
+const fmtLong=d=>d.toLocaleDateString(lang==='ml'?'ml-IN':'en-IN',{weekday:'long',day:'numeric',month:'long'});
+const starInWindow=()=>{const s=soonestStar();return s?daysUntil(s.d)<=STAR_WINDOW:false;};
+
+/* ═══════════════════════════════════════════════════════════════
+   POOJAS TAB — the star day, the catalogue, then the bookings
+   ═══════════════════════════════════════════════════════════════ */
+const CATALOGUE=[
+ {k:'pushpanjali',amt:101,lead:0},
+ {k:'pArchana',amt:51,lead:0},
+ {k:'pNeyvilakku',amt:75,lead:1},
+ {k:'ganapathi',amt:1250,lead:3},
+];
+function renderPoojas(){
+  const box=$('#poojasBody');if(!box)return;
+  const t=byId(DEFAULT_ID), soon=soonestStar();
+  const star=soon?soon.d:nextStar(), n=daysUntil(star);
+  const whoseStar=soon?soon.m:MEMBERS[0];
+  let h=`
+   <div class="starcard">
+     <svg class="sg" aria-hidden="true"><use href="#i-star"/></svg>
+     <div class="kk">${ic('i-star')}${starOwner(whoseStar)}</div>
+     <h2>${memberNak(whoseStar)!=null?nak(memberNak(whoseStar)):T('vNak').split('·')[0].trim()}</h2>
+     <div class="when">${fmtLong(star)}</div>
+     <div class="cd">
+       <div class="box"><b>${n}</b><span>${T('cdDays')}</span></div>
+       <div class="box"><b>${fmtDate(star)}</b><span>${T('cdDate')}</span></div>
+       <div class="box"><b>${fmtWeek(star)}</b><span>${T('cdWeekday')}</span></div>
+     </div>
+     <button class="btn btn-pri btn-block" onclick="whoId=${whoseStar.id};openBook('pushpanjali',101,starDateLabel())">${ic('i-lamp','ic sm')}${T('bookForStar')}</button>
+   </div>
+   <div class="starnote">${ic('i-shield','ic sm')}<span>${T('starNote')}</span></div>
+
+   <div class="sec"><h2>${T('bookAt')} ${tName(t)}<span class="ml">${fmtLong(star)}</span></h2></div>`;
+  h+=CATALOGUE.map(c=>{
+    const locked=c.lead>n;
+    const note=c.lead===0?T('sameDay'):c.lead===1?T('needs1'):T('needs3');
+    return `<div class="pjrow ${locked?'locked':''}">
+      <span class="pi">${ic('i-lamp')}</span>
+      <span class="pm"><b>${T(c.k)}</b><span class="${locked?'warn':''}">${locked?T('windowClosed'):note}</span></span>
+      <span class="rt"><b>${money(c.amt)}</b>
+        ${locked?'':`<button class="btn btn-pri" onclick="openBook('${c.k}',${c.amt},starDateLabel())">${T('book')}</button>`}
+      </span></div>`;
+  }).join('');
+  h+=`<div class="sec"><h2>${T('yourBookings')}<span class="ml">${T('upcoming')}</span></h2></div>`;
+  h+=BOOKINGS.length?BOOKINGS.map(b=>`
+    <div class="bkrow"><span class="bi">${ic('i-lamp')}</span>
+      <span class="bm"><b>${b.k?T(b.k):b.label}${b.who?' · '+memberName(byMember(b.who)):''}</b><span>${tName(byId(b.temple))} · ${b.when}</span></span>
+      <span class="pill ${b.state==='ok'?'pill-open':'pill-def'}">${ic(b.state==='ok'?'i-check':'i-clock')}${T(b.state==='ok'?'confirmed':'pending')}</span>
+    </div>`).join('')
+   :`<div class="emptyline">${T('noPast')}</div>`;
+  box.innerHTML=h;
+}
+/* book straight into a member's star day from anywhere */
+function bookForMember(id){
+  const m=byMember(id), k=memberNak(m);
+  whoId=id;
+  openBook('pushpanjali',101,k!=null?fmtLong(nextStarFor(k)):undefined);
+}
+function starDateLabel(){const s=soonestStar();return fmtLong(s?s.d:nextStar());}
+const BOOKINGS=[
+ {k:'pushpanjali',temple:4,when:'28 Jul, 6:00 AM',state:'ok',who:1},
+ {k:'ganapathi',temple:1,when:'2 Aug',state:'wait'},
+];
+
+/* ═══════════════════════════════════════════════════════════════
+   HOME · notices from your temple (the old Feed, folded in)
+   ═══════════════════════════════════════════════════════════════ */
+function renderNotices(){
+  const el=$('#noticerail');if(!el)return;
+  el.innerHTML=articles.map((a,i)=>{
+    const m=FEEDML[i+1];
+    const title=lang==='ml'?m[0]:a.t, who=lang==='ml'?m[2]:a.who;
+    return `<button class="notice" onclick="${a.id?`openTemple(${a.id})`:'openFeed()'}">
+      <span class="nimg ${a.img}">${ic(a.gl)}${a.live?`<span class="pill pill-live badge">● ${T('tagLive')}</span>`:''}</span>
+      <span class="nb"><span class="cat">${T(CATKEY[a.cat]||'catDarshan')}</span>
+        <h3>${title}</h3>
+        <span class="who">${ic('i-user','ic sm')}${who}</span></span>
+    </button>`;
+  }).join('');
+}
+function openFeed(){
+  const el=mkSheet('feedsheet','right');
+  el.innerHTML=`<div class="sheet-bar"><button class="iconbtn" onclick="closeAll()">${ic('i-back')}</button><h2>${T('secNotices')}</h2></div>
+   <div class="sheet-scroll" id="feed"></div>`;
+  renderFeed();openSheet(el);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   ASTRO · three free tools, then the paid list
+   ═══════════════════════════════════════════════════════════════ */
+const NAKSHATRAMS=[
+ ['Ashwathi','അശ്വതി'],['Bharani','ഭരണി'],['Karthika','കാർത്തിക'],['Rohini','രോഹിണി'],
+ ['Makayiram','മകയിരം'],['Thiruvathira','തിരുവാതിര'],['Punartham','പുണർതം'],['Pooyam','പൂയം'],
+ ['Ayilyam','ആയില്യം'],['Makam','മകം'],['Pooram','പൂരം'],['Uthram','ഉത്രം'],
+ ['Atham','അത്തം'],['Chithira','ചിത്തിര'],['Chothi','ചോതി'],['Vishakham','വിശാഖം'],
+ ['Anizham','അനിഴം'],['Thrikketta','തൃക്കേട്ട'],['Moolam','മൂലം'],['Pooradam','പൂരാടം'],
+ ['Uthradam','ഉത്രാടം'],['Thiruvonam','തിരുവോണം'],['Avittam','അവിട്ടം'],['Chathayam','ചതയം'],
+ ['Pooruruttathi','പൂരുരുട്ടാതി'],['Uthrattathi','ഉത്രട്ടാതി'],['Revathi','രേവതി'],
+];
+const nak=i=>lang==='ml'?NAKSHATRAMS[i][1]:NAKSHATRAMS[i][0];
+function renderTools(){
+  const el=$('#tools');if(!el)return;
+  el.innerHTML=`
+   <button class="tool" onclick="${chartDone?"openShare('chart')":'openChat(true)'}">
+     <span class="ti">${ic('i-sparkle')}</span><b>${T('tJathakam')}</b><span>${T('tJathakamS')}</span></button>
+   <button class="tool blue" onclick="openPorutham()">
+     <span class="ti">${ic('i-heart')}</span><b>${T('tPorutham')}</b><span>${T('tPoruthamS')}</span></button>
+   <button class="tool slate" onclick="openMuhurtham()">
+     <span class="ti">${ic('i-clock')}</span><b>${T('tMuhurtham')}</b><span>${T('tMuhurthamS')}</span></button>`;
+}
+function upsellHtml(){
+  return `<div class="upsell">
+    <span class="ua">${ic('i-sparkle')}</span>
+    <span class="um"><b>${T('upsellT')}</b><span>${T('upsellS')}</span></span>
+    <button class="btn btn-pri" onclick="closeAll();setTimeout(()=>openBook('astro:0',675),240)">${T('consultNow')}</button>
+  </div>`;
+}
+let pBride=3,pGroom=13;   /* Rohini · Chithira */
+function openPorutham(){
+  const el=mkSheet('tool','right');
+  el.innerHTML=`<div class="sheet-bar"><button class="iconbtn" onclick="closeAll()">${ic('i-back')}</button><h2>${T('poruthamH')}</h2></div>
+   <div class="sheet-scroll"><div class="tsheet" id="ptBody"></div></div>`;
+  openSheet(el);renderPorutham();
+}
+function pickStar(which,i){which==='b'?pBride=i:pGroom=i;renderPorutham();}
+function renderPorutham(){
+  const el=$('#ptBody');if(!el)return;
+  const row=(which,cur)=>`<div class="starpick">`+NAKSHATRAMS.map((_,i)=>
+    `<button aria-pressed="${i===cur}" onclick="pickStar('${which}',${i})">${nak(i)}</button>`).join('')+`</div>`;
+  const score=poruthamScore(pBride,pGroom);
+  const verdict=score>=7?T('vGood'):score>=5?T('vOk'):T('vWeak');
+  el.innerHTML=`
+    <div class="lb">${T('brideStar')}</div>${row('b',pBride)}
+    <div class="lb" style="margin-top:18px">${T('groomStar')}</div>${row('g',pGroom)}
+    <div class="scorecard"><span class="stars"></span>
+      <div class="big">${score}<small>/10</small></div>
+      <div class="verdict">${verdict}</div>
+      <div class="pair">${nak(pBride)} · ${nak(pGroom)}</div>
+    </div>
+    ${PORUTHAMS.map((k,i)=>{
+      const on=(poruthamSeed(pBride,pGroom)>>i)&1;
+      return `<div class="mline"><b>${lang==='ml'?k[1]:k[0]}</b><span class="g" style="${on?'':'color:var(--muted)'}">${on?'✓':'—'}</span></div>`;
+    }).join('')}
+    <p class="sharehint" style="text-align:left;max-width:none;margin-top:14px">${T('poruthamNote')}</p>
+    ${upsellHtml()}`;
+}
+const PORUTHAMS=[['Dinam','ദിനം'],['Ganam','ഗണം'],['Mahendram','മഹേന്ദ്രം'],['Sthreedeergham','സ്ത്രീദീർഘം'],
+ ['Yoni','യോനി'],['Rasi','രാശി'],['Rasyadhipathi','രാശ്യാധിപതി'],['Vasyam','വശ്യം'],['Rajju','രജ്ജു'],['Vedha','വേധ']];
+const poruthamSeed=(a,b)=>((a*7+b*13)%1024);
+const poruthamScore=(a,b)=>{let s=0,x=poruthamSeed(a,b);for(let i=0;i<10;i++)s+=(x>>i)&1;return Math.max(3,s);};
+
+const OCCASIONS=[['oMarriage','i-heart'],['oHouse','i-home'],['oVehicle','i-navigate'],['oBusiness','i-star'],['oTravel','i-pin']];
+let mOcc=0;
+function openMuhurtham(){
+  const el=mkSheet('tool','right');
+  el.innerHTML=`<div class="sheet-bar"><button class="iconbtn" onclick="closeAll()">${ic('i-back')}</button><h2>${T('muhurthamH')}</h2></div>
+   <div class="sheet-scroll"><div class="tsheet" id="mtBody"></div></div>`;
+  openSheet(el);renderMuhurtham();
+}
+function pickOcc(i){mOcc=i;renderMuhurtham();}
+function renderMuhurtham(){
+  const el=$('#mtBody');if(!el)return;
+  const wins=[[6,'6:20 – 7:45 AM'],[13,'10:10 – 11:30 AM'],[21,'5:40 – 6:55 AM']].map(([off,time])=>{
+    const d=midnight(new Date());d.setDate(d.getDate()+off+mOcc);return [d,time];
+  });
+  el.innerHTML=`
+    <div class="lb">${T('occasion')}</div>
+    <div class="starpick">${OCCASIONS.map(([k],i)=>
+      `<button aria-pressed="${i===mOcc}" onclick="pickOcc(${i})">${T(k)}</button>`).join('')}</div>
+    <div class="lb" style="margin-top:20px">${T('goodWindows')}</div>
+    ${wins.map(([d,time])=>`<div class="mline"><b>${fmtLong(d)}</b><span class="g">${time}</span></div>`).join('')}
+    <p class="sharehint" style="text-align:left;max-width:none;margin-top:14px">${T('muhurthamNote')}</p>
+    ${upsellHtml()}`;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SHARE — a portrait picture for WhatsApp, never a link
+   ═══════════════════════════════════════════════════════════════ */
+function openShare(kind,extra){
+  const el=mkSheet('sharesheet','');
+  const t=byId(DEFAULT_ID);
+  const card=kind==='chart'
+   ? `<div class="sharecard"><span class="stars"></span>
+        <div class="sh-k">${T('shareKChart')}</div>
+        <div class="sh-t">${T('vNak')}</div>
+        <div class="sh-s">${T('vRasi')}</div>
+        <div class="sh-body">
+          <div class="sh-row"><span>${T('fNak')}</span><b>${T('vNak')}</b></div>
+          <div class="sh-row"><span>${T('fRasi')}</span><b>${T('vRasi')}</b></div>
+          <div class="sh-row"><span>${T('fDasha')}</span><b>${T('vDasha')}</b></div>
+        </div>
+        <div class="sh-foot"><span class="mk2">${ic('i-lamp','ic sm')}</span>Nithara</div>
+      </div>`
+   : `<div class="sharecard warm">
+        <div class="sh-k">${T('shareKBook')}</div>
+        <div class="sh-t">${extra&&extra.name?extra.name:T('pushpanjali')}</div>
+        <div class="sh-s">${tName(t)}</div>
+        <div class="sh-body">
+          <div class="sh-row"><span>${T('mName')}</span><b>${extra&&extra.who?extra.who:memberName(byMember(whoId))}</b></div>
+          <div class="sh-row"><span>${T('rTemple')}</span><b>${tName(t)}</b></div>
+          <div class="sh-row"><span>${T('poojaOn')}</span><b>${extra&&extra.when?extra.when:starDateLabel()}</b></div>
+          <div class="sh-row"><span>${T('refWord')}</span><b>${extra&&extra.ref?extra.ref:'NT000000'}</b></div>
+        </div>
+        <div class="sh-foot"><span class="mk2">${ic('i-lamp','ic sm')}</span>Nithara</div>
+      </div>`;
+  el.innerHTML=`<div class="sheet-bar"><button class="iconbtn" onclick="closeAll()">${ic('i-close')}</button><h2>${T(kind==='chart'?'shareChartH':'shareBookH')}</h2></div>
+   <div class="sheet-scroll"><div class="sharewrap">
+     ${card}
+     <div class="shareacts">
+       <button class="btn btn-sec" onclick="toast(T('savedToast'))">${ic('i-share','ic sm')}${T('saveImg')}</button>
+       <button class="btn btn-pri" onclick="toast(T('sharedToast'))">${T('shareWA')}</button>
+     </div>
+     <p class="sharehint">${T('shareHint')}</p>
+   </div></div>`;
+  openSheet(el);
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   PEOPLE
+   One list. The booking sheet reads from it, the profile edits it,
+   and a booking made in a new name writes back into it — so the
+   family list fills itself from ordinary use.
+   ═══════════════════════════════════════════════════════════════ */
+const RELS=['rSelf','rMother','rFather','rSpouse','rSon','rDaughter','rBrother','rSister','rOther'];
+let MEMBERS=[{id:1,name:'Kailas Nath',rel:'rSelf',nak:3,self:true}];   /* you — editable from the profile */
+let memberSeq=1, whoId=1, editingId=null, draft=null;
+
+/* the self row carries a real name once given; until then it invites one */
+const memberNamed=m=>!!(m.name&&m.name.trim());
+const memberName=m=>memberNamed(m)?m.name:(m.self?T('addYourName'):'—');
+/* whose star it is, phrased for a headline */
+const starOwner=m=>m.self&&!memberNamed(m)?T('starKicker'):`${memberName(m)} · ${T('starOf')}`;
+const memberInitial=m=>{const n=memberName(m).trim();return (n[0]||'?').toUpperCase();};
+const byMember=id=>MEMBERS.find(m=>m.id===id)||MEMBERS[0];
+function memberNak(m){
+  if(m.self&&!chartDone&&m.nak==null)return null;
+  return m.nak;
+}
+/* the star returns every 27 days; each nakshatram sits at a fixed offset */
+function nextStarFor(nakIdx){
+  const d=midnight(new Date());
+  let off=3+(((nakIdx-3)%STAR_CYCLE)+STAR_CYCLE)%STAR_CYCLE;
+  if(off>STAR_CYCLE)off-=STAR_CYCLE;
+  d.setDate(d.getDate()+off);return d;
+}
+/* whichever star lands first across the whole family */
+function soonestStar(){
+  const cand=MEMBERS.filter(m=>memberNak(m)!=null)
+    .map(m=>({m,d:nextStarFor(memberNak(m))}))
+    .sort((a,b)=>a.d-b.d);
+  return cand[0]||null;
+}
+
+/* ── the "in whose name" strip that sits on top of every booking ── */
+function whoStrip(){
+  return `<div class="whorow">
+    <div class="lb">${T('whoFor')}</div>
+    <div class="whochips">
+      ${MEMBERS.map(m=>{
+        const k=memberNak(m);
+        if(m.self&&!memberNamed(m))
+          return `<button class="whochip unnamed" onclick="openMember(${m.id},'book')">
+            ${ic('i-edit','ic sm')}<span class="wn">${T('addYourName')}<small>${k!=null?nak(k):T('nakUnset')}</small></span>
+          </button>`;
+        return `<button class="whochip" aria-pressed="${m.id===whoId}" onclick="setWho(${m.id})">
+          <span class="in">${memberInitial(m)}</span>
+          <span class="wn">${memberName(m)}<small>${k!=null?nak(k):T('nakUnset')}</small></span>
+        </button>`;}).join('')}
+      <button class="whochip add" onclick="openMember(null,'book')">${ic('i-user','ic sm')}${T('addSomeone')}</button>
+    </div>
+  </div>`;
+}
+function setWho(id){whoId=id;$$('.whochip[aria-pressed]').forEach(b=>b.setAttribute('aria-pressed','false'));
+  const el=[...$$('.whochip')].find(b=>b.getAttribute('onclick')===`setWho(${id})`);
+  el&&el.setAttribute('aria-pressed','true');
+  const row=$('#whoValue');if(row){const m=byMember(id),k=memberNak(m);
+    row.innerHTML=`${memberName(m)}${k!=null?` <span style="color:var(--muted);font-weight:600">· ${nak(k)}</span>`:''}`;}
+}
+
+/* ── add / edit a person ── */
+function openMember(id,from){
+  editingId=id;
+  const m=id?byMember(id):null;
+  draft={name:m?(m.name||''):'',rel:m?m.rel:'rMother',nak:m?(m.nak==null?3:m.nak):3,self:m?!!m.self:false};
+  const el=mkSheet('member','right');
+  el.innerHTML=`<div class="sheet-bar"><button class="iconbtn" onclick="closeMember('${from||''}')">${ic('i-back')}</button><h2>${T(draft.self?'yourDetails':(id?'editMember':'addMember'))}</h2></div>
+   <div class="sheet-scroll"><div class="mform" id="mfBody"></div></div>
+   <div class="dcta">
+     ${id&&!draft.self?`<button class="btn btn-sec" onclick="removeMember(${id},'${from||''}')">${T('mRemove')}</button>`:''}
+     <button class="btn btn-pri" style="flex:1" onclick="saveMember('${from||''}')">${T('mSave')}</button>
+   </div>`;
+  renderMemberForm();openSheet(el);
+  setTimeout(()=>$('#mfName')?.focus(),240);
+}
+function renderMemberForm(){
+  const el=$('#mfBody');if(!el)return;
+  el.innerHTML=`
+    <div class="lb">${T('mName')}</div>
+    <div class="mfield">${ic('i-user')}<input id="mfName" value="${(draft.name||'').replace(/"/g,'&quot;')}"
+      placeholder="${T('mNamePh')}" oninput="draft.name=this.value" autocomplete="off"></div>
+    ${draft.self?`<p class="sharehint" style="text-align:left;max-width:none;margin-top:10px">${T('yourNameWhy')}</p>`
+      :`<div class="lb">${T('mRelation')}</div>
+    <div class="relgrid">${RELS.map(r=>
+      `<button aria-pressed="${r===draft.rel}" onclick="draft.rel='${r}';renderMemberForm()">${T(r)}</button>`).join('')}</div>`}
+    <div class="lb">${T('mNak')}</div>
+    <div class="starpick">${NAKSHATRAMS.map((_,i)=>
+      `<button aria-pressed="${i===draft.nak}" onclick="draft.nak=${i};renderMemberForm()">${nak(i)}</button>`).join('')}</div>`;
+}
+function saveMember(from){
+  const nm=(draft.name||'').trim();
+  if(!nm){toast(T('needName'));return;}
+  if(editingId){
+    const m=byMember(editingId);m.name=nm;if(!m.self)m.rel=draft.rel;m.nak=draft.nak;
+    toast(T('memberSaved'));
+  }else{
+    const m={id:++memberSeq,name:nm,rel:draft.rel,nak:draft.nak,self:false};
+    MEMBERS.push(m);whoId=m.id;toast(T('memberAdded'));
+  }
+  closeMember(from);
+}
+function removeMember(id,from){
+  MEMBERS=MEMBERS.filter(m=>m.id!==id);
+  if(whoId===id)whoId=MEMBERS[0].id;
+  toast(T('memberRemoved'));closeMember(from);
+}
+function closeMember(from){
+  const el=$('.member',$('#phone'));el&&el.removeAttribute('data-open');
+  renderProfile();renderPoojas();renderPromos();
+  if(from==='book'){
+    const rv=$('.review',$('#phone'));
+    if(rv&&rv.hasAttribute('data-open')){reopenBooking();return;}
+  }
+  if(from!=='book')closeAll();
+}
+/* the review sheet is rebuilt so the new person is selected on it */
+let LAST_BOOK_ARGS=null;
+function reopenBooking(){if(LAST_BOOK_ARGS)openBook(...LAST_BOOK_ARGS);}
+
+/* ── the family card on the profile ── */
+function familyCard(){
+  return `<div class="pcard"><h2>${T('family')}</h2>
+    ${MEMBERS.map(m=>{
+      const k=memberNak(m), d=k!=null?nextStarFor(k):null, n=d?daysUntil(d):null;
+      return `<div class="mbrow ${m.self?'self':''}">
+        <span class="mav">${memberInitial(m)}</span>
+        <span class="mm"><b class="${m.self&&!memberNamed(m)?'unset':''}">${memberName(m)}</b><span>${T(m.rel)}${k!=null?' · '+nak(k):' · '+T('nakUnset')}</span></span>
+        ${d?`<span class="mnext ${n<=STAR_WINDOW?'soon':''}"><b>${n===0?T('starToday'):fmtDate(d)}</b><span>${T('nextStar')}</span></span>`:''}
+        <button class="medit" onclick="openMember(${m.id})" aria-label="${T('editMember')}">${ic('i-edit','ic sm')}</button>
+      </div>`;}).join('')}
+    <button class="addmember" onclick="openMember(null)">${ic('i-user','ic sm')}${T('addMember')}</button>
+    <p class="sharehint" style="text-align:left;max-width:none;margin-top:12px">${T('autoNote')}</p>
+  </div>`;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   TEMPLE BOARD
+   Everyone attached to the same temple, ordered by darshan.
+   Your household rows are marked so the list reads as belonging
+   rather than ranking.
+   ═══════════════════════════════════════════════════════════════ */
+const DEVOTEES=[
+ {n:['Sethumadhavan Nair','സേതുമാധവൻ നായർ'],d:26,pj:4,f:2},
+ {n:['Radhamani Amma','രാധാമണി അമ്മ'],d:24,pj:6,f:1},
+ {n:['Unnikrishnan Menon','ഉണ്ണികൃഷ്ണൻ മേനോൻ'],d:22,pj:2,f:2},
+ {n:['Bhavani Teacher','ഭവാനി ടീച്ചർ'],d:19,pj:3,f:1},
+ {n:['Ramachandran','രാമചന്ദ്രൻ'],d:17,pj:1,f:1},
+ {n:['Sarojini','സരോജിനി'],d:14,pj:2,f:0},
+ {n:['Vasudevan Namboothiri','വാസുദേവൻ നമ്പൂതിരി'],d:12,pj:5,f:1},
+ {n:['Leela Krishnan','ലീല കൃഷ്ണൻ'],d:11,pj:1,f:1},
+];
+const PT_DARSHAN=10, PT_POOJA=25, PT_FEST=50;
+const pts=r=>r.d*PT_DARSHAN+r.pj*PT_POOJA+r.f*PT_FEST;
+let boardSeg='month', boardFull=false;
+
+function boardRows(){
+  const mul=boardSeg==='year'?7:1;
+  const others=DEVOTEES.map((x,i)=>({
+    key:'d'+i, name:lang==='ml'?x.n[1]:x.n[0], sub:null,
+    d:x.d*mul, pj:x.pj*mul, f:x.f*mul, you:false, kin:false}));
+  /* you, and anyone in your family list, sit in the same board */
+  const mine=MEMBERS.map((m,i)=>({
+    key:'m'+m.id, name:m.self&&!memberNamed(m)?T('youWord'):memberName(m),
+    sub:m.self?T('youWord'):T('household'),
+    d:(m.self?18:9-i)*mul, pj:(m.self?4:1)*mul, f:(m.self?1:1)*mul,
+    you:!!m.self, kin:!m.self}));
+  return others.concat(mine).map(r=>({...r,p:pts(r)})).sort((a,b)=>b.p-a.p);
+}
+function setBoardSeg(v){boardSeg=v;renderProfile();}
+function toggleBoard(){boardFull=!boardFull;renderProfile();}
+
+function boardCard(){
+  const rows=boardRows();
+  const meIdx=rows.findIndex(r=>r.you), me=rows[meIdx];
+  const shown=boardFull?rows:rows.slice(0,6);
+  const list=shown.some(r=>r.you)?shown:shown.concat([Object.assign({gap:true},me)]);
+  return `<div class="pcard"><h2>${T('boardT')}</h2>
+    <div class="boardtop">
+      <span class="bi2">${ic('i-temple')}</span>
+      <span class="bm2"><b>${tName(byId(DEFAULT_ID))}</b>
+        <span>${T('boardStanding')} · ${meIdx+1} ${T('boardOf')} ${rows.length+120} ${T('boardDevotees')}</span></span>
+      <span class="bpts"><b>${me.p}</b><span>${T('boardPts')}</span></span>
+    </div>
+    <div class="bsegs">
+      <button aria-pressed="${boardSeg==='month'}" onclick="setBoardSeg('month')">${T('segMonth')}</button>
+      <button aria-pressed="${boardSeg==='year'}" onclick="setBoardSeg('year')">${T('segYear')}</button>
+    </div>
+    <div class="btable">
+      <div class="bhead"><span style="width:22px">${T('boardRank')}</span><span style="width:30px"></span>
+        <span class="hn">${T('boardName')}</span><span class="hd">${T('boardDarshan')}</span><span class="hp">${T('boardPts')}</span></div>
+      ${list.map((r,i)=>{
+        const rank=rows.indexOf(rows.find(x=>x.key===r.key))+1;
+        return `<div class="brow ${r.you?'you':r.kin?'kin':''} ${rank<4?'top'+rank:''}">
+          <span class="rk">${rank}</span>
+          <span class="bav">${(r.name.trim()[0]||'?').toUpperCase()}</span>
+          <span class="bn" title="${r.name}">${r.name}${r.sub?`<small>${r.sub}</small>`:''}</span>
+          <span class="bd">${r.d}</span>
+          <span class="bp">${r.p}</span>
+        </div>`;}).join('')}
+    </div>
+    <button class="boardmore" onclick="toggleBoard()">${boardFull?T('boardMoreT'):T('boardMore')}</button>
+    <div class="boardkey">
+      <span><b>+${PT_DARSHAN}</b> ${T('keyDarshan')}</span>
+      <span><b>+${PT_POOJA}</b> ${T('keyPooja')}</span>
+      <span><b>+${PT_FEST}</b> ${T('keyFestival')}</span>
+    </div>
+    <p class="sharehint" style="text-align:left;max-width:none;margin-top:11px">${T('boardNote')}</p>
+  </div>`;
+}
+
+/* one family member is present from the start so the family surfaces have
+   something to show; she is editable and removable like any other */
+(function seedFamily(){
+  let pick=null;
+  for(let i=0;i<STAR_CYCLE;i++){
+    const d=nextStarFor(i), n=daysUntil(d);
+    if(d.getDay()===5&&n>=2&&(!pick||n<pick.n))pick={i:i,n:n};
+  }
+  MEMBERS.push({id:++memberSeq,name:'Radhamani',rel:'rMother',nak:pick?pick.i:11,self:false});
+})();
+
+/* ── BOOT ── */
+applyLang();          // paints every string, then renders every screen
+renderOnboard();
+syncOverlay();        // onboarding is up, so the tab bar starts hidden
+</script>
+</body>
+</html>
