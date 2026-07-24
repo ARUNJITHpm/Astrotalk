@@ -1,7 +1,11 @@
-"""Generate Tara project overview PDF -run once, outputs tara_project_overview.pdf."""
+"""Generate Tara project overview PDF -run once, outputs docs/tara_project_overview.pdf."""
+
+from pathlib import Path
 
 from fpdf import FPDF
 from fpdf.enums import XPos, YPos
+
+ROOT = Path(__file__).resolve().parents[1]
 
 ACCENT = (196, 90, 59)   # terracotta
 DARK   = (44, 38, 34)    # sidebar dark
@@ -478,8 +482,8 @@ def build() -> None:
     )
 
     # ── Output ──────────────────────────────────────────────────────────────────
-    out = "tara_project_overview.pdf"
-    pdf.output(out)
+    out = ROOT / "docs" / "tara_project_overview.pdf"
+    pdf.output(str(out))
     print(f"PDF written -> {out}  ({len(guardrails)} guardrails, 9 sections)")
 
 

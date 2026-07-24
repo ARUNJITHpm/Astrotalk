@@ -18,9 +18,10 @@ into strongly-bounded modules that talk only through public service interfaces
 and the shared event bus — never by reaching into each other's files or tables.
 
 ## Read first
-- [`Tara-Project-Documentation.md`](./Tara-Project-Documentation.md) — full human spec.
-- [`AGENTS.md`](./AGENTS.md) — rules for AI agents working in this repo.
-- [`GUARDRAILS.md`](./GUARDRAILS.md) — absolute, non-negotiable rules.
+- [`FILE_STRUCTURE.md`](./FILE_STRUCTURE.md) — full repo layout with a brief note on what each part does.
+- [`docs/Tara-Project-Documentation.md`](./docs/Tara-Project-Documentation.md) — full human spec.
+- [`docs/AGENTS.md`](./docs/AGENTS.md) — rules for AI agents working in this repo.
+- [`docs/GUARDRAILS.md`](./docs/GUARDRAILS.md) — absolute, non-negotiable rules.
 
 ## Layout
 ```
@@ -32,8 +33,11 @@ app/
     identity/  astrology_engine/  knowledge/  tone_safety/
     chat/  content/  whatsapp/  community/  commerce/
     notifications/  admin/
-tests/                     pytest suite
+tests/                     pytest suite, one subfolder per module
+docs/                       specs, guardrails, growth plans, pitch decks, PDFs
+scripts/                    migrations, PDF builders, WhatsApp Cloud API utils
 ```
+See [`FILE_STRUCTURE.md`](./FILE_STRUCTURE.md) for the full tree.
 Each module exposes a single public `service.py` (the only cross-module surface)
 and keeps internals in `router.py`, `models.py`, `schemas.py`.
 

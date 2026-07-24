@@ -1,4 +1,4 @@
-"""Build Tara_Pitch_Deck_Malayalam.pdf -- the startup pitch + marketing deck for
+"""Build docs/Tara_Pitch_Deck_Malayalam.pdf -- the startup pitch + marketing deck for
 Tara, in Malayalam, for a Malayali audience (investors, temple/astrologer
 partners, the founder's own brand setup). Mirrors build_pitch_deck_en.py.
 
@@ -19,7 +19,7 @@ from fpdf import FPDF
 
 ROOT = Path(__file__).resolve().parents[1]
 FONT = ROOT / "assets" / "fonts" / "NotoSansMalayalam-Regular.ttf"
-OUT = ROOT / "Tara_Pitch_Deck_Malayalam.pdf"
+OUT = ROOT / "docs" / "Tara_Pitch_Deck_Malayalam.pdf"
 
 INDIGO = (11, 15, 42)
 GOLD = (232, 182, 76)

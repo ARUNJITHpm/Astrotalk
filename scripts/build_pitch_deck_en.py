@@ -1,10 +1,10 @@
-"""Build Tara_Pitch_Deck_English.pdf -- a startup pitch + marketing deck for
+"""Build docs/Tara_Pitch_Deck_English.pdf -- a startup pitch + marketing deck for
 Tara, the Malayalam-first AI astrology companion. Non-technical, for investors,
 partners and the founder's own brand/marketing setup. Re-run after edits:
 
     .venv312/Scripts/python scripts/build_pitch_deck_en.py
 
-Outputs Tara_Pitch_Deck_English.pdf in the project root.
+Outputs docs/Tara_Pitch_Deck_English.pdf.
 
 Core PDF fonts are latin-1 only, so a few Malayalam brand words appear
 transliterated here; the Malayalam edition (build_pitch_deck_ml.py) carries the
@@ -18,7 +18,7 @@ from fpdf import FPDF
 from fpdf.enums import XPos, YPos
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / "Tara_Pitch_Deck_English.pdf"
+OUT = ROOT / "docs" / "Tara_Pitch_Deck_English.pdf"
 
 # Brand palette (shared with the app + dev guide)
 INDIGO = (11, 15, 42)       # deep night sky

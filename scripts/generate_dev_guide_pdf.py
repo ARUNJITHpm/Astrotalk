@@ -1,17 +1,20 @@
-"""Generate Tara_Developer_Guide.pdf  -  an as-built explainer of how the codebase
-actually works today (not the original aspirational plan). Run once:
+"""Generate docs/Tara_Developer_Guide.pdf  -  an as-built explainer of how the
+codebase actually works today (not the original aspirational plan). Run once:
 
-    vinimon/Scripts/python generate_dev_guide_pdf.py
+    python scripts/generate_dev_guide_pdf.py
 
-Outputs Tara_Developer_Guide.pdf in the project root.
+Outputs docs/Tara_Developer_Guide.pdf.
 
 NOTE: core PDF fonts are latin-1 only, so Malayalam script cannot appear here;
 Malayalam terms are shown transliterated.
 """
 
 import math
+from pathlib import Path
 
 from fpdf import FPDF
+
+ROOT = Path(__file__).resolve().parents[1]
 from fpdf.enums import XPos, YPos
 
 ACCENT = (196, 90, 59)     # terracotta
@@ -995,8 +998,9 @@ def build() -> None:
         "chunks, deterministic prashnam/porutham engines, and a working admin dashboard."
     )
 
-    pdf.output("Tara_Developer_Guide.pdf")
-    print("Wrote Tara_Developer_Guide.pdf")
+    out = ROOT / "docs" / "Tara_Developer_Guide.pdf"
+    pdf.output(str(out))
+    print(f"Wrote {out}")
 
 
 if __name__ == "__main__":

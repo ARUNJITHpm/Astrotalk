@@ -1,17 +1,17 @@
-"""Generate Tara_Content_Review.pdf - a part-by-part pack of EVERY piece of
+"""Generate docs/Tara_Content_Review.pdf - a part-by-part pack of EVERY piece of
 astrological/devotional content in the app, for a qualified Kerala astrologer
 (and, for Part 7, a clinician) to actually read and sign off on. Run once:
 
-    vinimon/Scripts/python generate_content_review_pdf.py
+    python scripts/generate_content_review_pdf.py
 
-Outputs Tara_Content_Review.pdf in the project root.
+Outputs docs/Tara_Content_Review.pdf.
 
 Unlike generate_dev_guide_pdf.py, this document renders Malayalam script
 natively (Windows' bundled Nirmala UI font + HarfBuzz shaping via uharfbuzz),
 because the primary reader is expected to read Malayalam.
 
 Content is pulled LIVE from the actual data modules (not retyped), so this
-document always matches what ships. See NEEDS_ASTROLOGER.md for the running
+document always matches what ships. See docs/NEEDS_ASTROLOGER.md for the running
 status note: every `reviewed` flag was bulk-set to True to unblock other work
 -- none of this has actually been checked yet.
 """
@@ -19,7 +19,8 @@ status note: every `reviewed` flag was bulk-set to True to unblock other work
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent))
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
 
 from fpdf import FPDF
 from fpdf.enums import XPos, YPos
@@ -474,8 +475,9 @@ def build() -> None:
     )
     pdf.signoff("Part 8 - Unverified folk terms")
 
-    pdf.output("Tara_Content_Review.pdf")
-    print("Wrote Tara_Content_Review.pdf")
+    out = ROOT / "docs" / "Tara_Content_Review.pdf"
+    pdf.output(str(out))
+    print(f"Wrote {out}")
 
 
 if __name__ == "__main__":
