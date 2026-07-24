@@ -86,55 +86,35 @@ and openTemple()'s check-in button.
 Migration for members + check-ins. Tests in tests/identity/.
 ```
 
-## Part 3 — Astrology surface + shared conversational chart-setup
+## Part 3 — Astrology surface (chat just reuses /chat/message)
 ```
-Read the Astro tab (renderTools, openPorutham, openMuhurtham), the chat chart-
-setup flow (chartQ, chartAns, chartDone), renderProfile()'s Jathakam (rasiHtml,
-dasha), AND app/modules/whatsapp/onboarding.py (the FSM) + app/modules/chat/
-service.py (the single brain that already grounds on chart-if-present).
+Read the Astro tab (renderTools, openPorutham, openMuhurtham) and
+renderProfile()'s Jathakam (rasiHtml, dasha).
 
---- A. Expose astrology services that already exist ---
-In app/modules/astrology_engine/router.py:
-- GET /astrology/today?nak= — today-for-nakshatram guidance (tithi + one-line
-  reading). Guidance-only per GUARDRAILS.
-- GET /astrology/porutham?bride=&groom= — nakshatram compatibility (engine
-  already computes porutham; wrap it).
-- GET /astrology/muhurtham?date=&purpose= — auspicious windows.
+--- A. Astrology tool endpoints (astrology_engine) ---
+- GET /astrology/today?nak= — today's panchangam, flagged when it is that
+  nakshatram's day. Guidance-only per GUARDRAILS (facts + a light note).
+- GET /astrology/porutham?bride=&groom= — the ten Kerala poruthams from two
+  nakshatram indices (each star's rasi = the sign at its midpoint; the engine's
+  compute_porutham does the grading). Facts only.
+- GET /astrology/muhurtham?date=&purpose= — auspicious-window guidance from the
+  day's nalla neram (Abhijit muhurta).
 
---- B. ONE brain, ONE conversational collector (do NOT build a third path) ---
-Architecture rule: Nithara chat, WhatsApp, and the website form must all share
-the SAME chat brain (chat/service.py) and the SAME chart-collection FSM. Today
-that FSM lives inside whatsapp/onboarding.py keyed by phone (WASession). It must
-become channel-agnostic.
+--- B. Chat: reuse the SAME route, no new machinery ---
+IMPORTANT (design decision): the Nithara app chat calls the existing
+POST /chat/message directly, synchronously. The WhatsApp module's extra
+machinery (WASession FSM, async send, egress-window background retry) exists
+ONLY to work around the WhatsApp Cloud API's send-timeout — the frontend has no
+such constraint. So DO NOT extract or rebuild the onboarding FSM. The one brain
+in chat/service.py already grounds answers on the chart when one exists; birth
+details are set via the profile form (recompute-chart). Same route, that's it.
 
-1. EXTRACT the onboarding FSM out of app/modules/whatsapp/ into a shared,
-   channel-agnostic module (app/modules/chat/onboarding.py, or identity/). Keep
-   its parsers (parse_dob, parse_time), step prompts (collect_name → collect_dob
-   → collect_time → collect_place), and the final IdentityService.create_user()
-   call. Key the FSM state by user_id / anon-session token instead of phone.
-2. REFACTOR whatsapp/ to call the extracted collector (phone is just one key
-   type). Behavior and the existing whatsapp tests must not change.
-3. In POST /chat/message, apply the runtime rule:
-     - load chart (identity.get_chart) as service.py already does;
-     - if a chart EXISTS -> answer grounded in it (unchanged);
-     - if NO chart AND the message is a personal/chart question -> enter the
-       shared FSM (ask DOB -> time -> place), save via create_user, then answer
-       the ORIGINAL question. This is exactly the WhatsApp behavior, in-app.
-   The website profile form remains a non-conversational way to set the same
-   details -> same create_user -> same chart. No separate logic.
-4. DELETE the prototype's scripted chartQ/chartAns/replies in the frontend
-   (Part 8); the in-app "Set up my birth chart" flow becomes real FSM turns over
-   POST /chat/message. The profile's chartDone boolean becomes real chart state.
+--- C. Chart shape: derive on the frontend, no ChartOut change ---
+The natal chart already embeds `planets` (each with rasi + whole-sign house) and
+a `dasha` timeline. The profile's rasi grid and dasha bar are derived on the
+frontend from that existing JSON — no backend restructure.
 
---- C. Extend the chart shape for the profile UI ---
-- Extend ChartOut with rasi_grid[12]{sign, planets[]} and
-  dasha{current, pct_elapsed, from, to} so the profile rasi grid + dasha bar
-  render from real data.
-
-Tests: tests/astrology_engine/ (porutham/muhurtham/today routes);
-tests/chat/ (the FSM: no-chart question triggers collection, saves, then answers;
-existing-chart question skips collection); tests/whatsapp/ (unchanged behavior
-after the extraction); tests/identity/ (chart shape).
+Tests: tests/astrology_engine/ (porutham/today/muhurtham routes + bad-index).
 ```
 
 ## Part 4 — Feed, promos, and nakshatram reminders (FCM)

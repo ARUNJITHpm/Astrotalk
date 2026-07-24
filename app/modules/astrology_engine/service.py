@@ -68,6 +68,57 @@ class AstrologyEngineService:
         """Panchangam for the day: nakshatram, nalla neram, tithi."""
         return await self._client.panchangam(day or date.today())
 
+    def porutham_by_nakshatra(self, bride_nak: int, groom_nak: int) -> dict:
+        """The ten poruthams from two nakshatrams alone. Each nakshatram's rasi
+        is taken as the sign holding its midpoint — the standard simplification
+        when only the stars (not full charts) are known."""
+        if not (0 <= bride_nak <= 26 and 0 <= groom_nak <= 26):
+            raise ValueError("nakshatram index out of range")
+        from app.modules.astrology_engine.porutham import Star, compute_porutham
+
+        span = 360.0 / 27.0
+
+        def _star(nak: int, sex: str) -> Star:
+            rasi = int((nak * span + span / 2) // 30) % 12
+            return Star(nakshatra=nak, rasi=rasi, sex=sex)
+
+        return compute_porutham(_star(bride_nak, "female"), _star(groom_nak, "male"))
+
+    async def today_for_nakshatram(
+        self, nak_index: int | None = None, day: date | None = None
+    ) -> dict:
+        """Today's panchangam, flagged when it is a given nakshatram's day."""
+        panchangam = await self.get_panchangam(day)
+        is_star_day = (
+            nak_index is not None
+            and self._panchangam_nak_index(panchangam) == nak_index
+        )
+        prefix = "Your nakshatram falls today. " if is_star_day else ""
+        return {
+            "date": panchangam["date"],
+            "tithi": panchangam["tithi"],
+            "nakshatram": panchangam["nakshatram"],
+            "nalla_neram": panchangam["nalla_neram"],
+            "is_star_day": is_star_day,
+            "note": f"{prefix}Tithi {panchangam['tithi']}. "
+            f"A reliable auspicious window is around {panchangam['nalla_neram']}.",
+        }
+
+    async def muhurtham(self, day: date | None = None, purpose: str = "") -> dict:
+        """Auspicious-window guidance for a date. Uses the day's nalla neram
+        (Abhijit muhurta) — a dependable default without a specific location."""
+        panchangam = await self.get_panchangam(day)
+        for_what = f" for {purpose}" if purpose else ""
+        return {
+            "date": panchangam["date"],
+            "tithi": panchangam["tithi"],
+            "nakshatram": panchangam["nakshatram"],
+            "nalla_neram": panchangam["nalla_neram"],
+            "purpose": purpose,
+            "note": f"On {panchangam['date']} the Abhijit muhurta{for_what} is "
+            f"around {panchangam['nalla_neram']} (tithi {panchangam['tithi']}).",
+        }
+
     @staticmethod
     def _panchangam_nak_index(panchangam: dict) -> int:
         """The day's nakshatra index, from the real field or the name lookup."""

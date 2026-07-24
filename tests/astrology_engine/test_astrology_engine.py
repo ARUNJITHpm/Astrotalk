@@ -128,3 +128,47 @@ async def test_nakshatram_next_endpoint_sorted_soonest_first(client):
     assert [r["days_until"] for r in body] == sorted(r["days_until"] for r in body)
     for r in body:
         assert r["nakshatram"] and r["days_until"] >= 0
+
+
+# ---- astrology tools: porutham, today, muhurtham (Part 3) ----
+
+
+def test_porutham_by_nakshatra_scores_and_echoes():
+    svc = AstrologyEngineService()
+    result = svc.porutham_by_nakshatra(3, 13)  # Rohini × Chithira
+    assert 0.0 <= result["score"] <= result["max_score"] == 10.0
+    assert len(result["poruthams"]) == 10
+    assert result["female"]["nakshatram"] and result["male"]["rasi"]
+    assert isinstance(result["rajju_dosha"], bool)
+
+
+def test_porutham_rejects_bad_index():
+    with pytest.raises(ValueError):
+        AstrologyEngineService().porutham_by_nakshatra(3, 30)
+
+
+async def test_porutham_endpoint(client):
+    async with client:
+        resp = await client.get("/astrology/porutham", params={"bride": 3, "groom": 13})
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["max_score"] == 10.0
+
+
+async def test_today_flags_the_star_day(client):
+    svc = AstrologyEngineService()
+    today_idx = svc._panchangam_nak_index(await svc.get_panchangam())
+    async with client:
+        star = await client.get("/astrology/today", params={"nak": today_idx})
+        other = await client.get("/astrology/today", params={"nak": (today_idx + 1) % 27})
+    assert star.json()["is_star_day"] is True
+    assert other.json()["is_star_day"] is False
+    assert star.json()["note"] and star.json()["nalla_neram"]
+
+
+async def test_muhurtham_endpoint(client):
+    async with client:
+        resp = await client.get("/astrology/muhurtham", params={"purpose": "travel"})
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["purpose"] == "travel" and "travel" in body["note"]
+    assert body["nalla_neram"] in body["note"]

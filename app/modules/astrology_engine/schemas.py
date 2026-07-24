@@ -19,6 +19,48 @@ class NakshatramDayOut(BaseModel):
     days_until: int
 
 
+class PoruthamSide(BaseModel):
+    name: str
+    nakshatram: str
+    rasi: str
+
+
+class PoruthamOut(BaseModel):
+    """The ten Kerala poruthams for a (bride, groom) nakshatram pair — facts
+    only; the 'should they marry' framing is the chat persona's job."""
+
+    female: PoruthamSide
+    male: PoruthamSide
+    poruthams: dict[str, Any]
+    score: float
+    max_score: float
+    rajju_dosha: bool
+    favourable: list[str]
+    unfavourable: list[str]
+
+
+class TodayOut(BaseModel):
+    """Today's panchangam, flagged for one nakshatram (the Astro tab header)."""
+
+    date: str
+    tithi: str
+    nakshatram: str
+    nalla_neram: str
+    is_star_day: bool
+    note: str
+
+
+class MuhurthamOut(BaseModel):
+    """Auspicious-window guidance for a date + purpose (guidance only)."""
+
+    date: str
+    tithi: str
+    nakshatram: str
+    nalla_neram: str
+    purpose: str
+    note: str
+
+
 class NatalChartOut(BaseModel):
     system: str
     ayanamsa: str
