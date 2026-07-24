@@ -3,6 +3,21 @@ import { initReactI18next, useTranslation } from 'react-i18next'
 import en from './en.json'
 import ml from './ml.json'
 
+// Section headers the prototype kept in its separate SEC{} object (not STR{}),
+// added here so both locales resolve instead of falling back to English.
+const EXTRA_EN = {
+  secTempleHead: 'Your temple',
+  secNearbyHead: 'Nearby temples',
+  secMapHead: 'On the map',
+  secPoojasToday: 'Poojas today',
+}
+const EXTRA_ML = {
+  secTempleHead: 'നിങ്ങളുടെ ക്ഷേത്രം',
+  secNearbyHead: 'അടുത്തുള്ള ക്ഷേത്രങ്ങൾ',
+  secMapHead: 'ഭൂപടത്തിൽ',
+  secPoojasToday: 'ഇന്നത്തെ പൂജകൾ',
+}
+
 // The prototype's STR{} (334 bilingual keys) maps 1:1 to i18next resources.
 // T() = current language, T2() = the OTHER language (the small secondary line
 // under a heading) — exactly the prototype's T/T2 pair.
@@ -17,7 +32,10 @@ const initial = ((): Lang => {
 })()
 
 i18n.use(initReactI18next).init({
-  resources: { en: { translation: en }, ml: { translation: ml } },
+  resources: {
+    en: { translation: { ...en, ...EXTRA_EN } },
+    ml: { translation: { ...ml, ...EXTRA_ML } },
+  },
   lng: initial,
   fallbackLng: 'en',
   interpolation: { escapeValue: false },
