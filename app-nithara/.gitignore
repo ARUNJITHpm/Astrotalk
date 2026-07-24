@@ -1,0 +1,17 @@
+node_modules
+dist
+dist-ssr
+*.local
+.env
+.env.*
+!.env.example
+
+# build / tooling
+.vite
+coverage
+
+# Capacitor native projects (added in Part 9)
+/android
+/ios
+
+.DS_Store
