@@ -27,6 +27,17 @@ const EXTRA_EN = {
   bookPendingNote: 'Awaiting payment. It is confirmed once payment completes.',
   dateTbc: 'To be confirmed',
   loadFailed: 'Couldn’t load that — pull to retry.',
+  // The prototype's copy named a star the user never gave ("…suits Rohini").
+  nitharaBlurb:
+    'Your Malayalam astrology companion. Ask about today’s panchangam, what a tithi means, or which temple suits your nakshatram.',
+  chartComingSoon: 'Full jathakam is coming. For now, set your nakshatram to personalise the app.',
+  setYourStar: 'Set your nakshatram',
+  isStarDay: 'Your nakshatram falls today',
+  msFirstTemple: 'First darshan',
+  msTenTemples: 'Ten temples',
+  msFirstPooja: 'First pooja',
+  msWeekStreak: 'A week in a row',
+  msFiveDistricts: 'Five districts',
 }
 const EXTRA_ML = {
   secTempleHead: 'നിങ്ങളുടെ ക്ഷേത്രം',
@@ -50,6 +61,16 @@ const EXTRA_ML = {
   bookPendingNote: 'പണമടയ്ക്കൽ കാത്തിരിക്കുന്നു. പൂർത്തിയായാൽ സ്ഥിരീകരിക്കും.',
   dateTbc: 'തീയതി സ്ഥിരീകരിക്കാനുണ്ട്',
   loadFailed: 'ലോഡ് ചെയ്യാനായില്ല — വീണ്ടും ശ്രമിക്കൂ.',
+  nitharaBlurb:
+    'നിങ്ങളുടെ മലയാളം ജ്യോതിഷ കൂട്ടുകാരി. ഇന്നത്തെ പഞ്ചാംഗം, തിഥിയുടെ അർത്ഥം, നിങ്ങളുടെ നക്ഷത്രത്തിന് ചേരുന്ന ക്ഷേത്രം — എന്തും ചോദിക്കാം.',
+  chartComingSoon: 'പൂർണ ജാതകം ഉടൻ വരുന്നു. തൽക്കാലം നക്ഷത്രം ചേർത്ത് ആപ്പ് വ്യക്തിഗതമാക്കൂ.',
+  setYourStar: 'നക്ഷത്രം ചേർക്കൂ',
+  isStarDay: 'ഇന്ന് നിങ്ങളുടെ നക്ഷത്രമാണ്',
+  msFirstTemple: 'ആദ്യ ദർശനം',
+  msTenTemples: 'പത്ത് ക്ഷേത്രങ്ങൾ',
+  msFirstPooja: 'ആദ്യ പൂജ',
+  msWeekStreak: 'തുടർച്ചയായി ഒരാഴ്ച',
+  msFiveDistricts: 'അഞ്ച് ജില്ലകൾ',
 }
 
 // The prototype's STR{} (334 bilingual keys) maps 1:1 to i18next resources.
