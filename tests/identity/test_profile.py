@@ -162,6 +162,63 @@ async def test_milestones_track_real_activity(session):
 
 
 @pytest.mark.asyncio
+async def test_anon_session_reusable_and_authorizes(session):
+    main_app.dependency_overrides[get_session] = lambda: session
+    try:
+        async with _client() as client:
+            r1 = await client.post("/identity/anon", json={})
+            assert r1.status_code == 200, r1.text
+            first = r1.json()
+            assert first["token"] and first["anon_id"]
+
+            # Returning the server-minted id resumes the same account.
+            again = await client.post("/identity/anon", json={"anon_id": first["anon_id"]})
+            assert again.json()["user"]["id"] == first["user"]["id"]
+
+            # A fresh call with no id is a different account.
+            other = await client.post("/identity/anon", json={})
+            assert other.json()["user"]["id"] != first["user"]["id"]
+
+            # The anon token authorizes user-scoped endpoints (lazy self member).
+            auth = {"Authorization": f"Bearer {first['token']}"}
+            members = await client.get("/identity/me/members", headers=auth)
+            assert members.status_code == 200 and members.json()[0]["self"] is True
+    finally:
+        main_app.dependency_overrides.pop(get_session, None)
+
+
+@pytest.mark.asyncio
+async def test_anon_key_cannot_escalate_or_impersonate(session):
+    """Regression: the anon key must never be usable as a phone number.
+
+    A client-supplied key once let a caller mint an ADMIN session (key = the
+    admin's number) or resolve to a REAL user's row and read their chart
+    (key = that person's number). The key is now server-minted and digit-free.
+    """
+    from app.platform.config import get_settings, is_admin_phone
+
+    admin_number = get_settings().admin_phones.split(",")[0].strip()
+
+    main_app.dependency_overrides[get_session] = lambda: session
+    try:
+        async with _client() as client:
+            # Attempts to inject the admin's number (or any number) are ignored:
+            # a malformed id mints a fresh, digit-free anonymous account.
+            for attempt in (admin_number, f"91{admin_number}", "", "a" * 64):
+                resp = await client.post("/identity/anon", json={"anon_id": attempt})
+                assert resp.status_code == 200, resp.text
+                body = resp.json()
+                assert body["is_admin"] is False
+                phone = body["user"]["phone"]
+                assert phone.startswith("anon-")
+                # No digit can be extracted → cannot match an admin or a user.
+                assert not any(ch.isdigit() for ch in phone), phone
+                assert is_admin_phone(phone) is False
+    finally:
+        main_app.dependency_overrides.pop(get_session, None)
+
+
+@pytest.mark.asyncio
 async def test_members_scoped_to_caller(session):
     main_app.dependency_overrides[get_session] = lambda: session
     try:

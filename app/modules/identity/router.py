@@ -15,6 +15,8 @@ from app.modules.astrology_engine.service import AstrologyEngineService
 from app.modules.identity.auth import CurrentUser
 from app.modules.identity.models import User
 from app.modules.identity.schemas import (
+    AnonRequest,
+    AnonResponse,
     AuthResponse,
     ChartOut,
     LoginRequest,
@@ -133,6 +135,22 @@ async def onboard_user(data: UserCreate, session: SessionDep) -> AuthResponse:
     result = await _auth_response(session, user)
     await session.commit()
     return result
+
+
+@router.post("/anon", response_model=AnonResponse)
+async def anon_session(payload: AnonRequest, session: SessionDep) -> AnonResponse:
+    """No-signup device session — the app calls this on first run so temple
+    check-ins, bookings and the family board work without an account.
+
+    The returned ``anon_id`` is server-minted; send it back to resume the same
+    anonymous account. An anonymous account is never an administrator, and its
+    key carries no digits, so it can never resolve to a real user's number
+    (see IdentityService.get_or_create_anon_user).
+    """
+    user, anon_id = await _service.get_or_create_anon_user(session, payload.anon_id)
+    base = await _auth_response(session, user)
+    await session.commit()
+    return AnonResponse(**base.model_dump(), anon_id=anon_id)
 
 
 @router.post("/login", response_model=AuthResponse)

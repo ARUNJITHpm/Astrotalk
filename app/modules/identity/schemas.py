@@ -91,6 +91,18 @@ class ReferralSummary(BaseModel):
     reward_granted: bool
 
 
+class AnonRequest(BaseModel):
+    """No-signup device session.
+
+    ``anon_id`` is the SERVER-MINTED key returned by a previous call, sent back
+    to resume the same anonymous account. Omit it on first run. An unknown or
+    malformed value simply mints a fresh account — the id is never trusted as
+    an identity claim beyond looking up an existing anonymous row.
+    """
+
+    anon_id: str | None = None
+
+
 class LoginRequest(BaseModel):
     """Login by the natural identity key (mobile number) + password."""
 
@@ -163,6 +175,12 @@ class AuthResponse(BaseModel):
     # True when the account is an app administrator (see config.admin_phones).
     # Lets the web app reveal the admin/console nav right after login.
     is_admin: bool = False
+
+
+class AnonResponse(AuthResponse):
+    """Auth payload plus the server-minted anon key the client stores to resume."""
+
+    anon_id: str
 
 
 class ChartOut(BaseModel):

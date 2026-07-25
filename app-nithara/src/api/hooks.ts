@@ -1,10 +1,14 @@
 import { useQuery } from '@tanstack/react-query'
 import { apiGet, qs } from './client'
 import type {
+  Booking,
   FeedItem,
+  Member,
+  Milestone,
   NakshatramDay,
   Panchangam,
   PoojaCatalogue,
+  Stats,
   Temple,
   TempleDetail,
 } from './types'
@@ -75,4 +79,22 @@ export function useNakshatramNext(naks: number[]) {
       ),
     enabled: naks.length > 0,
   })
+}
+
+// ---- authed (anon or account) surfaces ----
+
+export function useMembers() {
+  return useQuery({ queryKey: ['members'], queryFn: () => apiGet<Member[]>('/identity/me/members') })
+}
+
+export function useBookings() {
+  return useQuery({ queryKey: ['bookings'], queryFn: () => apiGet<Booking[]>('/bookings') })
+}
+
+export function useStats() {
+  return useQuery({ queryKey: ['stats'], queryFn: () => apiGet<Stats>('/identity/me/stats') })
+}
+
+export function useMilestones() {
+  return useQuery({ queryKey: ['milestones'], queryFn: () => apiGet<Milestone[]>('/identity/me/milestones') })
 }

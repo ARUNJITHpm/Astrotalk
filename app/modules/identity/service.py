@@ -302,6 +302,13 @@ def _is_real_chart(natal_json: Any) -> bool:
     return not natal_json.get("mock") and natal_json.get("status") != "pending"
 
 
+# Anonymous-account keys: letters only, so no digit can ever be extracted from
+# the resulting `anon-<id>` phone value (see get_or_create_anon_user).
+_ANON_ALPHABET = "abcdefghijklmnopqrstuvwxyz"
+_ANON_ID_LEN = 32
+_ANON_ID_RE = re.compile(rf"[{_ANON_ALPHABET}]{{{_ANON_ID_LEN}}}")
+
+
 def _mask_phone(phone: str) -> str:
     """Reduce a mobile number to a non-identifying tail for admin display.
 
@@ -359,6 +366,57 @@ class IdentityService:
         on failure — without reaching into identity's internals (AGENTS.md).
         """
         return await _geocode(place)
+
+    async def get_or_create_anon_user(
+        self, session: AsyncSession, anon_id: str | None
+    ) -> tuple[User, str]:
+        """A no-signup device session: a lightweight anonymous account.
+
+        SECURITY — the anon key is SERVER-MINTED and deliberately DIGIT-FREE, and
+        both properties are load-bearing:
+
+        * ``phone`` is the identity key everywhere else in the app, and callers
+          treat it as "a string I can pull digits out of". ``is_admin_phone``
+          matches on the trailing 10 digits, and ``phone_match_candidates``
+          normalizes to digits to find a user. A client-supplied key would
+          therefore let anyone mint an *admin* session (device id = the admin
+          number) or resolve to a REAL user's row and read their natal chart
+          (device id = that person's number). A digit-free key makes both
+          structurally impossible: the digit extraction yields "", which fails
+          ``is_admin_phone``'s truthiness check and matches no stored number.
+        * It is minted here (never accepted verbatim) from a 32-char random
+          alphabet, so an anon account cannot be guessed or enumerated.
+
+        Returns ``(user, anon_id)``; the caller returns the id so a returning
+        install can resume the same account (its temple, bookings, family board).
+        """
+        if anon_id and _ANON_ID_RE.fullmatch(anon_id):
+            existing = (
+                await session.execute(select(User).where(User.phone == f"anon-{anon_id}"))
+            ).scalars().first()
+            if existing is not None:
+                return existing, anon_id
+
+        # Unknown, malformed or missing id → mint a fresh anonymous account.
+        minted = "".join(secrets.choice(_ANON_ALPHABET) for _ in range(_ANON_ID_LEN))
+        user = User(
+            phone=f"anon-{minted}",
+            name="",
+            dob=date(1900, 1, 1),
+            birth_time=None,
+            birth_place="",
+            lat=0.0,
+            lng=0.0,
+            tz="Asia/Kolkata",
+        )
+        session.add(user)
+        await session.flush()
+        return user, minted
+
+    @staticmethod
+    def is_anonymous(user: User) -> bool:
+        """Whether this account came from the no-signup device flow."""
+        return user.phone.startswith("anon-")
 
     async def get_user(self, session: AsyncSession, user_id: int) -> User | None:
         return await session.get(User, user_id)

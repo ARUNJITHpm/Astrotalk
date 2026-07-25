@@ -20,7 +20,15 @@ export class ApiError extends Error {
   }
 }
 
-export async function api<T>(path: string, opts: RequestInit = {}): Promise<T> {
+// Set by lib/auth to avoid an import cycle (auth uses apiPost). Lets a 401 —
+// i.e. the 47h session expired — transparently re-mint and retry once, instead
+// of leaving the app permanently signed out until localStorage is cleared.
+let reauth: (() => Promise<void>) | null = null
+export function setReauthHandler(fn: () => Promise<void>) {
+  reauth = fn
+}
+
+async function send(path: string, opts: RequestInit): Promise<Response> {
   const headers = new Headers(opts.headers)
   headers.set('Accept', 'application/json')
   if (opts.body !== undefined && !headers.has('Content-Type')) {
@@ -28,8 +36,22 @@ export async function api<T>(path: string, opts: RequestInit = {}): Promise<T> {
   }
   const token = getToken()
   if (token) headers.set('Authorization', `Bearer ${token}`)
+  return fetch(`${BASE}${path}`, { ...opts, headers })
+}
 
-  const res = await fetch(`${BASE}${path}`, { ...opts, headers })
+export async function api<T>(path: string, opts: RequestInit = {}): Promise<T> {
+  let res = await send(path, opts)
+
+  // Expired/unknown session → re-mint once and replay the request.
+  if (res.status === 401 && reauth && path !== '/identity/anon') {
+    try {
+      await reauth()
+      res = await send(path, opts)
+    } catch {
+      /* fall through to the error below */
+    }
+  }
+
   if (!res.ok) {
     throw new ApiError(res.status, await res.text().catch(() => ''))
   }
