@@ -53,6 +53,26 @@ uvicorn app.main:app --reload --port 3000
 ```
 API docs at `http://localhost:3000/docs`.
 
+### The frontend
+`/` serves the Nithara app — a React PWA whose source is in
+[`app-nithara/`](./app-nithara) and whose build output (`app-nithara/dist`) is
+gitignored. Docker builds it in a Node stage; locally you need it once:
+
+```bash
+cd app-nithara && npm ci && npm run build
+```
+
+Until then `/` answers 503 and the API is unaffected. For frontend work run
+Vite instead (`npm run dev`, with `VITE_API_BASE` pointing at this server) —
+uvicorn's reloader does not rebuild `dist`.
+
+Three hand-written operator pages also live here, served from `app/web/`:
+`/admin` (analytics), `/console` (content studio, daily pack, temple tools) and
+`/whatsapp` (flow simulator). `app/web/ui/` is the white-label partner surface
+(`/a/{handle}/ui`, `/login`, `/dashboard`). The pre-Nithara consumer UI was
+removed when Nithara took the root; it is preserved on the `legacy-tara-ui`
+branch.
+
 ## Checks
 ```bash
 ruff check .      # lint

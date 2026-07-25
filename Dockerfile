@@ -1,5 +1,26 @@
-# Tara backend — modular monolith (FastAPI). Single image runs the API,
-# the Celery worker, and Celery beat (command overridden per compose service).
+# Nithara — modular monolith (FastAPI) plus the React PWA it serves at /.
+# The single image runs the API, the Celery worker, and Celery beat (command
+# overridden per compose service).
+
+# ---- Stage 1: build the frontend ----
+# app-nithara/dist is a build artefact and stays gitignored, so the image has to
+# produce it. Deps are installed from the lockfile alone first, keeping the npm
+# layer cached across source-only changes.
+FROM node:20-slim AS frontend
+
+WORKDIR /build
+
+COPY app-nithara/package.json app-nithara/package-lock.json ./
+RUN npm ci
+
+COPY app-nithara/ ./
+# Empty base URL = same origin. The API and the app are served by one process,
+# so the browser never makes a cross-origin call and no CORS layer is needed.
+ENV VITE_API_BASE=""
+RUN npm run build
+
+
+# ---- Stage 2: the app ----
 FROM python:3.12-slim
 
 ENV PYTHONUNBUFFERED=1 \
@@ -24,6 +45,10 @@ RUN pip install --upgrade pip && pip install -r requirements.txt
 
 # App source.
 COPY . .
+
+# The frontend build, into the path app/main.py serves the SPA from. Copied
+# after the source so it survives even if a stale dist/ leaks into the context.
+COPY --from=frontend /build/dist ./app-nithara/dist
 
 EXPOSE 3000
 

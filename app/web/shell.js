@@ -16,14 +16,14 @@
     document.currentScript || document.querySelector('script[src*="shell.js"]');
   const navKey = (script && script.dataset.nav) || "off";
 
-  // Mirrors the nav in index.html / feed.html so every page offers the same
-  // destinations in the same order.
+  // Operator destinations only. This shell now ships on /admin and /console
+  // alone: the Tara-era consumer pages it also used to link (the /feed page,
+  // the chat at /, /ui/astrologers) were removed when the Nithara app took the
+  // root, and / is a React SPA that renders its own tab bar.
   const ITEMS = [
-    { key: "feed", href: "/feed", icon: "🏠", label: "ഇന്ന്" },
-    { key: "chat", href: "/", icon: "💬", label: "ചാറ്റ്" },
-    { key: "astrologers", href: "/ui/astrologers", icon: "🧑‍🏫", label: "ജ്യോതിഷർ" },
     { key: "admin", href: "/admin", icon: "📊", label: "അഡ്മിൻ", adminOnly: true },
     { key: "console", href: "/console", icon: "🛠️", label: "കൺസോൾ", adminOnly: true },
+    { key: "app", href: "/", icon: "🪔", label: "ആപ്പ്" },
   ];
 
   // Self-contained styling: these pages have unrelated palettes (the chat's

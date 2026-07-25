@@ -1,0 +1,52 @@
+# Keep the build context small and hermetic. Without this, `COPY . .` ships the
+# host's node_modules (hundreds of MB of platform-specific binaries that would
+# break the Linux image) into every layer.
+#
+# Docker matches each pattern against the WHOLE path, so a bare `__pycache__/`
+# would only ever match one at the context root. Anything that can occur at any
+# depth needs the `**/` prefix.
+
+# Frontend: the image builds these itself in the `frontend` stage. Excluding
+# node_modules also stops `COPY app-nithara/ ./` from clobbering the modules
+# `npm ci` just installed in that stage.
+app-nithara/node_modules/
+app-nithara/dist/
+app-nithara/android/
+app-nithara/ios/
+
+# Python build/test artefacts.
+**/__pycache__/
+**/*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+**/*.egg-info/
+.venv/
+venv/
+
+# Local state that must never bake into an image. Secrets come from the
+# platform (HF Space secrets), never from a file in the build context.
+**/.env
+**/.env.*
+!**/.env.example
+**/*.db
+**/*.sqlite3
+db/
+chroma/
+media/
+
+# VCS and editor noise.
+.git/
+.github/
+.gitignore
+.idea/
+.vscode/
+.claude/
+
+# Docs and design sources — nothing reads these at runtime, and the PDFs are
+# large. The knowledge corpus is NOT here: it lives in
+# app/modules/knowledge/ingested/ and ships with the app.
+docs/
+nithara-v11.html
+NITHARA-BUILD-PLAN.md
+NITHARA-UI-ENDPOINT-AUDIT.md

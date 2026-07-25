@@ -155,7 +155,7 @@
 
 <script>
 const TOKEN_KEY = "tara_admin_token";
-// The app's own login session (set by /auth and /ui/login). An owner already
+// A user login session (set by the white-label login page). An owner already
 // signed in on an ADMIN_PHONES mobile authorizes with it, so the console does
 // not ask for a second login. The server decides whether that session really
 // belongs to an admin — see platform/admin_auth.py.
@@ -408,7 +408,7 @@ PANELS.polls = async () => {
       <div class="field"><label>Question (Malayalam)</label><input id="pq" placeholder="ഏത് ദിവസമാണ് നല്ലത്?"></div>
       <div class="field"><label>Options (one per line, min 2)</label><textarea id="popts" rows="3" placeholder="തിങ്കൾ&#10;വ്യാഴം&#10;വെള്ളി"></textarea></div>
       <button class="btn sm" id="mkPoll">Create poll</button>
-      <a class="btn sm ghost" href="/feed" target="_blank" style="margin-left:8px">Open user feed ↗</a>
+      <a class="btn sm ghost" href="/" target="_blank" style="margin-left:8px">Open the app ↗</a>
     </div>
     <div id="pollList"><div class="center">Loading polls…</div></div>`;
   $("mkPoll").onclick = async () => {
@@ -622,12 +622,12 @@ PANELS.referrals = async () => {
       <div><div class="t">Share cards</div><div class="d">Personal + daily nakshatra cards with /s landing pages carry the referral code.</div></div>
       <div class="go"><a class="btn sm" href="#cards">Open ↗</a></div></div>
     <div class="launch"><div class="ic">🏠</div>
-      <div><div class="t">Invite panel</div><div class="d">Live on the user feed — code, progress bar, and share button.</div></div>
-      <div class="go"><a class="btn sm" href="/feed" target="_blank">Open feed ↗</a></div></div>`;
+      <div><div class="t">Invite panel</div><div class="d">Live in the app — code, progress bar, and share button.</div></div>
+      <div class="go"><a class="btn sm" href="/" target="_blank">Open app ↗</a></div></div>`;
 };
 PANELS.astrologers = async () => launcher("Astrologer Platform","White-label AI assistant, bookings, CRM",[
-  {ic:"🧑‍🏫",t:"Astrologer directory",d:"Live: browse the consult directory.",href:"/ui/astrologers",blank:true,cta:"Open ↗"},
-  {ic:"🏢",t:"Org dashboard",d:"Live preview: the white-label org console.",href:"/ui/org-dashboard",blank:true,cta:"Open ↗"},
+  {ic:"🧑‍🏫",t:"Astrologer directory",d:"No page: the directory is still seeded dummy data (astrologers/seed_data.py), so nothing user-facing links to it."},
+  {ic:"🏢",t:"Org dashboard",d:"Live: the white-label org console, per org at /a/{handle}/dashboard."},
   {ic:"📅",t:"Bookings & CRM",d:"Planned: multi-tenant booking + customer management (GROWTH_PLAN Part 4)."}]);
 PANELS.commerce = async () => {
   $("psub").textContent = "Payments, entitlements & premium reports (Razorpay — mock mode)";
@@ -657,8 +657,8 @@ PANELS.commerce = async () => {
         <div class="muted" style="font-size:13px">product key <code>premium_report</code> — detailed PDF (graha, dasha). Unlocks via purchase OR 3 referral activations.</div></div>
     </div>
     <div class="launch"><div class="ic">🏠</div>
-      <div><div class="t">Test the purchase flow</div><div class="d">The user feed shows the premium card with the mock "Unlock" button and download.</div></div>
-      <div class="go"><a class="btn sm" href="/feed" target="_blank">Open feed ↗</a></div></div>
+      <div><div class="t">Test the purchase flow</div><div class="d">The app shows the premium card with the mock "Unlock" button and download.</div></div>
+      <div class="go"><a class="btn sm" href="/" target="_blank">Open app ↗</a></div></div>
     <div class="launch"><div class="ic">🎁</div>
       <div><div class="t">Referral rewards land here</div><div class="d">Reaching the referral threshold grants a premium_report entitlement (granted_by=referral).</div></div>
       <div class="go"><a class="btn sm" href="#referrals">Referrals ↗</a></div></div>`;

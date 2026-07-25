@@ -128,62 +128,57 @@ async def media(key: str) -> Response:
                     headers={"Cache-Control": "public, max-age=86400"})
 
 
-# Dev convenience: never let the browser serve a stale copy of the web UI. The
-# app runs with uvicorn --reload locally, so edits to app.js / auth.js / styles
-# / the HTML pages must show up on refresh without a hard-reload.
+# The SPA shell and the operator pages must never be served stale (a new deploy
+# has to reach an open tab), but Vite content-hashes everything under /assets/,
+# so those filenames change whenever their bytes do and can be cached hard.
+_NO_STORE_PATHS = frozenset((
+    "/", "/poojas", "/astro", "/profile",
+    "/sw.js", "/registerSW.js", "/manifest.webmanifest",
+    "/admin", "/console", "/wa", "/whatsapp",
+))
+
+
 @app.middleware("http")
-async def _no_store_web_assets(request, call_next):
+async def _web_cache_headers(request, call_next):
     response = await call_next(request)
     path = request.url.path
-    if path.startswith("/static") or path in (
-        "/", "/feed", "/auth", "/wa", "/whatsapp", "/ui", "/ui/login", "/ui/astrologers",
-        "/admin", "/console",
-    ):
+    if path.startswith("/assets/"):
+        response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    elif path.startswith("/static") or path in _NO_STORE_PATHS:
         response.headers["Cache-Control"] = "no-store"
     return response
 
 
-# ---- Web UI (Claude-desktop-style chatbot) ----
-_WEB_DIR = Path(__file__).parent / "web"
+# ---- Web UI ----
+# Two surfaces share this app:
+#   /                          the Nithara PWA — a React SPA built from
+#                              app-nithara/ into app-nithara/dist (see the
+#                              frontend stage of the Dockerfile).
+#   /admin, /console, /whatsapp   operator pages, still hand-written HTML.
+# The old user-facing UI (chat at /, /auth, /feed, /ui/*) was removed when
+# Nithara took the root; it lives on in the `legacy-tara-ui` branch.
+_WEB_DIR = _HERE / "web"
+_NITHARA_DIR = _ROOT / "app-nithara" / "dist"
+_NITHARA_INDEX = _NITHARA_DIR / "index.html"
+
 app.mount("/static", StaticFiles(directory=_WEB_DIR), name="static")
 
 
-@app.get("/", include_in_schema=False)
-async def index() -> FileResponse:
-    return FileResponse(_WEB_DIR / "index.html")
+def _spa_shell() -> FileResponse:
+    if not _NITHARA_INDEX.is_file():
+        raise HTTPException(
+            status_code=503,
+            detail="Nithara frontend not built — run `npm ci && npm run build` in app-nithara/.",
+        )
+    return FileResponse(_NITHARA_INDEX)
 
 
-# User feed ("ഇന്ന്" / Today) — the engagement surface at the site root
-# (ENGAGEMENT_PLAN.md Part A). Public page; personalises via the bearer token
-# in localStorage. Reachable from the bottom nav (mobile) / top nav (desktop).
-@app.get("/feed", include_in_schema=False)
-async def feed_page() -> FileResponse:
-    return FileResponse(_WEB_DIR / "feed.html")
-
-
-# Login / register page. The chat (`/`) redirects here when no account is known;
-# on success this page stores the mobile number and sends the user back to `/`.
-@app.get("/auth", include_in_schema=False)
-async def auth_page() -> FileResponse:
-    return FileResponse(_WEB_DIR / "auth.html")
-
-
-# New cinematic UI (dark cosmic skin) over the SAME backend: /ui is the chat,
-# /ui/login the auth page. Shares the localStorage session with the classic UI.
-@app.get("/ui", include_in_schema=False)
-async def ui_chat() -> FileResponse:
-    return FileResponse(_WEB_DIR / "ui" / "chat.html")
-
-
-@app.get("/ui/login", include_in_schema=False)
-async def ui_login() -> FileResponse:
-    return FileResponse(_WEB_DIR / "ui" / "login.html")
-
-
-# Astrologer directory + free consult booking (dummy directory for now).
-@app.get("/ui/astrologers", include_in_schema=False)
-async def ui_astrologers() -> FileResponse:
-    return FileResponse(_WEB_DIR / "ui" / "astrologers.html")
+# react-router's client-side routes (app-nithara/src/App.tsx). Each serves the
+# same shell and the router picks the screen. Listed explicitly rather than via
+# a catch-all so an unknown path still 404s instead of silently rendering the
+# app — a catch-all would turn every typo'd API call into an HTML 200.
+for _spa_route in ("/", "/poojas", "/astro", "/profile"):
+    app.get(_spa_route, include_in_schema=False)(_spa_shell)
 
 
 # WhatsApp simulator: same brain as real WhatsApp (POST /whatsapp/simulate →
@@ -216,6 +211,15 @@ async def console_page() -> FileResponse:
     return FileResponse(_WEB_DIR / "console.html")
 
 
+# Nithara's build output (/assets/*, /sw.js, /manifest.webmanifest, icons).
+# Mounted LAST and at the root: Starlette matches in registration order, so
+# every API route and operator page declared above still wins, and only what
+# none of them claimed reaches the static files. Guarded on the directory
+# existing so the API (and the test suite) boots without a frontend build.
+if _NITHARA_DIR.is_dir():
+    app.mount("/", StaticFiles(directory=_NITHARA_DIR), name="nithara")
+
+
 # Dev entrypoint: `python main.py` (from anywhere) starts the server. Production
 # should use `uvicorn app.main:app` directly. We chdir to the project root and
 # put it on PYTHONPATH so uvicorn's reloader subprocess can import `app` too.
@@ -233,9 +237,12 @@ if __name__ == "__main__":
     # ASCII-only banner: Windows consoles often default to cp1252, where
     # printing "→"/"·" raises UnicodeEncodeError and kills the server at boot.
     print(
-        f"Tara running -  website http://localhost:{port}/"
-        f"   |   new UI http://localhost:{port}/ui"
-        f"   |   WhatsApp http://localhost:{port}/whatsapp"
+        f"Nithara running -  app http://localhost:{port}/"
+        f"   |   console http://localhost:{port}/console"
         f"   |   admin http://localhost:{port}/admin"
+        f"   |   WhatsApp sim http://localhost:{port}/whatsapp"
     )
+    # The app at / needs app-nithara/dist. For frontend work run Vite instead
+    # (`npm run dev` in app-nithara/, VITE_API_BASE pointed at this server) —
+    # dist is a build artefact and is not rebuilt by the reloader.
     uvicorn.run("app.main:app", host="127.0.0.1", port=port, reload=True)

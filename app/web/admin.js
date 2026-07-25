@@ -3,8 +3,8 @@
   "use strict";
 
   const TOKEN_KEY = "tara_admin_token";
-  // The app's own login session (set by /auth and /ui/login), reused here so an
-  // admin phone doesn't have to log in again on this page.
+  // A user login session (set by the white-label login at /a/{handle}/login),
+  // reused here so an admin phone doesn't have to log in again on this page.
   const USER_TOKEN_KEY = "tara_token";
   const $ = (id) => document.getElementById(id);
   const nf = new Intl.NumberFormat();

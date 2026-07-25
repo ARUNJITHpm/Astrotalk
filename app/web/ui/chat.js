@@ -16,8 +16,13 @@
   let profile = null;
   try { profile = JSON.parse(localStorage.getItem("tara_profile") || "null"); } catch (_) {}
 
+  // This page now ships only as the white-label chat, which the orgs router
+  // mounts at /a/{handle}/ui — so its login page is a sibling of wherever we
+  // are, never the fixed /ui/login that went away with the consumer UI.
+  const LOGIN_URL = window.location.pathname.replace(/\/ui\/?$/, "/login");
+
   if (!userId || !authToken) {
-    window.location.replace("/ui/login");
+    window.location.replace(LOGIN_URL);
     return;
   }
 
@@ -26,7 +31,7 @@
 
   function sessionExpired() {
     localStorage.removeItem("tara_token");
-    window.location.href = "/ui/login";
+    window.location.href = LOGIN_URL;
   }
 
   const esc = (s) =>
@@ -418,17 +423,15 @@
     return out.slice(0, 3);
   }
 
-  // Booking link chip built from an `astrologer:<id>` grounded-in tag. Unlike
-  // the question chips it navigates (does not auto-submit a message).
-  function astrologerLinkChip(groundedIn) {
-    const tag = (groundedIn || []).find((x) => String(x).startsWith("astrologer:"));
-    if (!tag) return null;
-    const id = String(tag).slice("astrologer:".length);
-    const a = document.createElement("a");
-    a.className = "chip chip-link";
-    a.textContent = "📿 ബുക്കിംഗ് പേജ് കാണൂ";
-    a.href = `/ui/astrologers?astro=${encodeURIComponent(id)}`;
-    return a;
+  // Booking link chip built from an `astrologer:<id>` grounded-in tag.
+  //
+  // Disabled: it pointed at /ui/astrologers, which was removed along with the
+  // rest of the consumer UI. The directory behind it is also still the seeded
+  // dummy data (astrologers/seed_data.py — names are slugs, ratings computed),
+  // so a live booking link would be fabricated social proof. Restore this when
+  // real, consented practitioners exist and a booking page is back.
+  function astrologerLinkChip(_groundedIn) {
+    return null;
   }
 
   function renderFollowUps(bubble, groundedIn, suggestions) {
@@ -963,7 +966,7 @@
     ["tara_token", "tara_phone", "tara_name", "tara_profile"].forEach((k) =>
       localStorage.removeItem(k)
     );
-    window.location.href = "/ui/login";
+    window.location.href = LOGIN_URL;
   }
   $("logout-btn").addEventListener("click", logout);
   $("profile-logout").addEventListener("click", logout);

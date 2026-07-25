@@ -9,6 +9,10 @@ dist-ssr
 # build / tooling
 .vite
 coverage
+# `tsc -b` incremental state, and the temp module Vite writes beside the config
+# when it has to transpile it (usually cleaned up, but not if a build is killed).
+tsconfig.tsbuildinfo
+vite.config.ts.timestamp-*.mjs
 
 # Capacitor native projects (added in Part 9)
 /android
