@@ -47,6 +47,8 @@ media/
 # large. The knowledge corpus is NOT here: it lives in
 # app/modules/knowledge/ingested/ and ships with the app.
 docs/
-nithara-v11.html
 NITHARA-BUILD-PLAN.md
 NITHARA-UI-ENDPOINT-AUDIT.md
+
+# NOT excluded: nithara-v11.html. It is a design source, but the app serves it
+# at /prototype for UI review, so it has to ship in the image.

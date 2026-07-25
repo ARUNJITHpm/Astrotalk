@@ -134,7 +134,7 @@ async def media(key: str) -> Response:
 _NO_STORE_PATHS = frozenset((
     "/", "/poojas", "/astro", "/profile",
     "/sw.js", "/registerSW.js", "/manifest.webmanifest",
-    "/admin", "/console", "/wa", "/whatsapp",
+    "/admin", "/console", "/wa", "/whatsapp", "/prototype",
 ))
 
 
@@ -209,6 +209,19 @@ async def admin_page() -> FileResponse:
 @app.get("/console", include_in_schema=False)
 async def console_page() -> FileResponse:
     return FileResponse(_WEB_DIR / "console.html")
+
+
+# The original design prototype, served as-is for eyeballing the intended UI
+# against what the React port actually does. It is a single self-contained file
+# (its own CSS, SVG sprite and mock data inline) and talks to nothing here — so
+# it renders identically whether or not the API behind it is healthy, which is
+# the point: it is the reference, not a second copy of the product.
+@app.get("/prototype", include_in_schema=False)
+async def prototype_page() -> FileResponse:
+    prototype = _ROOT / "nithara-v11.html"
+    if not prototype.is_file():
+        raise HTTPException(status_code=404, detail="Prototype not found")
+    return FileResponse(prototype)
 
 
 # Nithara's build output (/assets/*, /sw.js, /manifest.webmanifest, icons).
