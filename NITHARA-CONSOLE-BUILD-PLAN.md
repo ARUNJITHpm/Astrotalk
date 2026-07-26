@@ -342,14 +342,22 @@ Build the PEOPLE group against Parts 5 and 7.
 - Engagement: check-ins, streaks, milestones.
 ```
 
-## Part 12 — Carried-over sections
+## Part 12 — Carried-over sections (incl. the WhatsApp simulator)
 ```
 Port the panels that already work today, so /admin and /console can be deleted:
 - CONTENT: daily pack, studio, share cards. NOTE the daily pack is implemented
   TWICE and independently (admin.js:692-813 and console.html:286-340) — build
   ONE, keeping console's extra mark-published action.
 - ASTROLOGY: panchangam explorer, temple-suggest tester.
-- CHANNELS: WhatsApp simulator (port whatsapp.html), notification runs.
+- CHANNELS: **WhatsApp simulator — a first-class console section, not a
+  launcher card.** Port app/web/whatsapp.html (413 ln, self-contained: its own
+  WhatsApp-brand palette, phone frame, typing indicator, ticks) INTO the
+  console as a real page. Until the Cloud API timeout is fixed this simulator
+  IS our WhatsApp surface, so it must not be a link to a separate page the way
+  console.html:501 has it today. It drives the real brain through
+  POST /whatsapp/simulate (admin-gated), so nothing about the conversation
+  logic is faked. Keep the sender-number switcher and the Tele-MANAS crisis
+  banner. Also notification runs.
 - SYSTEM: integration status pills, read-only chat explorer for support, org
   tenants, settings.
 Lowest-risk part — these endpoints all exist and are exercised today.
@@ -381,6 +389,36 @@ Lowest-risk part — these endpoints all exist and are exercised today.
   FILE_STRUCTURE.md.
 - DO NOT touch app/web/ui/ — white-label B2B surface, breaks tests/orgs/.
 - whatsapp.html stays until Part 12 ports it.
+```
+
+## Part 14 — Retire the WAHA transport
+```
+Decision (2026-07-27): drop the self-hosted WAHA path entirely. It is an
+unofficial bridge that links a real phone account, needs an external always-on
+host, and carries its own keepalive/auto-recover machinery to survive that
+host sleeping. Until the official Cloud API is usable we work through the
+console's WhatsApp simulator instead, which exercises the same brain.
+
+EXPLICITLY NOT IN SCOPE: the Cloud API send-timeout problem. Leave the Cloud
+transport and its egress-window retry exactly as they are; this part only
+removes WAHA.
+
+Footprint to remove:
+- app/modules/whatsapp/waha_client.py  (166 ln) — delete
+- app/modules/whatsapp/keepalive.py    (110 ln) — delete; it exists ONLY to
+  keep a scale-to-zero WAHA host awake
+- app/main.py — the start_keepalive() call and its cancel in lifespan
+- app/modules/whatsapp/router.py — /waha-webhook, /waha-status, /waha-qr
+- whatsapp/{service,schemas}.py — the waha branches
+- app/platform/config.py — waha_* settings (9 of them) and, critically,
+  `whatsapp_transport` whose default is still "waha" (config.py:122)
+- tests/whatsapp/test_waha_admin_guard.py — delete with the routes it covers
+
+⚠️ BEFORE MERGING: check what `whatsapp_transport` is set to on the live HF
+Space. If it is "waha" (the current default), removing this path takes
+WhatsApp down until the Space is switched. Confirm with the owner first, and
+change the default in the same commit so a Space with no explicit setting does
+not silently fall through to a transport that no longer exists.
 ```
 
 ---
