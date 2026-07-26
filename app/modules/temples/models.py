@@ -84,6 +84,61 @@ class Temple(Base):
     updated_at: Mapped[datetime] = mapped_column(default=_utcnow, onupdate=_utcnow)
 
 
+class Pooja(Base):
+    """The master offering catalogue.
+
+    Was ``DEFAULT_POOJAS``, a four-item Python constant in service.py, shared
+    verbatim by all 53 temples. Amounts are stored in **paise**, like every
+    other money column in the app (``pooja_bookings.amount_paise``,
+    ``payments.amount_paise``); the catalogue the app is served converts to
+    whole rupees under the key ``amount``, which is the existing API contract.
+    """
+
+    __tablename__ = "poojas"
+
+    key: Mapped[str] = mapped_column(primary_key=True)  # "pushpanjali"
+    name: Mapped[str]
+    name_ml: Mapped[str] = mapped_column(default="")
+    description: Mapped[str | None] = mapped_column(Text, default=None)
+    amount_paise: Mapped[int]
+    # Days of notice the temple needs. 0 = bookable same day. The app locks an
+    # offering when lead_days > days_until the target star day.
+    lead_days: Mapped[int] = mapped_column(default=0)
+    active: Mapped[bool] = mapped_column(default=True)
+    sort_order: Mapped[int] = mapped_column(default=0)
+    created_at: Mapped[datetime] = mapped_column(default=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(default=_utcnow, onupdate=_utcnow)
+
+
+class TemplePooja(Base):
+    """A temple's override of one master offering.
+
+    The override slot has existed in the seed schema since the start
+    (``TempleSeed.poojas``) and not one of the 53 temples used it, so every
+    temple in the product offers the identical four items at identical prices.
+    This is the table that lets an operator change that per temple.
+
+    ``amount_paise`` and ``lead_days`` are NULL when the master value applies —
+    inheriting is the common case and must not require copying the price.
+    ``active=False`` means "this temple does not offer it", which is different
+    from deleting the row.
+    """
+
+    __tablename__ = "temple_poojas"
+    __table_args__ = (
+        UniqueConstraint("temple_id", "pooja_key", name="uq_temple_pooja"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    temple_id: Mapped[str] = mapped_column(index=True)
+    pooja_key: Mapped[str] = mapped_column(index=True)
+    amount_paise: Mapped[int | None] = mapped_column(default=None)  # None = inherit
+    lead_days: Mapped[int | None] = mapped_column(default=None)  # None = inherit
+    active: Mapped[bool] = mapped_column(default=True)
+    created_at: Mapped[datetime] = mapped_column(default=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(default=_utcnow, onupdate=_utcnow)
+
+
 class TemplePartner(Base):
     __tablename__ = "temple_partners"
 

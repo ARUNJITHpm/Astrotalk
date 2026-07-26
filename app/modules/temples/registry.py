@@ -19,7 +19,7 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.temples.models import Temple
+from app.modules.temples.models import Pooja, Temple, TemplePooja
 from app.modules.temples.seed_data import SEED_TEMPLES
 
 # None = "not loaded, or loaded and empty" → fall back to the seed. A loaded,
@@ -59,6 +59,40 @@ def row_to_dict(t: Temple) -> dict[str, Any]:
     return out
 
 
+def _resolve_catalogue(
+    masters: list[Pooja], overrides: list[TemplePooja]
+) -> list[dict[str, Any]]:
+    """Master catalogue + one temple's overrides → the list the app is served.
+
+    ``amount`` is emitted in whole RUPEES: the DB stores paise like every other
+    money column, but ``amount`` in rupees is the established API contract
+    (PoojaCatalogueItem.amount, and the app's `amount` field).
+    """
+    by_key = {o.pooja_key: o for o in overrides}
+    out: list[dict[str, Any]] = []
+    for m in masters:
+        o = by_key.get(m.key)
+        if o is not None and not o.active:
+            continue  # this temple does not offer it
+        amount_paise = m.amount_paise if o is None or o.amount_paise is None else o.amount_paise
+        lead_days = m.lead_days if o is None or o.lead_days is None else o.lead_days
+        out.append({
+            "key": m.key,
+            "name": m.name,
+            "name_ml": m.name_ml,
+            "amount": amount_paise // 100,
+            # The authoritative figure. `amount` is a lossy rupee rendering for
+            # the client (PoojaCatalogueItem.amount is an int), so the booking
+            # path must price from this rather than multiplying `amount` back
+            # up — otherwise a price that is not a whole rupee undercharges.
+            # PoojaCatalogueItem does not declare it, so it never reaches the
+            # wire.
+            "amount_paise": amount_paise,
+            "lead_days": lead_days,
+        })
+    return out
+
+
 async def load(session: AsyncSession) -> int:
     """Refresh the snapshot from the database. Returns the active row count.
 
@@ -77,7 +111,31 @@ async def load(session: AsyncSession) -> int:
             select(Temple).where(Temple.active.is_(True)).order_by(Temple.sort_order, Temple.id)
         )
     ).scalars().all()
-    _snapshot = [row_to_dict(t) for t in rows]
+
+    # Resolve the offering catalogue per temple and materialise it into the
+    # temple dict under "poojas". That is deliberate: it means
+    # TemplesService.pooja_catalogue() and BookingsService._find_pooja() — both
+    # of which read t.get("poojas", DEFAULT_POOJAS) — keep working untouched,
+    # and pricing stays server-side truth by construction.
+    masters = (
+        await session.execute(
+            select(Pooja).where(Pooja.active.is_(True)).order_by(Pooja.sort_order, Pooja.key)
+        )
+    ).scalars().all()
+    overrides: dict[str, list[TemplePooja]] = {}
+    if masters:
+        for o in (await session.execute(select(TemplePooja))).scalars().all():
+            overrides.setdefault(o.temple_id, []).append(o)
+
+    snapshot = []
+    for t in rows:
+        row = row_to_dict(t)
+        # A temple's own JSON column still wins if set — it is the escape hatch
+        # for a catalogue the relational shape cannot express.
+        if masters and "poojas" not in row:
+            row["poojas"] = _resolve_catalogue(list(masters), overrides.get(t.id, []))
+        snapshot.append(row)
+    _snapshot = snapshot
     return len(rows)
 
 

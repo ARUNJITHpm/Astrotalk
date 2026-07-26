@@ -18,13 +18,22 @@ import secrets
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.bookings.models import PoojaBooking
+from app.modules.bookings.models import BookingSettings, PoojaBooking
 from app.modules.bookings.schemas import BookingCreate
 from app.modules.commerce.service import CommerceService
 from app.modules.temples.service import DEFAULT_POOJAS, TemplesService
 from app.platform import metrics
 
+# Fallback only. The live value comes from the booking_settings row so an
+# operator can change it without a deploy; this applies when that row is absent
+# (a database predating the table, and every test's fresh one).
 SERVICE_FEE_PAISE = 1500  # ₹15, matching the app's review screen
+
+
+async def service_fee_paise(session: AsyncSession) -> int:
+    """The service fee to charge, operator-set or the built-in default."""
+    row = await session.get(BookingSettings, 1)
+    return SERVICE_FEE_PAISE if row is None else row.service_fee_paise
 
 
 class UnknownTemple(LookupError):
@@ -56,8 +65,14 @@ class BookingsService:
         if pooja is None:
             raise UnknownPooja(payload.pooja_key)
 
-        amount_paise = int(pooja["amount"]) * 100
-        total_paise = amount_paise + SERVICE_FEE_PAISE
+        # Price from the catalogue's paise figure when it has one. `amount` is
+        # a whole-rupee rendering for the client, so multiplying it back up
+        # would silently undercharge any price that is not a whole rupee.
+        # DEFAULT_POOJAS (the pre-catalogue fallback) only carries rupees.
+        paise = pooja.get("amount_paise")
+        amount_paise = int(paise) if paise is not None else int(pooja["amount"]) * 100
+        fee_paise = await service_fee_paise(session)
+        total_paise = amount_paise + fee_paise
         order = await self._commerce.create_custom_order(
             session,
             user_id=user_id,
@@ -71,7 +86,7 @@ class BookingsService:
             pooja_key=payload.pooja_key,
             pooja_name=pooja["name"],
             amount_paise=amount_paise,
-            service_fee_paise=SERVICE_FEE_PAISE,
+            service_fee_paise=fee_paise,
             member_id=payload.member_id,
             member_name=payload.member_name,
             member_nak=payload.member_nak,
