@@ -167,10 +167,74 @@ catalogue so a client can never send an amount. Do not weaken that.
 Alembic revision + import. Ask before running. `pytest tests/bookings` unchanged.
 ```
 
-## Part 4 — Temple admin API
+## Part 4 — Operator accounts & roles  ⭐ RUN BEFORE 5–8
+
 ```
-Add admin-gated routes to app/modules/temples/router.py, all with
-dependencies=[AdminGuard]. Schemas in temples/schemas.py.
+Today there is exactly ONE privilege level. The owner, a per-temple operator and
+a content reviewer all present the same X-Admin-Token and can do everything —
+including editing every temple and reading every user's chat transcript. Build
+the role model FIRST so Parts 5-8 are written role-aware; retro-fitting scopes
+onto finished endpoints means touching all of them twice.
+
+--- A. Reuse identity; do NOT build a second auth stack ---
+Operators are `users` rows. Sessions, password hashing, reset and the bearer
+token already exist in app/modules/identity — a parallel operator login is
+exactly the duplication AGENTS.md warns about. Add ONE table:
+
+  operator_roles(id, user_id, role, temple_id NULL, created_at)
+    unique (user_id, role, temple_id)
+
+  role ∈ {owner, temple_admin, content_reviewer, support}
+  temple_id scopes the row. NULL = unscoped (an owner, or a reviewer over all
+  content). A temple_admin ALWAYS has a temple_id; one row per temple they run,
+  so a person managing three temples has three rows.
+
+--- B. The guard ---
+In app/platform/admin_auth.py, keep require_admin working (it is the coarse
+gate) but add a role-aware dependency that RETURNS a context rather than
+returning None:
+
+  class Operator: user_id, roles: set[str], temple_ids: set[str], is_owner: bool
+      def can_edit_temple(self, temple_id) -> bool
+      def visible_temple_ids(self) -> set[str] | None   # None = all
+
+  require_operator(*roles) -> Operator     # 401 unauthenticated, 403 wrong role
+
+An X-Admin-Token caller resolves to a synthetic owner Operator, so scripts and
+the existing console keep working unchanged. A bearer session resolves to that
+user's rows; a phone in `admin_phones` still implies owner (that is the second
+door, and the ONLY door once ADMIN_TOKEN is the sole token).
+
+--- C. Retire the chargemod backdoor, in this same part ---
+- app/platform/admin_auth.py:40 accepts the literal "chargemod"
+  UNCONDITIONALLY. Remove it; the configured admin_token becomes the only token.
+- app/modules/admin/router.py:50 accepts admin/chargemod at POST /admin/login,
+  and _admin_token() at :36 falls back to the literal. Remove both.
+- app/web/admin.html:363 PRINTS "admin / chargemod" on the login screen, and
+  admin.js:68-74 prefills it. Delete.
+- 8 test files send X-Admin-Token: chargemod. Do NOT edit them one by one — add
+  a root tests/conftest.py that sets settings.admin_token for the session. Tests
+  then configure a token explicitly, exactly as production does.
+
+⚠️ ADMIN_TOKEN IS NOT YET SET ON THE SPACE (owner, 2026-07-27). Commit this,
+but do NOT push to the `hf` remote until they confirm the secret exists.
+Deploying it without ADMIN_TOKEN closes the token door entirely; only an
+admin_phones bearer session would still get in.
+
+--- D. Seeding the first operator ---
+A CLI (scripts/grant_role.py) that grants a role to a phone, so the first owner
+exists without a chicken-and-egg. Idempotent. Never a route.
+
+Tests in tests/platform/ (the guard: each role, scope hit and miss, token→owner,
+403 vs 401) and tests/admin/ (login without the backdoor).
+```
+
+## Part 5 — Temple admin API
+```
+Add operator-gated routes to app/modules/temples/router.py. Gate with
+require_operator("owner", "temple_admin") from Part 4 and enforce the scope:
+a temple_admin may only touch temples in operator.temple_ids — check it in the
+route, and 403 otherwise. Schemas in temples/schemas.py.
 
 - POST/PATCH/DELETE temple records (DELETE = soft, flip `active`).
 - PATCH /{id}/timings — per-temple hours + display strings.
@@ -187,11 +251,12 @@ at router.py:152-154). Tests in tests/temples/ covering the 401-without-token
 path, happy path, and validation failures.
 ```
 
-## Part 5 — Astrologer admin API
+## Part 6 — Astrologer admin API
 ```
-Add admin-gated routes to app/modules/astrologers/router.py. The module does
-not import AdminGuard at all today — all six routes are public reads or
-user-scoped bookings.
+Add operator-gated routes to app/modules/astrologers/router.py, owner-only
+(require_operator("owner")) — a temple admin has no business editing the
+astrologer directory. The module does not import AdminGuard at all today: all
+six routes are public reads or user-scoped bookings.
 
 - POST/PATCH astrologer records; PATCH /{id}/active.
 - PUT /{id}/availability — replace the baked-in weekly windows.
@@ -203,7 +268,7 @@ user-scoped bookings.
 Tests in tests/astrologers/.
 ```
 
-## Part 6 — Bookings operator API
+## Part 7 — Bookings operator API
 ```
 The biggest gap: operators can currently see NOTHING. app/modules/bookings/
 has exactly two routes, both hard-scoped to the caller (router.py:31, :45).
@@ -212,8 +277,10 @@ has exactly two routes, both hard-scoped to the caller (router.py:31, :45).
   (bookings/models.py:21) has no cancelled / completed / refunded. Nothing but
   the payment reconciler (service.py:106-113) ever writes state. Add the terminal
   states and an explicit transition guard. Alembic revision — ask before running.
-- GET admin list: filters (temple_id, state, pooja_key, date range, ref, user
-  phone) + pagination + sort.
+- GET operator list: filters (temple_id, state, pooja_key, date range, ref,
+  user phone) + pagination + sort. SCOPE IT: a temple_admin sees only bookings
+  for their own temples (operator.visible_temple_ids()), never the whole queue.
+  This is the endpoint where a missing scope check leaks the most.
 - GET detail by id and by ref, joined to the user, member name/nakshatram, and
   the commerce payment.
 - PATCH /{id}/status; cancel and refund (no cancel path exists for poojas at all
@@ -227,7 +294,7 @@ ask before wiring the refund call; land everything else first.
 Tests in tests/bookings/.
 ```
 
-## Part 7 — Users, payments, feed, and auth hardening
+## Part 8 — Users, payments, feed, and auth hardening
 ```
 --- Users (identity) ---
 GET /admin/users — paginated, searchable by phone/name. Today the only operator
@@ -259,7 +326,7 @@ CRUD over the app feed, replacing the hardcoded FEED_ITEMS list
 
 # FRONTEND  (React + Vite + TypeScript · desktop)
 
-## Part 8 — `app-console/` scaffold: shell, sidebar, auth, dashboard
+## Part 9 — `app-console/` scaffold: shell, sidebar, auth, dashboard
 ```
 Create a new frontend app in /app-console (sibling to app/ and app-nithara/).
 Do NOT touch app-nithara.
@@ -274,13 +341,17 @@ frame. This is a desktop tool for operators, in English.
 - Login screen against POST /admin/login. Do NOT prefill any credential —
   console.html:117 hardcodes a personal email and admin.html:363 prints the
   password on screen; neither carries over.
-- The left sidebar and routing skeleton for every section in the IA below,
-  with unbuilt sections stubbed.
+- Login is a normal identity login (phone + password) that returns the bearer
+  token; the console then reads the caller's roles. NOT a shared password.
+- The left sidebar is ROLE-AWARE: render only the sections the caller's roles
+  allow, and guard the routes too — hiding a nav item is not access control.
+  A temple_admin sees Temples (theirs) + Bookings (theirs) and nothing else.
+- The routing skeleton for every section in the IA below, unbuilt ones stubbed.
 - Dashboard: today's bookings, check-ins, payments, new users, alerts.
 - /app-console/dist is already covered by the root .gitignore `dist/` rule.
 ```
 
-**Sidebar information architecture** — build order is Parts 9 → 12:
+**Sidebar information architecture** — build order is Parts 10 → 13:
 
 ```
 OVERVIEW    Dashboard        bookings today, check-ins, payments, new users, alerts
@@ -298,6 +369,7 @@ BOOKINGS    Pooja bookings   the queue: filters, ref lookup, status, notes, expo
 
 PEOPLE      Users            search by phone/name → bookings, chart, family, entitlements
             Astrologers      onboard real practitioners, availability, pricing, active
+            Operators        grant/revoke roles, scope a temple admin to temples
             Engagement       check-ins, streaks, milestones
 
 CONTENT     App feed         CRUD over what the app's notices rail shows
@@ -317,9 +389,9 @@ SYSTEM      Integrations     health + live/mock status pills                    
             Settings         service fee, admin token, roles
 ```
 
-## Part 9 — Temples section
+## Part 10 — Temples section
 ```
-Build the TEMPLES group against the Part 4 API:
+Build the TEMPLES group against the Part 5 API:
 - All temples: searchable/filterable table (district, deity, reviewed, active).
 - Temple editor: every field incl. the bilingual story pair, map-picker for
   lat/lng, timings, image upload, and the review toggle.
@@ -331,9 +403,9 @@ Build the TEMPLES group against the Part 4 API:
 Vitest tests for the list filters and the editor's save path.
 ```
 
-## Part 10 — Bookings section
+## Part 11 — Bookings section
 ```
-Build the BOOKINGS group against the Part 6 API. This is the operational heart
+Build the BOOKINGS group against the Part 7 API. This is the operational heart
 of the product — treat it as the most important screen in the console.
 - Pooja bookings queue: filters, ref lookup, status transitions, operator notes,
   CSV export. Show member name + nakshatram and the payment state.
@@ -343,18 +415,21 @@ of the product — treat it as the most important screen in the console.
 Vitest tests for the filter state and a status transition.
 ```
 
-## Part 11 — People section
+## Part 12 — People section
 ```
-Build the PEOPLE group against Parts 5 and 7.
+Build the PEOPLE group against Parts 6 and 8.
 - Users: search by phone/name, detail with bookings, family, entitlements.
   Birth data is sensitive (GUARDRAILS §4) — never put it in a URL, and show the
   chart only where an operator genuinely needs it.
 - Astrologers: onboarding form for REAL practitioners (the 28 seeded ones are
-  placeholders), availability editor, pricing, active toggle.
+  placeholders), availability editor, pricing, active toggle. Owner only.
+- Operators: grant and revoke roles, scope a temple_admin to their temples.
+  Owner only. This is the UI for Part 4's table, and it replaces the
+  scripts/grant_role.py bootstrap for everyone after the first.
 - Engagement: check-ins, streaks, milestones.
 ```
 
-## Part 12 — Carried-over sections (incl. the WhatsApp simulator)
+## Part 13 — Carried-over sections (incl. the WhatsApp simulator)
 ```
 Port the panels that already work today, so /admin and /console can be deleted:
 - CONTENT: daily pack, studio, share cards. NOTE the daily pack is implemented
@@ -379,7 +454,7 @@ Lowest-risk part — these endpoints all exist and are exercised today.
 
 # SHIP
 
-## Part 13 — Serve it, then retire the old pages
+## Part 14 — Serve it, then retire the old pages
 ```
 --- Serving ---
 - Dockerfile: a third stage `FROM node:20-slim AS console`, mirroring the
@@ -394,16 +469,16 @@ Lowest-risk part — these endpoints all exist and are exercised today.
   VERIFY IN A BROWSER — curl cannot see a service worker, which is exactly how
   the /prototype bug got missed.
 
---- Retirement (only after Part 12 reaches parity) ---
+--- Retirement (only after Part 13 reaches parity) ---
 - Delete app/web/admin.html, admin.js, console.html; drop their routes.
 - Point shell.js's nav at the new console.
 - Update README.md (still describes three hand-written operator pages) and
   FILE_STRUCTURE.md.
 - DO NOT touch app/web/ui/ — white-label B2B surface, breaks tests/orgs/.
-- whatsapp.html stays until Part 12 ports it.
+- whatsapp.html stays until Part 13 ports it.
 ```
 
-## Part 14 — Retire the WAHA transport
+## Part 15 — Retire the WAHA transport
 ```
 Decision (2026-07-27): drop the self-hosted WAHA path entirely. It is an
 unofficial bridge that links a real phone account, needs an external always-on
@@ -435,19 +510,38 @@ not silently fall through to a transport that no longer exists.
 
 ---
 
+## Roles at a glance
+
+| | owner | temple_admin | content_reviewer | support |
+|---|:--:|:--:|:--:|:--:|
+| Edit temples | all | **only their own** | — | — |
+| Pooja catalogue (master) | ✅ | — | — | — |
+| Pooja pricing at a temple | ✅ | **their own** | — | — |
+| Bookings queue | all | **their own temples** | — | read-only |
+| Astrologers | ✅ | — | — | — |
+| Users + payments | ✅ | — | — | read-only |
+| Content / feed | ✅ | — | ✅ | — |
+| Grant roles | ✅ | — | — | — |
+| Settings, WhatsApp, orgs | ✅ | — | — | — |
+
+`temple_admin` is the reason this exists: temple staff should manage **their**
+temple's offerings and see **their** bookings, without reading every devotee's
+chat transcript or repricing someone else's temple.
+
 ## Sequencing at a glance
 
 ```
 Part 1 (temples→DB) ─┐
-Part 2 (astro→DB) ───┼─► Part 4 (temple admin API) ─► Part 9  (Temples UI) ──┐
-Part 3 (poojas→DB) ──┘    Part 5 (astro admin API) ─► Part 11 (People UI) ───┤
-                          Part 6 (bookings API) ────► Part 10 (Bookings UI) ─┼─► Part 13
-                          Part 7 (users/pay/feed/auth) ─► Part 12 (carried) ─┘
-Part 8 (console scaffold) — can start as soon as Part 4 lands
+Part 2 (astro→DB)  ──┼─► Part 4 (ROLES) ─┬─► Part 5 (temple API) ─► Part 10 (Temples UI) ──┐
+Part 3 (poojas→DB) ─┘                    ├─► Part 6 (astro API) ──► Part 12 (People UI) ───┤
+                                         ├─► Part 7 (bookings) ───► Part 11 (Bookings UI) ─┼─► Part 14
+                                         └─► Part 8 (users/pay/feed) ─► Part 13 (carried) ─┘
+Part 9 (console scaffold) — needs Part 4 for role-aware login, Part 5 for content
 ```
 
-Parts 1–3 are strictly sequential and block everything. Parts 4–7 are
-independent of each other. Part 7's auth hardening can ship on its own, today.
+Parts 1–3 are done. **Part 4 now blocks 5–8**: build the role model before the
+endpoints so each is written with its scope, rather than having every endpoint
+revisited later. Parts 5–8 are independent of each other once 4 lands.
 
 ## Verification
 
