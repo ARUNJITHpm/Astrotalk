@@ -135,6 +135,54 @@ never silently widen the API.
 
 ---
 
+## Part 3 — Pooja catalogue + service fee out of constants (`287a8fe`)
+
+### Findings
+
+- **`DEFAULT_POOJAS` was a 4-item Python constant** (`temples/service.py:59`)
+  shared verbatim by all 53 temples. The per-temple override slot
+  (`TempleSeed.poojas`, read at `service.py:209`) had existed from the start and
+  **not one temple used it** — so every temple in the product offered the
+  identical four items at identical prices.
+- **The ₹15 fee was `SERVICE_FEE_PAISE`** (`bookings/service.py:27`), unchangeable
+  without a deploy.
+- Two readers consume the catalogue, both synchronously and both via
+  `t.get("poojas", DEFAULT_POOJAS)`: `TemplesService.pooja_catalogue` and
+  `BookingsService._find_pooja`.
+
+### Done
+
+`poojas` (master), `temple_poojas` (override; NULL columns inherit, so changing a
+lead time does not require copying the price), single-row `booking_settings`,
+migration `c9d0e1f2a3b4`, and 11 new tests.
+
+**Key design decision.** The catalogue is resolved *during the registry load* and
+materialised into each temple's `poojas` key. Both readers therefore needed **no
+change at all**, and server-side pricing is preserved by construction. An empty
+master table falls through to `DEFAULT_POOJAS`.
+
+`booking_settings` is deliberately narrow rather than an app-wide key/value
+store — a shared settings table would be a cross-module surface that
+`docs/AGENTS.md` puts behind human approval.
+
+**Review finding, fixed before commit.** Amounts are stored in paise but
+`amount` is served in whole rupees (the existing `PoojaCatalogueItem` contract),
+and the booking path multiplied that rupee figure back up by 100 — silently
+**undercharging any price that is not a whole rupee** (₹101.50 would bill ₹101).
+The resolved catalogue now also carries the authoritative `amount_paise` and
+bookings prices from it. `PoojaCatalogueItem` does not declare the field, so it
+never reaches the wire; a test pins both halves.
+
+### Verification
+
+- `tests/temples` + `tests/bookings` **59 pass**; full suite **332 pass**
+- ruff **128** — unchanged
+- DB-resolved catalogue identical to the constant path, lead-time locks included
+- Applied to production: 4 master offerings, 0 overrides, fee 1500 paise,
+  schema at `c9d0e1f2a3b4`
+
+---
+
 ## Migrations applied to production — 2026-07-27
 
 Owner approved running against the real database. Applied

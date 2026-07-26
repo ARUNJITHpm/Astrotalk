@@ -139,7 +139,13 @@ Same move as Part 1:
 Done when `pytest tests/astrologers` passes UNCHANGED.
 ```
 
-## Part 3 — Pooja catalogue + settings
+## Part 3 — Pooja catalogue + settings  ✅ DONE (`287a8fe`)
+
+> Shipped as: `Pooja` + `TemplePooja` + `BookingSettings`, catalogue resolution
+> inside the temple registry load, migration `c9d0e1f2a3b4` (applied to
+> production). **Parts 1–3 complete — the data-migration block is closed and
+> Parts 4–7 can start.**
+
 ```
 Read temples/service.py:59 (DEFAULT_POOJAS) and bookings/service.py:27
 (SERVICE_FEE_PAISE) and :55-60 (server-side re-pricing).
