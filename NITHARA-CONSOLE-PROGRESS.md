@@ -83,7 +83,7 @@ flag in a migration would contradict it and silently change what
 
 ---
 
-## Part 2 — Astrologers out of `seed_data.py`, into Postgres (`0f9a2f0`)
+## Part 2 — Astrologers out of `seed_data.py`, into Postgres (`48c1d71`)
 
 ### Findings
 

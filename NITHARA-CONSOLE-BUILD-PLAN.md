@@ -116,7 +116,13 @@ Done when `pytest tests/temples` passes UNCHANGED and GET /temples,
 /temples/{id}, /temples/suggest return what they returned before.
 ```
 
-## Part 2 — Astrologers: out of `seed_data.py`, into Postgres
+## Part 2 — Astrologers: out of `seed_data.py`, into Postgres  ✅ DONE (`48c1d71`)
+
+> Shipped as: `Astrologer` model, `astrologers/registry.py`, `_astrologers`
+> as a property, migration `b8c9d0e1f2a3`, and
+> `tests/astrologers/test_astrologer_registry.py`. `availability` stayed a
+> JSON column rather than its own table — see the progress log for why.
+
 ```
 Read app/modules/astrologers/{seed_data.py,service.py,models.py,router.py}.
 
