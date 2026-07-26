@@ -227,12 +227,13 @@ CRUD over the app feed, replacing the hardcoded FEED_ITEMS list
 (content/feed.py:17). Its own docstring flags this as pending.
 
 --- Auth hardening (do this part regardless of the rest) ---
-- Add AdminGuard to GET /whatsapp/waha-status and /waha-qr
-  (whatsapp/router.py:427, :433). They are UNGATED today despite "for admin"
-  docstrings, and the QR route exposes WhatsApp session pairing info to
-  anonymous callers.
+- [DONE, commit e224cac] AdminGuard on GET /whatsapp/waha-status and /waha-qr.
 - Retire the literal "chargemod" accepted unconditionally at
   admin_auth.py:40 and by POST /admin/login (admin/router.py:50).
+  CAUTION: this can lock the owner out of the live HF Space if ADMIN_TOKEN is
+  not set there. Confirm the Space has an ADMIN_TOKEN secret and that login
+  works with it BEFORE removing the fallback, and ship the two changes in
+  separate commits so the removal can be reverted on its own.
 ```
 
 ---
@@ -397,8 +398,9 @@ independent of each other. Part 7's auth hardening can ship on its own, today.
   **unchanged**; `python scripts/migrate.py` on a scratch DB lands 53 temples
   and 28 astrologers with the same ids the app already serves.
 - **Parts 4–7:** new tests per module — 401 without a token, happy path,
-  validation failure. `ruff check .` (27 pre-existing findings; the count must
-  not grow) and `mypy app`.
+  validation failure. `ruff check app tests` (**129** pre-existing findings;
+  the count must not grow — `ruff check .` reports 462 because it also walks
+  the local `vinimon/` venv, so always scope it) and `mypy app`.
 - **Parts 8–12:** `npx vitest run` in app-console/, plus one manual end-to-end
   pass: create a temple in the console → see it in the app at `/` → book its
   pooja → watch it land in the console queue → move its status.
