@@ -60,25 +60,34 @@ from app.platform.mongo import close_mongo
 configure_logging()
 
 
+async def _load_directories() -> None:
+    """Cache the temple and astrologer directories into the process.
+
+    Both are read synchronously from inside the chat turn, so they are snapshots
+    rather than per-call queries (see each module's ``registry.py``). An empty
+    table falls back to that module's curated seed, so a failure here must never
+    stop the app booting — the fallback still serves a working directory.
+    """
+    from app.modules.astrologers import registry as astrologers_registry
+    from app.modules.temples import registry as temples_registry
+    from app.platform.db import async_session_factory
+
+    log = get_logger(__name__)
+    for name, registry in (("temple", temples_registry), ("astrologer", astrologers_registry)):
+        try:
+            async with async_session_factory() as session:
+                loaded = await registry.load(session)
+            log.info("%s directory loaded: %d rows", name, loaded)
+        except Exception:
+            log.exception("%s directory load failed; falling back to the seed", name)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Every table-owning module's models are imported above via its router, so
     # Base.metadata is complete by the time we create missing tables here.
     await init_db()
-    # Load the temple directory into the process. It is read synchronously from
-    # inside the chat turn, so it is cached rather than queried per call; an
-    # empty table falls back to the curated seed (see temples/registry.py). A
-    # failure here must not stop the app booting — the fallback still serves.
-    log = get_logger(__name__)
-    try:
-        from app.modules.temples import registry as temple_registry
-        from app.platform.db import async_session_factory
-
-        async with async_session_factory() as session:
-            loaded = await temple_registry.load(session)
-        log.info("temple directory loaded: %d rows", loaded)
-    except Exception:
-        log.exception("temple directory load failed; falling back to the curated seed")
+    await _load_directories()
     # Keep a scale-to-zero WAHA host (Render free tier) awake by pinging it on
     # an interval. No-op unless waha_keepalive_enabled is set in production.
     keepalive_task = start_keepalive()

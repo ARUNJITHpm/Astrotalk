@@ -18,19 +18,23 @@ we store the absolute instant (UTC) and render times back in IST.
 
 from datetime import (
     UTC,
-    date as date_type,
     datetime,
-    time as time_type,
     timedelta,
     timezone,
+)
+from datetime import (
+    date as date_type,
+)
+from datetime import (
+    time as time_type,
 )
 from math import asin, cos, radians, sin, sqrt
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.astrologers import registry
 from app.modules.astrologers.models import AstroBooking
-from app.modules.astrologers.seed_data import SEED_ASTROLOGERS
 
 _EARTH_RADIUS_KM = 6371.0
 # India Standard Time — fixed +05:30, no DST, so a constant offset is exact.
@@ -65,8 +69,15 @@ def _as_utc(dt: datetime) -> datetime:
 
 
 class AstrologersService:
-    def __init__(self) -> None:
-        self._astrologers = SEED_ASTROLOGERS
+    @property
+    def _astrologers(self) -> list[dict]:
+        """The directory, read fresh from the registry snapshot.
+
+        A property, not a value bound in ``__init__``: the router instantiates
+        this service at import time, long before the database is read, so
+        binding once would pin the process to the seed fallback for good.
+        """
+        return registry.current()
 
     # ---- directory ----
 
