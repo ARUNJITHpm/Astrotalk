@@ -86,7 +86,14 @@ visible.**
 
 # BACKEND
 
-## Part 1 — Temples: out of `seed_data.py`, into Postgres
+## Part 1 — Temples: out of `seed_data.py`, into Postgres  ✅ DONE (`dcfac5d`)
+
+> Shipped as: `Temple` model, `temples/registry.py` (sync snapshot + seed
+> fallback), `TemplesService._temples` as a property, migration
+> `a7b8c9d0e1f2`, and `tests/temples/test_temple_registry.py`.
+> **The migration has not been run against a real database** — still needs your
+> approval. Parts 2 and 3 follow the same registry pattern.
+
 ```
 Read app/modules/temples/{seed_data.py,service.py,models.py,router.py} and
 migrations/versions/ for the current head (f6a7b8c9d0e1).
