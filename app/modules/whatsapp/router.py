@@ -422,15 +422,19 @@ async def simulate_message(
 
 
 # ---- WAHA admin endpoints (new) ----
+# Both are admin-gated: /waha-qr returns the pairing QR and session details for
+# the WhatsApp account, which is enough for a stranger to attach their own
+# device to it. /waha-status leaks the connected number and session state. They
+# were unguarded until now despite saying "for admin" on the tin.
 
 
-@router.get("/waha-status")
+@router.get("/waha-status", dependencies=[AdminGuard])
 async def waha_status() -> dict:
     """Check WAHA connection status (for admin dashboard / health probes)."""
     return await _service.waha_status()
 
 
-@router.get("/waha-qr")
+@router.get("/waha-qr", dependencies=[AdminGuard])
 async def waha_qr() -> dict:
     """Get the WAHA QR code / session info (for admin pairing setup)."""
     return await _waha.get_qr()
