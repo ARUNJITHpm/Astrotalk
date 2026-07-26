@@ -6,12 +6,17 @@ dashboard is read-only: it reports aggregate metrics and never mutates domain
 data.
 """
 
+import hmac
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
+# Imported for its side effect: registering the operator tables on Base.metadata.
+# Every table-owning module is reached through its router this way (app/main.py),
+# and without it create_all/autogenerate never see operators or their sessions.
+from app.modules.admin import models as _models  # noqa: F401
 from app.modules.admin.auth import AdminGuard, admin_required
 from app.modules.admin.schemas import AdminOverview
 from app.modules.admin.service import AdminService
@@ -26,35 +31,38 @@ SessionDep = Annotated[AsyncSession, Depends(get_session)]
 
 
 class LoginPayload(BaseModel):
-    # Accepts either the owner email or the legacy "admin" username.
+    # The owner's configured email.
     username: str
     password: str
 
 
-def _admin_token() -> str:
-    """The token the console uses on every later call (configured, else legacy)."""
-    return get_settings().admin_token or "chargemod"
-
-
-@router.post("/login", summary="Owner login (email or legacy username) → admin token")
+@router.post("/login", summary="Owner login (email + password) → admin token")
 async def admin_login_endpoint(payload: LoginPayload) -> dict:
+    """The owner's own sign-in. Operators use POST /admin/operators/login.
+
+    The legacy ``admin`` / ``chargemod`` pair was accepted here until console
+    plan Part 4; it is gone, along with the hardcoded token it returned. If
+    ``admin_token`` is not configured there is no token to hand out and this
+    route fails closed.
+    """
     settings = get_settings()
     username = payload.username.strip().lower()
 
-    # 1) Owner console login: the email + configured password.
-    email_ok = (
-        username == settings.admin_email.strip().lower()
-        and payload.password == settings.admin_password
-    )
-    # 2) Legacy username/password kept working for existing bookmarks/scripts.
-    legacy_ok = payload.username == "admin" and payload.password == "chargemod"
-
-    if email_ok or legacy_ok:
-        return {"token": _admin_token(), "email": settings.admin_email}
-    raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Invalid email or password",
-    )
+    if not (
+        settings.admin_password
+        and username == settings.admin_email.strip().lower()
+        and hmac.compare_digest(payload.password, settings.admin_password)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password",
+        )
+    if not settings.admin_token:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="ADMIN_TOKEN is not configured on this deployment",
+        )
+    return {"token": settings.admin_token, "email": settings.admin_email}
 
 
 @router.get(

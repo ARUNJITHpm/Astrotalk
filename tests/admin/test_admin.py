@@ -153,18 +153,18 @@ async def api():
         await engine.dispose()
 
 
-async def test_admin_login(api):
-    # Legacy username/password still works (kept for existing bookmarks/scripts).
-    resp = await api.post("/admin/login", json={"username": "admin", "password": "chargemod"})
-    assert resp.status_code == 200
-    body = resp.json()
-    assert body["token"] == "chargemod"
-    # Login now also echoes the owner email so the console can show who is signed in.
-    assert body["email"] == get_settings().admin_email
+async def test_legacy_admin_chargemod_login_is_rejected(api):
+    """The admin/chargemod backdoor is gone (console plan Part 4).
 
-    # Invalid login
-    resp_invalid = await api.post("/admin/login", json={"username": "admin", "password": "wrongpassword"})
-    assert resp_invalid.status_code == 401
+    It was accepted here regardless of configuration, and the login screen
+    printed the password on the page.
+    """
+    resp = await api.post("/admin/login", json={"username": "admin", "password": "chargemod"})
+    assert resp.status_code == 401
+
+    # And the literal is no longer a valid credential on the guard either.
+    monkey = await api.get("/admin/overview", headers={"X-Admin-Token": "wrong"})
+    assert monkey.status_code == 401
 
 
 async def test_admin_login_with_owner_email(api):
@@ -187,9 +187,7 @@ async def test_admin_login_with_owner_email(api):
     assert bad.status_code == 401
 
 
-async def test_overview_requires_token_always(api, monkeypatch):
-    monkeypatch.setattr(get_settings(), "admin_token", "")
-
+async def test_overview_requires_token_always(api):
     # Config endpoint indicates token is required
     cfg = await api.get("/admin/config")
     assert cfg.json() == {"token_required": True}
@@ -200,11 +198,24 @@ async def test_overview_requires_token_always(api, monkeypatch):
         await api.get("/admin/overview", headers={"X-Admin-Token": "nope"})
     ).status_code == 401
 
-    # Authorized requests succeed
+    # The configured token works (tests/conftest.py sets it, as production does).
     ok = await api.get("/admin/overview", headers={"X-Admin-Token": "chargemod"})
     assert ok.status_code == 200
     data = ok.json()
     assert set(data) == {"generated_at", "system", "users", "chat", "llm"}
+
+
+async def test_unset_admin_token_authenticates_nobody(api, monkeypatch):
+    """An unset secret must mean "this door is shut", not "anything matches".
+
+    Before Part 4 an empty admin_token silently fell back to the literal
+    "chargemod", so a deployment that configured nothing was wide open to
+    anyone who had read the source.
+    """
+    monkeypatch.setattr(get_settings(), "admin_token", "")
+
+    for header in ({}, {"X-Admin-Token": ""}, {"X-Admin-Token": "chargemod"}):
+        assert (await api.get("/admin/overview", headers=header)).status_code == 401
 
 
 async def test_admin_phone_session_authorizes_admin_api(api, monkeypatch):

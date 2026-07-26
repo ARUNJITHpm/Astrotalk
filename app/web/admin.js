@@ -65,13 +65,8 @@
     $("dash").classList.remove("hidden");
   }
 
-  // Prefill admin/chargemod credentials helper
-  window.prefillCreds = function (e) {
-    if (e) e.preventDefault();
-    $("usernameInput").value = "admin";
-    $("passwordInput").value = "chargemod";
-    $("gateErr").textContent = "";
-  };
+  // (The "use default credentials" helper that filled in admin/chargemod was
+  // removed with the backdoor itself — console plan Part 4.)
 
   // Submit Login credentials to POST /admin/login
   window.submitLogin = async function () {
