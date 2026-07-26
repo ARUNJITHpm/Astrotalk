@@ -9,6 +9,21 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      workbox: {
+        // The SW is registered at the root scope, and Workbox's navigation
+        // fallback would otherwise answer EVERY in-scope navigation out of the
+        // precached index.html — silently shadowing the server-rendered pages
+        // this same origin serves (/prototype, /admin, /console, /whatsapp,
+        // /a/{handle}/*, /docs). An allowlist, not a denylist: only the routes
+        // react-router actually knows (see App.tsx) get the shell, so any page
+        // added to app/main.py later keeps working without touching this file.
+        navigateFallbackAllowlist: [
+          /^\/$/,
+          /^\/poojas\/?$/,
+          /^\/astro\/?$/,
+          /^\/profile\/?$/,
+        ],
+      },
       manifest: {
         name: 'Nithara — your temple, in your pocket',
         short_name: 'Nithara',
