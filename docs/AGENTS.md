@@ -40,6 +40,20 @@ Node stage.
 **Hosting** A single Docker image on a Hugging Face Space (`talk-to/nitara`),
 config in the root `README.md` YAML frontmatter. **Not AWS.**
 
+## Product promises (from `NITHARA-BUILD-PLAN.md`; treat as requirements)
+- **Bilingual by default.** Every user-facing string in the consumer app ships
+  `{en, ml}` and lives in `app-nithara/src/i18n/{en,ml}.json`. Never hardcode a
+  visible English string in a component. *(The operator console is the
+  exception: English only, it is a staff tool.)*
+- **No-signup.** An anonymous device session comes first
+  (`POST /identity/anon`); an account is optional and only ever **links** an
+  existing anonymous session. Never gate a consumer feature behind a login.
+- **The UI is the source of truth for shape.** Field names come from
+  `nithara-v11.html` (`en`, `ml`, `place`, `sig`, `closes`, …) so the frontend
+  needs no remapping. Match them; do not "tidy" them.
+- **No birth data on temple endpoints**, and guidance-only framing on every
+  astrology surface.
+
 ## Architecture
 - **Single deployable, modular monolith.** Modules live in `app/modules/<name>`
   and share `app/platform/**`.
@@ -66,6 +80,15 @@ the fallback when the table is empty. Consequences:
 ordered list. `app/main.py` mounts the SPA at `/` **last**, so anything
 registered after that mount is dead. Add new routes above it. Inside a router,
 declare literal paths before a `/{id}` catch-all.
+
+**Adding a consumer SPA route touches three files, not one.** The PWA service
+worker claims navigations at the root scope, so a route must be added to
+`app-nithara/src/App.tsx`, to the explicit list in `app/main.py`, **and** to
+`workbox.navigateFallbackAllowlist` in `app-nithara/vite.config.ts`. Miss the
+third and the server-rendered page still works in curl but the browser silently
+gets the React shell instead — that exact bug shipped once
+(fixed in `776399b`). **Never verify a page a service worker could shadow with
+curl alone**; use a browser or read `dist/sw.js`.
 
 ## Module ownership (agents stay inside their domain)
 | Agent task area | May edit |
@@ -120,7 +143,10 @@ the same module at once.
 
 ## Requires human approval (stop and ask)
 - Database schema migrations (Alembic) — **writing** one is fine, **running**
-  it against a real database is not.
+  it against a real database is not. Note the local `.env` `DATABASE_URL`
+  points at the **production Neon database**, not a scratch one: verify the
+  target before running anything, and test migrations against a throwaway
+  SQLite file first.
 - Anything in `commerce` / payments (Razorpay), especially refunds.
 - The first live WhatsApp send, and any change to send volume or cadence.
 - Any edit to `tone_safety` prompts or to `GUARDRAILS.md`.
@@ -135,9 +161,15 @@ the same module at once.
   check with `mypy app`. There is no `black` in this project.
 - New Alembic revisions must use `sa.DateTime(timezone=True)` for timestamps —
   asyncpg rejects aware datetimes into a naive column.
-- Tests with `pytest`, one subfolder per module under `tests/`.
+- Tests with `pytest`, one subfolder per module under `tests/`. **Every backend
+  Part adds pytest; every frontend Part adds a Vitest/RTL test** for the
+  screen's loading / empty / error states.
 - Never put client-controlled text into `users.phone` — it is the identity key
   across Postgres and Mongo.
+- **WAHA is being retired** (console plan Part 14). Do not build anything new on
+  `waha_client.py` or `keepalive.py`. Until the official Cloud API's send
+  timeout is fixed, the WhatsApp surface is the console's simulator, which
+  drives the real brain through `POST /whatsapp/simulate`.
 
 ## Working baselines (do not regress)
 - `pytest` — **321 pass**. Two failures in `tests/whatsapp/test_whatsapp.py` are

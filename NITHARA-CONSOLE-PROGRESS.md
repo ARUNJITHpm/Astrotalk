@@ -135,11 +135,23 @@ never silently widen the API.
 
 ---
 
-## Standing items
+## Migrations applied to production — 2026-07-27
 
-- ⚠️ **Neither migration has been run against a real database.** Alembic
-  revisions need human approval (`docs/AGENTS.md`). Current chain:
-  `f6a7b8c9d0e1` → `a7b8c9d0e1f2` (temples) → `b8c9d0e1f2a3` (astrologers).
+Owner approved running against the real database. Applied
+`a7b8c9d0e1f2` (temples) and `b8c9d0e1f2a3` (astrologers) to the managed Neon
+Postgres the live Space uses. Both are purely additive — two `CREATE TABLE`
+plus inserts; nothing existing was altered or dropped, and
+`alembic downgrade f6a7b8c9d0e1` reverses them.
+
+Verified after the run: **53 temples** (all `reviewed=true`, curated
+`sort_order` intact) and **28 astrologers** (all `active=true`), schema at
+`b8c9d0e1f2a3`, and the live data path returns output **identical to the seed
+path** for both directories.
+
+Note for future work: the local `.env` `DATABASE_URL` points at production, not
+a scratch database. Test migrations against a throwaway SQLite file first.
+
+## Standing items
 - Removing the `"chargemod"` fallback (Part 7) can lock the owner out of the
   live Space if `ADMIN_TOKEN` is not set there — confirm before shipping it.
 - Part 14 (retire WAHA) must move `whatsapp_transport`'s default off `"waha"`
