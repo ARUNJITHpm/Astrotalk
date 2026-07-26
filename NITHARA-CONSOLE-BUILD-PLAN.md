@@ -1,0 +1,439 @@
+# Nithara Operator Console — Partwise Build Plan
+
+> Builds the back office the temple-first product never got.
+> **Backend:** new admin routes live in the **owning** `app/modules/*` — no
+> god-module (`docs/AGENTS.md` module-ownership rule).
+> **Frontend:** a new **desktop-first React + Vite + TypeScript** app in
+> `/app-console`, separate from the consumer PWA in `/app-nithara`.
+>
+> Each **Part** below is a self-contained prompt. Paste it into Claude Code and
+> let it run; parts are ordered so each builds on the last.
+
+---
+
+## Why this exists
+
+`main` became Nithara on 2026-07-25 and the consumer PWA at `/` is complete
+through Part 8 of [`NITHARA-BUILD-PLAN.md`](NITHARA-BUILD-PLAN.md). The back
+office never moved with it — [`NITHARA-UI-ENDPOINT-AUDIT.md`](NITHARA-UI-ENDPOINT-AUDIT.md)
+§5 explicitly parked the admin dashboard as out of scope for v1.
+
+Today an operator **cannot add a temple, edit a pooja price, onboard a real
+astrologer, or see a single booking**.
+
+### The blocker (verified, 2026-07-26)
+
+**There is no `temples` table and no `astrologers` table.**
+
+| Thing | Where it actually lives | Write API |
+|---|---|---|
+| 53 temples | `temples/seed_data.py` (621 ln), bound in memory at `temples/service.py:96` | **none** |
+| 28 astrologers | `astrologers/seed_data.py` — explicitly "DUMMY DATA", ids like `kozhikode-astro-1` | **none** |
+| Pooja catalogue | `DEFAULT_POOJAS`, a 4-item constant at `temples/service.py:59` | **none** |
+| App feed | `FEED_ITEMS`, 3 hardcoded items in `content/feed.py:17` | **none** |
+| ₹15 service fee | `SERVICE_FEE_PAISE`, `bookings/service.py:27` | **none** |
+
+Only relationship tables exist (`temple_partners`, `temple_subscriptions`,
+`temple_visits`, `temple_festivals`, `astro_bookings`, `pooja_bookings`).
+
+So no console UI can create or edit a temple until the directory leaves
+`seed_data.py`. **That ordering drives this plan: Parts 1–3 before anything
+visible.**
+
+### Existing pages this replaces
+
+- `/admin` (`app/web/admin.html` + `admin.js`, 1,369 ln) — Tara-era: LLM
+  token/cost accounting, chat-transcript explorer, social content pack. Has
+  **no temple, pooja, booking or astrologer panel at all**.
+- `/console` (`app/web/console.html`, 684 ln, JS inlined) — models
+  temple-as-distribution-channel (microsite, QR, widget, festival blast), not
+  temple-as-marketplace. Its Astrologer panel is a static "soon" card.
+
+`app/web/ui/` is **NOT** in scope — it is the white-label B2B surface
+(`/a/{handle}/ui`, `/login`, `/dashboard`) and deleting it breaks `tests/orgs/`.
+
+---
+
+## Ground rules (apply to every part)
+
+- **Stay in the owning module.** Temple admin routes go in
+  `app/modules/temples/router.py`, astrologer routes in `astrologers/`, and so
+  on. Never reach into another module's tables.
+- **Reuse the existing gate.** `AdminGuard` (`app/platform/admin_auth.py:82`)
+  is the admin dependency. Do not invent a second auth scheme.
+- **Migrations need human approval** (`docs/AGENTS.md`). Stop and ask before
+  running one. Use `sa.DateTime(timezone=True)` on every timestamp column.
+  Current head: `f6a7b8c9d0e1`.
+- **The existing test suite is the contract.** Where a part refactors a
+  service, `tests/<module>/` must pass **unchanged** — that is the proof.
+- **Tests.** Every backend part adds pytest under `tests/<module>/`. Every
+  frontend part adds a Vitest test.
+- **Commit per `AGENTS.md`:** one logical change per commit, Conventional
+  Commits, before switching parts.
+
+## Two product decisions needed before Part 1
+
+1. **Import the 53 temples as `reviewed=False`?** Every entry currently carries
+   `"reviewed": True`, while the file's own docstring (`seed_data.py:3`) says
+   *"DRAFT DATA — NOT reviewed. Every entry is `reviewed=False`"*. That flag is
+   served to clients via `TempleSuggestion.reviewed`. Importing as `False` makes
+   the console's review queue meaningful but changes what `/temples/suggest`
+   returns today.
+2. **Hide the 28 dummy astrologers (`active=False`) on import?** The consumer
+   app already refuses to render them (`app-nithara/src/screens/Astro.tsx:128`).
+
+---
+
+# BACKEND
+
+## Part 1 — Temples: out of `seed_data.py`, into Postgres
+```
+Read app/modules/temples/{seed_data.py,service.py,models.py,router.py} and
+migrations/versions/ for the current head (f6a7b8c9d0e1).
+
+In app/modules/temples/, add DB-backed temple storage:
+- models.py: `Temple` carrying every TempleSeed field (id, name, name_ml, deity,
+  district, town, lat, lng, famous_for, vazhipadu, reviewed, story, story_ml,
+  rating, reviews) PLUS `active`, `image_key`, `updated_at`. Add `TempleTiming`
+  (per-temple hours + display strings; today DEFAULT_TIMINGS at service.py:51
+  is shared by all 53).
+- One Alembic revision that creates the tables AND imports SEED_TEMPLES in the
+  same upgrade, so the app keeps serving on first deploy. Ask before running it.
+  Honor the `reviewed` decision above.
+- service.py: TemplesService reads from the DB instead of binding SEED_TEMPLES
+  in __init__ (service.py:96). KEEP EVERY PUBLIC METHOD SIGNATURE IDENTICAL —
+  list_temples, get_temple, suggest, pooja_catalogue, the lot.
+- Keep seed_data.py as the import fixture; stop importing it at runtime.
+
+Done when `pytest tests/temples` passes UNCHANGED and GET /temples,
+/temples/{id}, /temples/suggest return what they returned before.
+```
+
+## Part 2 — Astrologers: out of `seed_data.py`, into Postgres
+```
+Read app/modules/astrologers/{seed_data.py,service.py,models.py,router.py}.
+
+Same move as Part 1:
+- models.py: `Astrologer` (id, name, name_ml, district, town, lat, lng,
+  specialties, experience_years, languages, rating, bio_ml) PLUS `active`,
+  `price_paise_per_min` (the UI audit expects ₹/min; the model has no price at
+  all) and `photo_key`. Add `AstrologerAvailability` — consult windows are
+  currently baked into _morning_windows()/_evening_windows() (seed_data.py:97).
+- Alembic revision + data import of SEED_ASTROLOGERS. Ask before running.
+  Honor the `active=False` decision above.
+- service.py:69 reads from the DB. Public method signatures unchanged.
+
+Done when `pytest tests/astrologers` passes UNCHANGED.
+```
+
+## Part 3 — Pooja catalogue + settings
+```
+Read temples/service.py:59 (DEFAULT_POOJAS) and bookings/service.py:27
+(SERVICE_FEE_PAISE) and :55-60 (server-side re-pricing).
+
+In app/modules/temples/:
+- A master `Pooja` table (key, name, name_ml, description, amount_paise,
+  lead_days, active), seeded from DEFAULT_POOJAS.
+- A `TemplePooja` table overriding the master per temple (amount, lead_days,
+  active). The override slot already exists in the schema (TempleSeed.poojas,
+  read at service.py:209) but ZERO of the 53 temples use it — every temple in
+  the product currently serves the identical 4-item ₹51–₹1250 list.
+- pooja_catalogue() resolves master → per-temple override.
+- A small key/value settings table (or a settings row) for the ₹15 service fee,
+  read by bookings/service.py instead of the constant.
+
+Pricing MUST stay server-side truth — BookingsService.create re-prices from the
+catalogue so a client can never send an amount. Do not weaken that.
+
+Alembic revision + import. Ask before running. `pytest tests/bookings` unchanged.
+```
+
+## Part 4 — Temple admin API
+```
+Add admin-gated routes to app/modules/temples/router.py, all with
+dependencies=[AdminGuard]. Schemas in temples/schemas.py.
+
+- POST/PATCH/DELETE temple records (DELETE = soft, flip `active`).
+- PATCH /{id}/timings — per-temple hours + display strings.
+- PATCH /{id}/review — flip `reviewed`. The field is served to clients but
+  nothing can currently set it.
+- POST /{id}/image — temple photo via app/platform/storage.py.
+- Per-temple pooja override CRUD + master pooja CRUD (Part 3 tables).
+- PATCH/DELETE for partners and festivals: both are append-only today
+  (router.py:91, :120) — a wrong festival date can never be fixed, and
+  TemplePartner.active (models.py:43) has no route that writes it.
+
+Register new literal paths BEFORE the /{temple_id} catch-all (see the comment
+at router.py:152-154). Tests in tests/temples/ covering the 401-without-token
+path, happy path, and validation failures.
+```
+
+## Part 5 — Astrologer admin API
+```
+Add admin-gated routes to app/modules/astrologers/router.py. The module does
+not import AdminGuard at all today — all six routes are public reads or
+user-scoped bookings.
+
+- POST/PATCH astrologer records; PATCH /{id}/active.
+- PUT /{id}/availability — replace the baked-in weekly windows.
+- POST /{id}/photo.
+- GET /{id}/bookings — an astrologer cannot see their own diary today.
+- PATCH /astro-bookings/{id} — set confirmed|completed|no_show. Today only the
+  booking's own user can cancel it (router.py:56).
+
+Tests in tests/astrologers/.
+```
+
+## Part 6 — Bookings operator API
+```
+The biggest gap: operators can currently see NOTHING. app/modules/bookings/
+has exactly two routes, both hard-scoped to the caller (router.py:31, :45).
+
+- Extend the state machine FIRST: BOOKING_STATES = ("wait","ok")
+  (bookings/models.py:21) has no cancelled / completed / refunded. Nothing but
+  the payment reconciler (service.py:106-113) ever writes state. Add the terminal
+  states and an explicit transition guard. Alembic revision — ask before running.
+- GET admin list: filters (temple_id, state, pooja_key, date range, ref, user
+  phone) + pagination + sort.
+- GET detail by id and by ref, joined to the user, member name/nakshatram, and
+  the commerce payment.
+- PATCH /{id}/status; cancel and refund (no cancel path exists for poojas at all
+  today, for operator OR user); operator notes.
+- GET /temples/{id}/bookings — the temple worklist ("what do we perform
+  tomorrow"), grouped by star day.
+- CSV export for settlement.
+
+Refunds touch commerce/Razorpay — `AGENTS.md` requires human approval. Stop and
+ask before wiring the refund call; land everything else first.
+Tests in tests/bookings/.
+```
+
+## Part 7 — Users, payments, feed, and auth hardening
+```
+--- Users (identity) ---
+GET /admin/users — paginated, searchable by phone/name. Today the only operator
+view is GET /admin/users-chats (admin/router.py:60), which shows ONLY users who
+have chat history; a user who never chatted is invisible. Add user detail
+(bookings, chart, family, entitlements) and disable/export.
+NEVER put birth data in a URL or a log (GUARDRAILS §4).
+
+--- Payments (commerce) ---
+GET /admin/payments (filter status/date), payment detail, and
+POST /admin/entitlements — `granted_by="admin"` is a declared value
+(commerce/models.py:23) with no route that can produce it.
+
+--- Feed (content) ---
+CRUD over the app feed, replacing the hardcoded FEED_ITEMS list
+(content/feed.py:17). Its own docstring flags this as pending.
+
+--- Auth hardening (do this part regardless of the rest) ---
+- Add AdminGuard to GET /whatsapp/waha-status and /waha-qr
+  (whatsapp/router.py:427, :433). They are UNGATED today despite "for admin"
+  docstrings, and the QR route exposes WhatsApp session pairing info to
+  anonymous callers.
+- Retire the literal "chargemod" accepted unconditionally at
+  admin_auth.py:40 and by POST /admin/login (admin/router.py:50).
+```
+
+---
+
+# FRONTEND  (React + Vite + TypeScript · desktop)
+
+## Part 8 — `app-console/` scaffold: shell, sidebar, auth, dashboard
+```
+Create a new frontend app in /app-console (sibling to app/ and app-nithara/).
+Do NOT touch app-nithara.
+
+Stack: Vite + React + TypeScript, react-router, @tanstack/react-query, Vitest.
+DELIBERATELY NOT: vite-plugin-pwa, Capacitor, react-i18next, the 432px phone
+frame. This is a desktop tool for operators, in English.
+
+- Adapt the shape of app-nithara/src/api/client.ts, but send X-Admin-Token.
+  Reuse the existing dual-credential scheme (admin_auth.py accepts either
+  X-Admin-Token or a Bearer session whose phone is in admin_phones).
+- Login screen against POST /admin/login. Do NOT prefill any credential —
+  console.html:117 hardcodes a personal email and admin.html:363 prints the
+  password on screen; neither carries over.
+- The left sidebar and routing skeleton for every section in the IA below,
+  with unbuilt sections stubbed.
+- Dashboard: today's bookings, check-ins, payments, new users, alerts.
+- /app-console/dist is already covered by the root .gitignore `dist/` rule.
+```
+
+**Sidebar information architecture** — build order is Parts 9 → 12:
+
+```
+OVERVIEW    Dashboard        bookings today, check-ins, payments, new users, alerts
+
+TEMPLES     All temples      list/search by district + deity, reviewed + active badges
+            Temple editor    identity, bilingual story, location, timings, images, review
+            Pooja catalogue  master offerings + per-temple overrides and pricing
+            Partners & QR    registration, microsite, QR poster, embed widget   [carried]
+            Festivals        add / edit / delete dated festivals
+
+BOOKINGS    Pooja bookings   the queue: filters, ref lookup, status, notes, export
+            Temple worklist  "what do we perform tomorrow", grouped by star day
+            Consults         astrologer bookings + diary
+            Payments         orders, status, refunds, manual entitlement grants
+
+PEOPLE      Users            search by phone/name → bookings, chart, family, entitlements
+            Astrologers      onboard real practitioners, availability, pricing, active
+            Engagement       check-ins, streaks, milestones
+
+CONTENT     App feed         CRUD over what the app's notices rail shows
+            Daily pack       [carried — dedupe the TWO existing implementations]
+            Studio           [carried]
+            Share cards      [carried]
+
+ASTROLOGY   Panchangam       date explorer                                      [carried]
+            Temple suggest   concern → temples tester                           [carried]
+
+CHANNELS    WhatsApp sim     [carried from /whatsapp]
+            Notifications    nakshatram reminders, festival runs                [carried]
+
+SYSTEM      Integrations     health + live/mock status pills                    [carried]
+            Chat explorer    read-only, for support                             [carried]
+            Org tenants      white-label                                        [carried]
+            Settings         service fee, admin token, roles
+```
+
+## Part 9 — Temples section
+```
+Build the TEMPLES group against the Part 4 API:
+- All temples: searchable/filterable table (district, deity, reviewed, active).
+- Temple editor: every field incl. the bilingual story pair, map-picker for
+  lat/lng, timings, image upload, and the review toggle.
+  Malayalam fields need a proper input — the operator will paste ML script.
+- Pooja catalogue: master list, plus per-temple override with pricing.
+- Partners & QR + Festivals: port from console.html:503-588, adding the
+  edit/delete the old page never had.
+
+Vitest tests for the list filters and the editor's save path.
+```
+
+## Part 10 — Bookings section
+```
+Build the BOOKINGS group against the Part 6 API. This is the operational heart
+of the product — treat it as the most important screen in the console.
+- Pooja bookings queue: filters, ref lookup, status transitions, operator notes,
+  CSV export. Show member name + nakshatram and the payment state.
+- Temple worklist grouped by star day, printable.
+- Consults: astrologer diary + status.
+- Payments: order list, detail, manual entitlement grant.
+Vitest tests for the filter state and a status transition.
+```
+
+## Part 11 — People section
+```
+Build the PEOPLE group against Parts 5 and 7.
+- Users: search by phone/name, detail with bookings, family, entitlements.
+  Birth data is sensitive (GUARDRAILS §4) — never put it in a URL, and show the
+  chart only where an operator genuinely needs it.
+- Astrologers: onboarding form for REAL practitioners (the 28 seeded ones are
+  placeholders), availability editor, pricing, active toggle.
+- Engagement: check-ins, streaks, milestones.
+```
+
+## Part 12 — Carried-over sections
+```
+Port the panels that already work today, so /admin and /console can be deleted:
+- CONTENT: daily pack, studio, share cards. NOTE the daily pack is implemented
+  TWICE and independently (admin.js:692-813 and console.html:286-340) — build
+  ONE, keeping console's extra mark-published action.
+- ASTROLOGY: panchangam explorer, temple-suggest tester.
+- CHANNELS: WhatsApp simulator (port whatsapp.html), notification runs.
+- SYSTEM: integration status pills, read-only chat explorer for support, org
+  tenants, settings.
+Lowest-risk part — these endpoints all exist and are exercised today.
+```
+
+---
+
+# SHIP
+
+## Part 13 — Serve it, then retire the old pages
+```
+--- Serving ---
+- Dockerfile: a third stage `FROM node:20-slim AS console`, mirroring the
+  existing `frontend` stage, then
+  COPY --from=console /build/dist ./app-console/dist
+- app/main.py: mount app-console/dist at /console, registered ABOVE the root
+  Mount("/") — Starlette matches in registration order and anything after that
+  mount is dead (see the comment at main.py:227-231). Add the console paths to
+  _NO_STORE_PATHS (main.py:134).
+- Confirm app-nithara's service worker does not claim /console. It should not:
+  navigateFallbackAllowlist was restricted to the four SPA routes in 776399b.
+  VERIFY IN A BROWSER — curl cannot see a service worker, which is exactly how
+  the /prototype bug got missed.
+
+--- Retirement (only after Part 12 reaches parity) ---
+- Delete app/web/admin.html, admin.js, console.html; drop their routes.
+- Point shell.js's nav at the new console.
+- Update README.md (still describes three hand-written operator pages) and
+  FILE_STRUCTURE.md.
+- DO NOT touch app/web/ui/ — white-label B2B surface, breaks tests/orgs/.
+- whatsapp.html stays until Part 12 ports it.
+```
+
+---
+
+## Sequencing at a glance
+
+```
+Part 1 (temples→DB) ─┐
+Part 2 (astro→DB) ───┼─► Part 4 (temple admin API) ─► Part 9  (Temples UI) ──┐
+Part 3 (poojas→DB) ──┘    Part 5 (astro admin API) ─► Part 11 (People UI) ───┤
+                          Part 6 (bookings API) ────► Part 10 (Bookings UI) ─┼─► Part 13
+                          Part 7 (users/pay/feed/auth) ─► Part 12 (carried) ─┘
+Part 8 (console scaffold) — can start as soon as Part 4 lands
+```
+
+Parts 1–3 are strictly sequential and block everything. Parts 4–7 are
+independent of each other. Part 7's auth hardening can ship on its own, today.
+
+## Verification
+
+- **Parts 1–3:** `pytest tests/temples tests/astrologers tests/bookings` passes
+  **unchanged**; `python scripts/migrate.py` on a scratch DB lands 53 temples
+  and 28 astrologers with the same ids the app already serves.
+- **Parts 4–7:** new tests per module — 401 without a token, happy path,
+  validation failure. `ruff check .` (27 pre-existing findings; the count must
+  not grow) and `mypy app`.
+- **Parts 8–12:** `npx vitest run` in app-console/, plus one manual end-to-end
+  pass: create a temple in the console → see it in the app at `/` → book its
+  pooja → watch it land in the console queue → move its status.
+- **Part 13:** Docker is **not installed on this machine** — the HF Space build
+  is the first real test, as it was for the Nithara frontend stage. Then check
+  `/`, `/console`, `/prototype` and the API routes in a **browser**.
+- **Final:** full `pytest` — 263 pass today, plus 2 pre-existing WhatsApp
+  failures caused by local `.env` having `MOCK_WHATSAPP=false`.
+
+---
+
+## Deferred: consumer-app gaps (NOT built here)
+
+From comparing `/prototype` (`nithara-v11.html`) against the live React app.
+The app is mostly **ahead** — the prototype is 100% faked, down to a porutham
+score of `(a*7+b*13)%1024` — and some absences are deliberate guardrail calls
+(the astrologer directory is hidden because the seed is placeholders). Real
+gaps, cheapest first:
+
+**Pure UI:** Home's Book button is a toast (`Home.tsx:42`) and quick-book is
+hardcoded to `('pushpanjali',101)` (`:259`); promo/banner rail; notices
+"See all" → feed sheet; map count label + `fitPins` re-fit; WEEKDAY box and
+lead-time note on the Poojas star card; family-card next-star badges; share
+sheet; bilingual dual-line section headers.
+
+**Endpoint exists, unwired:** check-in is cosmetic while
+`POST /temples/{id}/checkin` sits unused (`temples/router.py:201`); QR
+onboarding needs `GET /temples/by-qr/{token}` (`:173`).
+
+**Needs backend:** `/home/promos`; "why today" reason line; `temple_name` on
+`Booking`; upcoming/past filter; multi-window muhurtham; **anon chart creation**
+(blocks the whole Jathakam / rasi grid / dasha bar on Profile); **temple devotee
+leaderboard** (nothing exists); **login + anon-account linking**.
+
+**Blocked on data:** the astrologer directory stays hidden until real, consented
+practitioners exist. Part 5 + Part 11 give you the tool to onboard them.
+
+Useful proxy for the total: **209 of 334 i18n keys are unused**.
