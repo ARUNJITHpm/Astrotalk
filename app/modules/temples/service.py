@@ -17,6 +17,7 @@ from datetime import datetime
 from math import asin, cos, radians, sin, sqrt
 from zoneinfo import ZoneInfo
 
+from app.modules.temples import registry
 from app.modules.temples.remedy_map import (
     CONCERN_DEITIES,
     CONCERN_KEYWORDS,
@@ -26,7 +27,6 @@ from app.modules.temples.remedy_map import (
     GRAHA_DEITIES,
 )
 from app.modules.temples.schemas import TempleSuggestion
-from app.modules.temples.seed_data import SEED_TEMPLES
 
 _EARTH_RADIUS_KM = 6371.0
 _IST = ZoneInfo("Asia/Kolkata")
@@ -92,11 +92,18 @@ def _open_state(hours: tuple[tuple[int, int], ...], now_min: int) -> tuple[bool,
 
 
 class TemplesService:
-    def __init__(self) -> None:
-        self._temples = SEED_TEMPLES
+    @property
+    def _temples(self) -> list[dict]:
+        """The directory, read fresh from the registry snapshot.
+
+        A property, not a value bound in ``__init__``: routers instantiate this
+        service at import time, long before the database is read, so binding
+        once would pin the process to the seed fallback for its whole life.
+        """
+        return registry.current()
 
     def get_temple(self, temple_id: str) -> dict | None:
-        """One seed-directory temple by id (public — Part 3 surfaces use it)."""
+        """One directory temple by id (public — Part 3 surfaces use it)."""
         for temple in self._temples:
             if temple["id"] == temple_id:
                 return dict(temple)

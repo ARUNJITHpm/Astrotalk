@@ -54,7 +54,7 @@ from app.modules.tone_safety.router import router as tone_safety_router
 from app.modules.whatsapp.keepalive import start_keepalive
 from app.modules.whatsapp.router import router as whatsapp_router
 from app.platform.db import init_db
-from app.platform.logging_config import configure_logging
+from app.platform.logging_config import configure_logging, get_logger
 from app.platform.mongo import close_mongo
 
 configure_logging()
@@ -65,6 +65,20 @@ async def lifespan(app: FastAPI):
     # Every table-owning module's models are imported above via its router, so
     # Base.metadata is complete by the time we create missing tables here.
     await init_db()
+    # Load the temple directory into the process. It is read synchronously from
+    # inside the chat turn, so it is cached rather than queried per call; an
+    # empty table falls back to the curated seed (see temples/registry.py). A
+    # failure here must not stop the app booting — the fallback still serves.
+    log = get_logger(__name__)
+    try:
+        from app.modules.temples import registry as temple_registry
+        from app.platform.db import async_session_factory
+
+        async with async_session_factory() as session:
+            loaded = await temple_registry.load(session)
+        log.info("temple directory loaded: %d rows", loaded)
+    except Exception:
+        log.exception("temple directory load failed; falling back to the curated seed")
     # Keep a scale-to-zero WAHA host (Render free tier) awake by pinging it on
     # an interval. No-op unless waha_keepalive_enabled is set in production.
     keepalive_task = start_keepalive()
