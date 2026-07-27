@@ -237,7 +237,14 @@ Tests in tests/platform/ (the guard: each role, scope hit and miss, token→owne
 403 vs 401) and tests/admin/ (login without the backdoor).
 ```
 
-## Part 5 — Temple admin API
+## Part 5 — Temple admin API  ✅ DONE (`10bfb16`)
+
+> **As built.** The image route takes raw bytes rather than a multipart upload
+> (`python-multipart` is not a pinned dependency), and `reviewed` is gated on
+> `owner`/`content_reviewer` rather than the temple's own admin — see
+> `NITHARA-CONSOLE-PROGRESS.md`. The pre-existing partner routes had to be
+> rescoped in the same commit.
+
 ```
 Add operator-gated routes to app/modules/temples/router.py. Gate with
 require_operator("owner", "temple_admin") from Part 4 and enforce the scope:

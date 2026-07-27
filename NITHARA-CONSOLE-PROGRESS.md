@@ -263,6 +263,91 @@ does not, because no operator exists yet); renamed to
 
 ---
 
+## Part 5 — Temple admin API (`10bfb16`)
+
+### Findings
+
+- **The directory had never had a write path.** Parts 1–3 gave it tables; this
+  is the first commit that can change a row. No migration was needed, which is
+  the point of having done the data moves first.
+- **Partners and festivals were append-only.** `add_festival` (`partners.py`)
+  had no counterpart, so a wrong festival date could never be corrected — and
+  a festival date is exactly what subscribers get notified about three days
+  early. `TemplePartner.active` (`models.py:153`) had no route that could
+  write it either: a partnership could be created but never ended.
+- **`python-multipart` is not a pinned dependency**, though it is importable
+  transitively. A `POST /image` on `UploadFile` would have rested on that.
+
+### Done
+
+| File | Change |
+|---|---|
+| `temples/admin.py` | **new** — operator data access + validation, the split `partners.py` already uses |
+| `temples/router.py` | 15 operator routes; the partner block rescoped |
+| `temples/partners.py` | `update_festival`, `delete_festival`, `update_partner` |
+| `temples/schemas.py` | the write shapes, kept separate from the app's read contract |
+| `tests/temples/test_temple_admin.py` | **new**, 38 tests |
+
+**Role split.** Owner: create/retire a temple, the master catalogue. Owner or
+`temple_admin` (then scoped by `require_temple`): edit a temple, its timings,
+its photo, its catalogue overrides, its partner and festivals. Owner or
+`content_reviewer`: the `reviewed` flag.
+
+**Key design decision — `reviewed` is not part of PATCH.** The flag asserts an
+astrologer checked the devotional content (GUARDRAILS §1) and it is served to
+clients. Routing it through the generic edit route would let the same role that
+writes a temple's copy also certify it, which makes the flag self-issued and
+therefore worthless. `TempleAdminPatch` sets `extra="forbid"` so this is
+enforced by the schema, not by convention; a test pins it.
+
+**Retire, never delete.** Bookings, visits, partners and festivals all
+reference `temples.id` as a plain string with no foreign key, so a real DELETE
+would orphan them without a word. `active=False` is the only removal on offer.
+The one exception is a festival: nothing references one, and a cancelled
+festival should leave the microsite rather than linger as an inactive row.
+
+**Publication.** Every write ends in `_publish()` — commit, then rebuild the
+registry snapshot. Without it an operator's edit would not appear until the
+next restart, because the readers are synchronous and serve the in-memory
+snapshot. The tests therefore assert against the *public* API, never the row.
+This is safe only because the container runs a single uvicorn worker
+(`Dockerfile:61`); adding `--workers N` would refresh one process and leave the
+others stale, and would need a shared invalidation signal first.
+
+**Images without multipart.** `POST /{id}/image` takes the raw file as the
+request body — one line for a console (`fetch(url, {method:'POST', body:file})`)
+and no new dependency. The format comes from the file's magic bytes, never
+from `Content-Type`: the header is a claim, the first bytes are evidence.
+
+### Review findings, fixed before commit
+
+1. **Partner routes were still on the coarse `AdminGuard`** next to the newly
+   scoped PATCH. A `temple_admin` could register a partner for a temple they
+   are then forbidden to edit, and `GET /temples/partners` returned *every*
+   partner's contact phone number. Creation, listing and the QR poster are all
+   scoped now. This is precisely the "retro-fitting scopes onto finished
+   endpoints" the plan warned about — the endpoints were finished before roles
+   existed.
+2. **The WebP sniff matched bare `RIFF`**, which is the generic container magic
+   that WAV and AVI also carry, so an audio file would have been stored and
+   served back as `image/webp`. Both halves of the header are checked now.
+
+### Verification
+
+- `tests/temples` **90 pass**; full suite **401 pass**
+- ruff **125** — three below the 128 baseline (an existing `B904` in
+  `create_partner` was fixed in passing)
+- Route-ordering pin: a test asserts `GET /temples/poojas` reaches the master
+  catalogue, so a future re-order that lets `/{temple_id}` claim it fails loudly
+- No migration; nothing was applied to production
+
+**Trap worth knowing, pinned by a test.** An empty `temples` table means "never
+imported" and serves the curated seed, so creating the *first* temple through
+the console on a deployment that never ran `a7b8c9d0e1f2` swaps 53 temples for
+1. Production has run it.
+
+---
+
 ## Migrations applied to production — 2026-07-27
 
 Owner approved running against the real database. Applied
