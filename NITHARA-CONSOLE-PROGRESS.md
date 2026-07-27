@@ -593,6 +593,87 @@ Both are decisions for the owner rather than defaults for me to pick:
 
 ---
 
+## Part 9 — `app-console/` scaffold
+
+A new React/Vite/TypeScript app served at `/console-app`. `app-nithara` is
+untouched and `/console` keeps working until Part 14 retires it. Not a PWA and
+not Capacitor-wrapped — a desktop staff tool, in English, and no service worker
+that could shadow the pages this origin already serves.
+
+### Role-awareness is the substance
+
+`lib/nav.ts` declares the whole IA **once**, and both the sidebar and the route
+guard read it. Hiding a nav item is not access control — a bookmark, a typed
+URL and a back button all skip the sidebar. Two separate lists is exactly how a
+section ends up invisible but reachable.
+
+This is defence in depth, not the defence: every path is behind
+`require_operator(...)` server-side. What it buys is an honest message instead
+of a page that mounts, fires a request and collapses into an error toast.
+
+| Role | Sees |
+|---|---|
+| owner | everything |
+| temple_admin | Overview, Temples, Bookings — **not** users, payments or operators |
+| content_reviewer | Overview, Content |
+| support | Overview, Engagement, Chat explorer, Astrology testers |
+
+### Backend changes this needed
+
+**`GET /admin/operators/me` is new.** Part 4 issued a session token but nothing
+told the holder what it was *for*, so a console could not render a role-aware
+sidebar. It returns the already-resolved `Operator` — no new authorisation
+logic. Its contract: **`is_owner`, not an empty `temple_ids`**, is what marks an
+unscoped owner. A client reading "no temple ids" as "no temples" either blinds
+an owner or unscopes a clerk; two tests pin both readings.
+
+**`POST /admin/operators/{id}/active` took a query parameter.** It declared
+`active: bool` bare, which FastAPI reads as a query param — so it wanted
+`?active=false` while its three siblings (temples, astrologers, users) all take
+a JSON body. Nothing called it and no test covered it, which is how it survived
+Part 4. Aligned to a body before the console became its first client.
+
+### Serving and caching
+
+A **scoped mount, not a catch-all**: `/console-app/*` serves the shell so deep
+links reach react-router, while the API keeps every path it already claimed —
+a test asserts `/admin/users` still answers 401 rather than HTML.
+
+The cache middleware needed both halves widened. The console's hashed assets
+sit under `/console-app/assets/`, which the bare `/assets/` prefix would have
+missed entirely, leaving them with **no** cache header. And the shell is now
+matched by prefix, because exact-matching `/console-app` would leave
+`/console-app/bookings` cacheable — how an operator ends up on yesterday's
+build after a deploy.
+
+### Two things carried over deliberately
+
+- **Login prefills nothing.** `console.html:117` hardcoded a personal email and
+  `admin.html:363` printed the password on screen. A test asserts both fields
+  start empty.
+- **The credential lives in `sessionStorage`.** A back-office machine may be
+  shared, so an operator token should die with the tab. The consumer app makes
+  the opposite trade on purpose.
+
+The dashboard reads the **scoped** endpoints rather than a new aggregate, so a
+temple_admin's figures narrow without this code knowing the scoping rule. A
+failed request shows an em dash, never a zero — "0 bookings today" and "we
+could not ask" are different facts.
+
+### Verification
+
+- Console: **35 vitest tests**, `tsc -b` clean, `vite build` clean
+- Backend: **506 pass** (+14), ruff steady at **123**
+- `/console-app` serving covered against a real built `dist/`
+
+**NOT verified: the Dockerfile's new `console` stage.** The machine hit its
+Windows commit limit (41 MB free of a 17.5 GB limit, 6 GB physical) and
+buildkit was OOM-killed during `npm ci`. The stage mirrors the existing
+`frontend` one and `app/main.py` is tested against a real build, but the image
+has not been built with it. **Do this before deploying Part 9.**
+
+---
+
 ## Local Docker verification — 2026-07-27
 
 Docker Desktop is installed on the dev machine now, so the image no longer has

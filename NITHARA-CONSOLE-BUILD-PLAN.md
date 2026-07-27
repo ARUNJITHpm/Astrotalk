@@ -364,7 +364,15 @@ CRUD over the app feed, replacing the hardcoded FEED_ITEMS list
 
 # FRONTEND  (React + Vite + TypeScript · desktop)
 
-## Part 9 — `app-console/` scaffold: shell, sidebar, auth, dashboard
+## Part 9 — `app-console/` scaffold: shell, sidebar, auth, dashboard  ✅ DONE
+
+> **As built.** Served at `/console-app` (not `/console` — the old page keeps
+> working until Part 14). Login is the operator/owner sign-in built in Part 4,
+> not the identity phone+password login this text predates. Needed one new
+> endpoint, `GET /admin/operators/me`, so the console can read its own roles.
+> The Dockerfile stage is written but **unbuilt** — see
+> `NITHARA-CONSOLE-PROGRESS.md`.
+
 ```
 Create a new frontend app in /app-console (sibling to app/ and app-nithara/).
 Do NOT touch app-nithara.
