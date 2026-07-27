@@ -417,6 +417,93 @@ state, with a test.
 
 ---
 
+## Part 7 — Bookings operator API (`c483bed`)
+
+### Findings
+
+- **Operators could see nothing.** Two routes, both hard-scoped to the caller
+  (`router.py:31,:45`). Answering "what are we performing tomorrow" meant
+  opening the database.
+- **`when_label` is free display text** the client composes ("28 Jul, 6:00 AM").
+  There was no machine-readable date anywhere on a booking, so a dated worklist
+  — the whole point of the operator queue — was not expressible.
+- **Nothing but the payment reconciler ever wrote `state`**, and the vocabulary
+  was `wait | ok`. There was no cancel path for a pooja at all, for an operator
+  *or* a user, and nothing recorded that an offering had been performed.
+- **The ₹15 fee got a row in Part 3 but no writer.**
+
+### Done
+
+| File | Change |
+|---|---|
+| `bookings/admin.py` | **new** — scoped queue, detail, state machine, worklist, CSV |
+| `bookings/router.py` | 9 operator routes under `/bookings/queue` |
+| `bookings/models.py` | `BOOKING_STATES` widened; `OPERATOR_TRANSITIONS`; `perform_on`, `operator_note`, `updated_at` |
+| `bookings/service.py` | the reconciler guard (below) |
+| `migrations/…e1f2a3b4c5d6` | the three columns — **not yet applied to production** |
+| `tests/bookings/test_booking_queue.py` | **new**, 33 tests |
+
+**Scope is the load-bearing part.** Filtering happens in the query, not after
+it, and `visible_temple_ids()` returns `None` for an owner but an **empty set**
+for a scoped operator with no grants. The obvious `if temple_ids:` treats them
+alike and opens the entire queue — devotee names and phone numbers included. A
+test drives the query directly to pin the empty-set branch.
+
+A booking outside scope reads as **missing**, not forbidden. Refs are `NT` plus
+six digits; answering "forbidden" for one temple and "unknown" for another
+turns the ref lookup into an oracle.
+
+**Two things the state machine must refuse.** An operator cannot assert `ok` —
+it means the reconciler saw a captured payment, and a console that could claim
+it would make a paid booking indistinguishable from a mistaken click. And
+`refunded` is bookkeeping only: it records that a refund was issued in the
+Razorpay dashboard. Wiring a real refund touches payments and is gated on human
+approval (AGENTS.md), so this stops at recording the fact rather than
+pretending.
+
+**The reconciler bug the new states created.** `list_for_user` promoted any
+booking whose state was `!= "ok"` — identical to `== "wait"` while those were
+the only two states. With a cancel path it would have resurrected a **cancelled**
+booking the moment a late capture landed, silently undoing an operator's
+decision. Now only `wait` reconciles, with a test.
+
+**`perform_on`.** Nullable and optional, so existing clients keep working. The
+worklist *reports* how many bookings it could not place rather than dropping
+them — a sheet that quietly omits work is worse than one that says what it is
+missing.
+
+### Review findings, fixed before commit
+
+1. **Date filters were a day out for Indian operators.** They compared UTC
+   dates, so a booking made at 03:00 IST (21:30 UTC the previous day) fell
+   under the wrong day and disappeared from both days' reports. The bounds are
+   now the UTC instants that bracket an IST day, computed in Python so the SQL
+   stays portable between SQLite (tests) and Postgres (production).
+2. **The CSV export reused the queue's 200-row page cap**, so a month's
+   settlement would have been cut off in silence. It has its own bound
+   (`MAX_EXPORT`, 5000) and a comment saying why the two differ.
+3. **A test was named for a branch it never reached** — the role check fired
+   first, so `test_an_operator_with_no_grants_sees_nothing` proved only that
+   `support` is not a queue role. Split into a direct query-level test of the
+   empty scope and a separate role test. (The same class of mistake as Part 4's
+   misnamed test; worth watching for.)
+
+### Verification
+
+- `tests/bookings` **40 pass**; full suite **462 pass**
+- ruff **123** — five below the 128 baseline
+- Migration verified on a throwaway SQLite: upgrade → downgrade → upgrade all
+  clean, 53 temples / 28 astrologers / 4 offerings intact, head at
+  `e1f2a3b4c5d6`
+- A test pins that `/queue/export.csv` is not parsed as a `{booking_id}`
+
+> ⚠️ **`e1f2a3b4c5d6` has NOT been applied to production.** The app will fail
+> to read `pooja_bookings` on the live database until it is — but the deploy is
+> already blocked on `ADMIN_TOKEN`, so nothing is broken today. Both need doing
+> before the next push to `hf`.
+
+---
+
 ## Migrations applied to production — 2026-07-27
 
 Owner approved running against the real database. Applied
@@ -440,6 +527,9 @@ a scratch database. Test migrations against a throwaway SQLite file first.
 - Part 14 (retire WAHA) must move `whatsapp_transport`'s default off `"waha"`
   (`config.py:122`) in the same commit, or a Space with no explicit setting
   falls through to a transport that no longer exists.
+- **Migration `e1f2a3b4c5d6` (Part 7) is pending on production.** Purely
+  additive; run it before the next deploy or the live app cannot read
+  `pooja_bookings`.
 - Baselines to hold: `ruff check app tests` ≤ 129; full suite green apart from
   the 2 pre-existing `tests/whatsapp/test_whatsapp.py` failures caused by local
   `.env` having `MOCK_WHATSAPP=false`.

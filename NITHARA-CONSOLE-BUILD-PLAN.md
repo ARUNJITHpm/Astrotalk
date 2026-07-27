@@ -289,7 +289,16 @@ six routes are public reads or user-scoped bookings.
 Tests in tests/astrologers/.
 ```
 
-## Part 7 — Bookings operator API
+## Part 7 — Bookings operator API  ✅ DONE (`c483bed`)
+
+> **As built.** The worklist lives at `GET /bookings/queue/worklist`, not under
+> `/temples/{id}/bookings` — reading booking tables from the temples module
+> would cross a module boundary. Bookings gained `perform_on`, because
+> `when_label` is free display text and a dated worklist was otherwise not
+> expressible. Refunds stop at bookkeeping. See `NITHARA-CONSOLE-PROGRESS.md`.
+>
+> ⚠️ Migration `e1f2a3b4c5d6` is **not yet applied to production**.
+
 ```
 The biggest gap: operators can currently see NOTHING. app/modules/bookings/
 has exactly two routes, both hard-scoped to the caller (router.py:31, :45).
