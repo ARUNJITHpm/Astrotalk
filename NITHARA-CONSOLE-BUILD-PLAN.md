@@ -167,7 +167,15 @@ catalogue so a client can never send an amount. Do not weaken that.
 Alembic revision + import. Ask before running. `pytest tests/bookings` unchanged.
 ```
 
-## Part 4 — Operator accounts & roles  ⭐ RUN BEFORE 5–8
+## Part 4 — Operator accounts & roles  ✅ DONE (`774cb73`, `49e1d72`)
+
+> **As built, one deviation from A below.** Operators are **not** `users` rows.
+> That table requires `dob`, `birth_place`, `lat`, `lng` and `tz`, all NOT NULL,
+> because it models a devotee with a natal chart — a temple clerk cannot be one.
+> So `operators` / `operator_roles` / `operator_sessions` / `operator_invites`
+> are their own tables, with password hashing reused from `identity.service`
+> rather than reimplemented. Accounts are **invite-only** (owner invites by
+> email or mobile; nobody self-registers). See `NITHARA-CONSOLE-PROGRESS.md`.
 
 ```
 Today there is exactly ONE privilege level. The owner, a per-temple operator and

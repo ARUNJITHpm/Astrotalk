@@ -183,6 +183,86 @@ never reaches the wire; a test pins both halves.
 
 ---
 
+## Part 4 — Role-based operator accounts (`774cb73`, `49e1d72`)
+
+Two commits: the auth model first, then the accounts that populate it.
+
+### Findings
+
+- **There was exactly one privilege level.** `require_admin` answered a single
+  yes/no question, so a per-temple clerk, a content reviewer and the owner all
+  presented the same credential and could do everything.
+- **The literal `"chargemod"` was accepted unconditionally** at
+  `admin_auth.py:40`, by `POST /admin/login`, and was *printed on screen* by
+  `admin.html:363`. Anyone who ever saw a screenshot of the dashboard had full
+  admin. This was pulled forward from Part 7 at the owner's instruction.
+- **Operators cannot be `users` rows.** That table requires `dob`,
+  `birth_place`, `lat`, `lng` and `tz`, all NOT NULL, because it models a
+  devotee with a natal chart. A temple clerk should not need a birth time to
+  sign in. Hence four new tables.
+- **`require_cron_or_admin` was quietly broken** (`cron_auth.py`): it called
+  `await require_admin(x_admin_token)`, binding the token string to
+  `require_admin`'s *session* parameter. It happened to fail closed, so no test
+  caught it.
+
+### Done
+
+| File | Change |
+|---|---|
+| `platform/admin_auth.py` | rewritten around an `Operator` context: `roles`, `temple_ids`, `can_edit_temple`, `visible_temple_ids`, `require_temple`; `require_operator(*roles)` factory |
+| `admin/models.py` | was a 3-line stub — now `Operator`, `OperatorRole`, `OperatorSession`, `OperatorInvite` + the `ROLES` / `SCOPED_ROLES` vocabulary |
+| `admin/operators.py` | **new** — invite / accept / login / logout / grant / revoke / set_active / listing |
+| `admin/router.py` | 8 operator routes; owner-only except login and accept |
+| `platform/cron_auth.py` | the regression above, fixed against `resolve_operator` |
+| `scripts/grant_role.py` | **new** — first-owner bootstrap |
+| `tests/conftest.py` | **new** — autouse fixture configuring `admin_token`, so the 8 existing admin-token test files needed no edits |
+| `migrations/…d0e1f2a3b4c5` | the four tables, seeded empty |
+
+**Roles.** `owner` (everything), `temple_admin` (scoped — must carry a
+`temple_id`), `content_reviewer`, `support`. The X-Admin-Token and an
+`admin_phones` session both still resolve to a full owner, so nothing that
+worked before stopped working.
+
+**Key design decision — invite, never self-register.** The invite records role
+and scope up front, so redeeming it is one step: set a password, get exactly
+the access you were invited for. The owner passes the link on themselves
+(there is no mail transport in this deployment yet), and the account row
+materialises on *accept*, not on invite, so a pending invite can never be
+mistaken for someone who already has access.
+
+`scripts/grant_role.py` is deliberately **not** a route: creating an owner
+should require shell access to the deployment, not merely a valid HTTP request.
+
+**Security properties pinned by tests.** Login returns one indistinguishable
+error for unknown account / unset password / deactivated / wrong password, so
+it cannot enumerate who has console access. Deactivating drops live sessions —
+revoking access has to mean *now*, not whenever the token expires. Logout
+revokes server-side and always 204s. 401 means unknown, 403 means known and
+denied.
+
+**Review findings, fixed before commit.** (1) `operators.logout` was written
+but no route reached it — dead code that let the client decide when a session
+ended; a `POST /admin/operators/logout` now exists. (2) A test was named the
+opposite of what it asserted (`test_listing_marks_pending_operators` — listing
+does not, because no operator exists yet); renamed to
+`test_an_unaccepted_invite_creates_no_operator`.
+
+### Verification
+
+- `tests/admin` **26 pass**; full suite **363 pass**
+- ruff **127** — one below the 128 baseline
+- The two tests that asserted the backdoor were rewritten to assert its
+  absence: `test_legacy_admin_chargemod_login_is_rejected` and
+  `test_unset_admin_token_authenticates_nobody`
+- `d0e1f2a3b4c5` applied to production; four empty tables, no existing row
+  touched
+
+> ⚠️ **Do not push to the `hf` remote** until the owner sets `ADMIN_TOKEN` as a
+> Space secret. `"chargemod"` is gone, so the only remaining door on the live
+> deployment is an `admin_phones` app session.
+
+---
+
 ## Migrations applied to production — 2026-07-27
 
 Owner approved running against the real database. Applied
@@ -200,8 +280,9 @@ Note for future work: the local `.env` `DATABASE_URL` points at production, not
 a scratch database. Test migrations against a throwaway SQLite file first.
 
 ## Standing items
-- Removing the `"chargemod"` fallback (Part 7) can lock the owner out of the
-  live Space if `ADMIN_TOKEN` is not set there — confirm before shipping it.
+- **`ADMIN_TOKEN` is not set on the live Space.** `"chargemod"` was removed in
+  Part 4, so pushing to `hf` before the owner adds that secret leaves only the
+  `admin_phones` session as a way in.
 - Part 14 (retire WAHA) must move `whatsapp_transport`'s default off `"waha"`
   (`config.py:122`) in the same commit, or a Space with no explicit setting
   falls through to a transport that no longer exists.
