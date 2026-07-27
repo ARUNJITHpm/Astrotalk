@@ -91,6 +91,7 @@ class BookingsService:
             member_name=payload.member_name,
             member_nak=payload.member_nak,
             when_label=payload.when,
+            perform_on=payload.perform_on,
             razorpay_order_id=order["order_id"],
             state="wait",
         )
@@ -119,7 +120,12 @@ class BookingsService:
             ).scalars().all()
         )
         for b in rows:
-            if b.state != "ok" and b.razorpay_order_id:
+            # Only `wait` is reconcilable. This read `!= "ok"`, which was the
+            # same thing when those were the only two states; with console plan
+            # Part 7's vocabulary it would promote a *cancelled* booking back to
+            # `ok` the moment a late capture landed, silently undoing an
+            # operator's decision.
+            if b.state == "wait" and b.razorpay_order_id:
                 status = await self._commerce.get_payment_status(
                     session, b.razorpay_order_id
                 )
@@ -143,6 +149,7 @@ class BookingsService:
             "member_name": b.member_name,
             "member_nak": b.member_nak,
             "when": b.when_label,
+            "perform_on": b.perform_on,
             "state": b.state,
             "order_id": b.razorpay_order_id,
             "mock": CommerceService.mock_mode(),
