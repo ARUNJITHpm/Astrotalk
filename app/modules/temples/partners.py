@@ -10,12 +10,18 @@ module's consent ledger, never around it.
 
 import io
 import re
-from datetime import UTC, date as date_type, datetime, timedelta
+from datetime import UTC, datetime, timedelta
+from datetime import date as date_type
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.temples.models import TempleFestival, TemplePartner, TempleSubscription
+from app.modules.temples.models import (
+    TIERS,
+    TempleFestival,
+    TemplePartner,
+    TempleSubscription,
+)
 from app.platform import metrics
 from app.platform.logging_config import get_logger
 
@@ -90,6 +96,72 @@ async def add_festival(
     session.add(festival)
     await session.flush()
     return festival
+
+
+async def update_festival(
+    session: AsyncSession,
+    *,
+    festival_id: int,
+    name: str | None = None,
+    name_ml: str | None = None,
+    day: date_type | None = None,
+) -> TempleFestival | None:
+    """Correct a festival entry. Festivals were append-only until console plan
+    Part 5, so a wrong date could never be fixed — and a wrong date is exactly
+    the thing subscribers get notified about three days early."""
+    festival = await session.get(TempleFestival, festival_id)
+    if festival is None:
+        return None
+    if name is not None:
+        festival.name = name
+    if name_ml is not None:
+        festival.name_ml = name_ml
+    if day is not None:
+        festival.day = day
+    await session.flush()
+    return festival
+
+
+async def delete_festival(session: AsyncSession, *, festival_id: int) -> bool:
+    """Remove a festival outright. Unlike a temple or a partner this is a hard
+    delete: nothing references a festival row, and a cancelled festival should
+    disappear from the microsite rather than linger as an inactive entry."""
+    festival = await session.get(TempleFestival, festival_id)
+    if festival is None:
+        return False
+    await session.delete(festival)
+    return True
+
+
+async def update_partner(
+    session: AsyncSession,
+    *,
+    slug: str,
+    contact_name: str | None = None,
+    contact_phone: str | None = None,
+    tier: str | None = None,
+    active: bool | None = None,
+) -> TemplePartner | None:
+    """Edit a partner record. ``active`` had no route that could write it, so a
+    partnership could be created but never ended; setting it False takes the
+    microsite and QR poster offline without dropping the festival history."""
+    partner = (
+        await session.execute(select(TemplePartner).where(TemplePartner.slug == slug))
+    ).scalars().first()
+    if partner is None:
+        return None
+    if tier is not None:
+        if tier not in TIERS:
+            raise PartnerError(f"tier must be one of: {', '.join(TIERS)}")
+        partner.tier = tier
+    if contact_name is not None:
+        partner.contact_name = contact_name
+    if contact_phone is not None:
+        partner.contact_phone = contact_phone
+    if active is not None:
+        partner.active = active
+    await session.flush()
+    return partner
 
 
 async def upcoming_festivals(

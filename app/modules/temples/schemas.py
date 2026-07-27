@@ -54,6 +54,23 @@ class FestivalOut(BaseModel):
     day: date
 
 
+class PartnerUpdate(BaseModel):
+    """Edit a partner (console plan Part 5). Every field is optional; only what
+    is sent is written, so a payload can end a partnership without restating
+    the contact details."""
+
+    contact_name: str | None = None
+    contact_phone: str | None = None
+    tier: str | None = None
+    active: bool | None = None
+
+
+class FestivalUpdate(BaseModel):
+    name: str | None = None
+    name_ml: str | None = None
+    day: date | None = None
+
+
 class SubscribePayload(BaseModel):
     """The microsite's subscribe action — an explicit WhatsApp opt-in."""
 
@@ -82,6 +99,170 @@ class PoojaCatalogueOut(BaseModel):
     temple_id: str
     days_until: int | None = None
     poojas: list[PoojaCatalogueItem]
+
+
+# ---- operator console (console plan Part 5) ----
+# These are the WRITE shapes. They are deliberately separate from TempleOut /
+# TempleDetailOut: those are the app's read contract, with UI-shaped names
+# (`en`, `ml`, `place`, `sig`) and computed fields the console must not send.
+
+
+class TempleAdminIn(BaseModel):
+    """Create a directory temple. Column names, not the app's display names."""
+
+    id: str
+    name: str
+    deity: str  # a remedy_map.DEITIES key
+    district: str
+    lat: float
+    lng: float
+    name_ml: str = ""
+    town: str = ""
+    town_ml: str | None = None
+    famous_for: str = ""
+    vazhipadu: list[str] = []
+    story: str | None = None
+    story_ml: str | None = None
+    hours: list[list[int]] | None = None
+    timings: dict[str, str] | None = None
+    rating: str | None = None
+    reviews: str | None = None
+    active: bool = True
+    sort_order: int = 0
+
+
+class TempleAdminPatch(BaseModel):
+    """Partial edit. Unset fields are left alone; an explicit ``null`` clears
+    the column (which is how `hours`/`timings` fall back to the defaults), so
+    the route reads ``model_dump(exclude_unset=True)`` rather than by-value."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str | None = None
+    name_ml: str | None = None
+    deity: str | None = None
+    district: str | None = None
+    town: str | None = None
+    town_ml: str | None = None
+    lat: float | None = None
+    lng: float | None = None
+    famous_for: str | None = None
+    vazhipadu: list[str] | None = None
+    story: str | None = None
+    story_ml: str | None = None
+    hours: list[list[int]] | None = None
+    timings: dict[str, str] | None = None
+    rating: str | None = None
+    reviews: str | None = None
+    sort_order: int | None = None
+
+
+class TempleAdminOut(BaseModel):
+    """A directory row as the console edits it — every stored column, including
+    `active` and `reviewed`, which the public shapes never expose."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    name: str
+    name_ml: str
+    deity: str
+    district: str
+    town: str
+    town_ml: str | None
+    lat: float
+    lng: float
+    famous_for: str
+    vazhipadu: list[str]
+    reviewed: bool
+    story: str | None
+    story_ml: str | None
+    hours: list[list[int]] | None
+    timings: dict[str, str] | None
+    rating: str | None
+    reviews: str | None
+    active: bool
+    image_key: str | None
+    sort_order: int
+    updated_at: datetime
+
+
+class ReviewedIn(BaseModel):
+    reviewed: bool
+
+
+class ActiveIn(BaseModel):
+    active: bool
+
+
+class PoojaAdminIn(BaseModel):
+    """A master offering. ``amount_paise``, not rupees: the wire contract for
+    the *app* is whole rupees (PoojaCatalogueItem.amount) but that is a lossy
+    rendering, and the console is where the authoritative figure is set."""
+
+    key: str
+    name: str
+    amount_paise: int
+    name_ml: str = ""
+    description: str | None = None
+    lead_days: int = 0
+    active: bool = True
+    sort_order: int = 0
+
+
+class PoojaAdminPatch(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str | None = None
+    name_ml: str | None = None
+    description: str | None = None
+    amount_paise: int | None = None
+    lead_days: int | None = None
+    active: bool | None = None
+    sort_order: int | None = None
+
+
+class PoojaAdminOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    key: str
+    name: str
+    name_ml: str
+    description: str | None
+    amount_paise: int
+    lead_days: int
+    active: bool
+    sort_order: int
+
+
+class TemplePoojaIn(BaseModel):
+    """One temple's override of a master offering.
+
+    ``null`` means *inherit*, and it is the default: changing a lead time must
+    not require copying the price, or a later master repricing would silently
+    skip this temple. ``active=False`` means the temple does not offer it,
+    which is different from having no override at all.
+    """
+
+    amount_paise: int | None = None
+    lead_days: int | None = None
+    active: bool = True
+
+
+class TemplePoojaOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    temple_id: str
+    pooja_key: str
+    amount_paise: int | None
+    lead_days: int | None
+    active: bool
+
+
+class TempleImageOut(BaseModel):
+    temple_id: str
+    image_key: str
+    url: str
 
 
 class TempleTimings(BaseModel):

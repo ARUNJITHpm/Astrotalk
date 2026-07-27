@@ -10,33 +10,52 @@ Three surfaces (GROWTH_PLAN.md Part 3 added the last two):
 
 import html as html_lib
 from datetime import date
+from functools import partial
 from typing import Annotated
 
+from anyio import to_thread
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from fastapi.responses import HTMLResponse
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.astrology_engine.service import AstrologyEngineService
 from app.modules.identity.auth import CurrentUser
-from app.modules.temples import partners
+from app.modules.temples import admin as temple_admin
+from app.modules.temples import partners, registry
+from app.modules.temples.models import TempleFestival, TemplePartner
 from app.modules.temples.schemas import (
+    ActiveIn,
     CheckinOut,
     FestivalCreate,
     FestivalOut,
+    FestivalUpdate,
     PartnerCreate,
     PartnerOut,
+    PartnerUpdate,
+    PoojaAdminIn,
+    PoojaAdminOut,
+    PoojaAdminPatch,
     PoojaCatalogueOut,
+    ReviewedIn,
     SubscribePayload,
+    TempleAdminIn,
+    TempleAdminOut,
+    TempleAdminPatch,
     TempleDetailOut,
     TempleDirectoryItem,
+    TempleImageOut,
     TempleOut,
+    TemplePoojaIn,
+    TemplePoojaOut,
     TempleSuggestion,
 )
 from app.modules.temples.service import TemplesService
 from app.platform import metrics
-from app.platform.admin_auth import AdminGuard
+from app.platform.admin_auth import AdminGuard, Operator, require_operator
 from app.platform.config import get_settings
 from app.platform.db import get_session
+from app.platform.storage import get_storage
 
 router = APIRouter(prefix="/temples", tags=["temples"])
 
@@ -47,6 +66,14 @@ _service = TemplesService()
 _engine = AstrologyEngineService()
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
+
+# Console plan Part 4 roles. Directory-wide decisions (adding or retiring a
+# temple, the master offering catalogue) are the owner's; per-temple edits are
+# open to that temple's admin, who is then scoped by require_temple(). The
+# review flag is a third gate — see set_temple_reviewed.
+OwnerDep = Annotated[Operator, Depends(require_operator("owner"))]
+TempleOperatorDep = Annotated[Operator, Depends(require_operator("owner", "temple_admin"))]
+ReviewerDep = Annotated[Operator, Depends(require_operator("owner", "content_reviewer"))]
 
 
 @router.get("/suggest", response_model=list[TempleSuggestion])
@@ -75,7 +102,12 @@ async def suggest(
     )
 
 
-# ---- Partner console (admin) ----
+# ---- Partner console ----
+# These predate roles: they were written when every operator was an owner, so
+# they gated on the coarse AdminGuard. Console plan Part 5 scopes them, because
+# leaving creation unscoped next to a scoped PATCH would mean a temple_admin
+# could register a partner for a temple they are then forbidden to edit — and
+# `GET /partners` carries partner contact phone numbers.
 
 
 @router.get(
@@ -92,9 +124,11 @@ async def temple_directory() -> list[dict]:
     "/partners",
     response_model=PartnerOut,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[AdminGuard],
 )
-async def create_partner(payload: PartnerCreate, session: SessionDep) -> PartnerOut:
+async def create_partner(
+    payload: PartnerCreate, session: SessionDep, operator: TempleOperatorDep
+) -> PartnerOut:
+    operator.require_temple(payload.temple_id)
     if _service.get_temple(payload.temple_id) is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Unknown temple id")
     try:
@@ -107,26 +141,37 @@ async def create_partner(payload: PartnerCreate, session: SessionDep) -> Partner
             tier=payload.tier,
         )
     except partners.PartnerError as exc:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
     await session.commit()
     return PartnerOut.model_validate(partner)
 
 
-@router.get("/partners", response_model=list[PartnerOut], dependencies=[AdminGuard])
-async def list_partners(session: SessionDep) -> list[PartnerOut]:
-    return [PartnerOut.model_validate(p) for p in await partners.list_partners(session)]
+@router.get("/partners", response_model=list[PartnerOut])
+async def list_partners(
+    session: SessionDep, operator: TempleOperatorDep
+) -> list[PartnerOut]:
+    visible = operator.visible_temple_ids()
+    return [
+        PartnerOut.model_validate(p)
+        for p in await partners.list_partners(session)
+        if visible is None or p.temple_id in visible
+    ]
 
 
 @router.post(
     "/partners/{slug}/festivals",
     response_model=FestivalOut,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[AdminGuard],
 )
-async def add_festival(slug: str, payload: FestivalCreate, session: SessionDep) -> FestivalOut:
+async def add_festival(
+    slug: str, payload: FestivalCreate, session: SessionDep, operator: TempleOperatorDep
+) -> FestivalOut:
     partner = await partners.get_partner_by_slug(session, slug)
     if partner is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Partner not found")
+    operator.require_temple(partner.temple_id)
     festival = await partners.add_festival(
         session,
         temple_id=partner.temple_id,
@@ -138,15 +183,394 @@ async def add_festival(slug: str, payload: FestivalCreate, session: SessionDep) 
     return FestivalOut.model_validate(festival)
 
 
-@router.get("/partners/{slug}/qr.png", dependencies=[AdminGuard])
-async def partner_qr(slug: str, session: SessionDep, request: Request) -> Response:
+@router.get("/partners/{slug}/qr.png")
+async def partner_qr(
+    slug: str, session: SessionDep, request: Request, operator: TempleOperatorDep
+) -> Response:
     """The printable QR poster asset: points at /t/{slug}?src=qr."""
     partner = await partners.get_partner_by_slug(session, slug)
     if partner is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Partner not found")
+    operator.require_temple(partner.temple_id)
     base = get_settings().public_base_url.rstrip("/") or str(request.base_url).rstrip("/")
     png = partners.qr_png(f"{base}/t/{partner.slug}?src=qr")
     return Response(content=png, media_type="image/png")
+
+
+@router.patch(
+    "/partners/{slug}",
+    response_model=PartnerOut,
+    summary="Edit a partner, or end the partnership (`active: false`)",
+)
+async def update_partner(
+    slug: str, payload: PartnerUpdate, session: SessionDep, operator: TempleOperatorDep
+) -> PartnerOut:
+    # Scope is checked before anything is written, not after: an unauthorised
+    # PATCH must not depend on the session being discarded to stay harmless.
+    existing = (
+        await session.execute(select(TemplePartner).where(TemplePartner.slug == slug))
+    ).scalars().first()
+    if existing is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Partner not found")
+    operator.require_temple(existing.temple_id)
+    try:
+        partner = await partners.update_partner(
+            session, slug=slug, **payload.model_dump(exclude_unset=True)
+        )
+    except partners.PartnerError as exc:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
+    await session.commit()
+    return PartnerOut.model_validate(partner)
+
+
+@router.patch(
+    "/festivals/{festival_id}",
+    response_model=FestivalOut,
+    summary="Correct a festival entry",
+)
+async def update_festival(
+    festival_id: int,
+    payload: FestivalUpdate,
+    session: SessionDep,
+    operator: TempleOperatorDep,
+) -> FestivalOut:
+    existing = await session.get(TempleFestival, festival_id)
+    if existing is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Festival not found")
+    operator.require_temple(existing.temple_id)
+    festival = await partners.update_festival(
+        session, festival_id=festival_id, **payload.model_dump(exclude_unset=True)
+    )
+    await session.commit()
+    return FestivalOut.model_validate(festival)
+
+
+@router.delete(
+    "/festivals/{festival_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Remove a festival",
+)
+async def delete_festival(
+    festival_id: int, session: SessionDep, operator: TempleOperatorDep
+) -> None:
+    festival = await session.get(TempleFestival, festival_id)
+    if festival is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Festival not found")
+    operator.require_temple(festival.temple_id)
+    await partners.delete_festival(session, festival_id=festival_id)
+    await session.commit()
+
+
+# ---- Directory administration (console plan Part 5) ----
+# The first writes the temple directory has ever had: until Part 1 it was a
+# Python literal, so correcting a temple's coordinates meant a redeploy.
+#
+# Two roles reach these routes. An `owner` may do everything; a `temple_admin`
+# is scoped — `operator.require_temple(...)` 403s them out of temples they do
+# not run, and their listing is filtered rather than merely hidden in the UI.
+# Creating and retiring temples, and the master offering catalogue, stay
+# owner-only: they are directory-wide decisions.
+#
+# Every write that changes what the app serves ends in `_publish`, which
+# commits and then rebuilds the in-memory snapshot the (synchronous) readers
+# use. Without it an operator's edit would not appear until the next restart.
+
+
+async def _publish(session: AsyncSession) -> None:
+    await session.commit()
+    await registry.load(session)
+
+
+def _temple_error(exc: temple_admin.TempleAdminError) -> HTTPException:
+    code = (
+        status.HTTP_404_NOT_FOUND
+        if isinstance(exc, temple_admin.NotFound)
+        else status.HTTP_422_UNPROCESSABLE_ENTITY
+    )
+    return HTTPException(code, detail=str(exc))
+
+
+@router.get(
+    "/manage",
+    response_model=list[TempleAdminOut],
+    summary="Directory rows for the console (includes retired temples)",
+)
+async def manage_temples(
+    session: SessionDep,
+    operator: TempleOperatorDep,
+    include_inactive: bool = Query(default=True),
+) -> list[TempleAdminOut]:
+    rows = await temple_admin.list_temples(
+        session,
+        temple_ids=operator.visible_temple_ids(),
+        include_inactive=include_inactive,
+    )
+    return [TempleAdminOut.model_validate(r) for r in rows]
+
+
+@router.post(
+    "",
+    response_model=TempleAdminOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Add a temple to the directory (owner)",
+)
+async def create_temple(
+    payload: TempleAdminIn, session: SessionDep, operator: OwnerDep
+) -> TempleAdminOut:
+    fields = payload.model_dump()
+    try:
+        row = await temple_admin.create_temple(session, temple_id=fields.pop("id"), **fields)
+    except temple_admin.TempleAdminError as exc:
+        raise _temple_error(exc) from exc
+    await _publish(session)
+    return TempleAdminOut.model_validate(row)
+
+
+@router.patch(
+    "/{temple_id}", response_model=TempleAdminOut, summary="Edit a temple record"
+)
+async def update_temple(
+    temple_id: str,
+    payload: TempleAdminPatch,
+    session: SessionDep,
+    operator: TempleOperatorDep,
+) -> TempleAdminOut:
+    operator.require_temple(temple_id)
+    try:
+        row = await temple_admin.update_temple(
+            session, temple_id=temple_id, changes=payload.model_dump(exclude_unset=True)
+        )
+    except temple_admin.TempleAdminError as exc:
+        raise _temple_error(exc) from exc
+    await _publish(session)
+    return TempleAdminOut.model_validate(row)
+
+
+@router.post(
+    "/{temple_id}/active",
+    response_model=TempleAdminOut,
+    summary="Retire or restore a temple (owner)",
+)
+async def set_temple_active(
+    temple_id: str, payload: ActiveIn, session: SessionDep, operator: OwnerDep
+) -> TempleAdminOut:
+    """Retiring is a soft delete, and the only one on offer. Bookings, visits,
+    partners and festivals all reference ``temples.id`` as a plain string with
+    no foreign key, so a real DELETE would orphan them without a word."""
+    try:
+        row = await temple_admin.update_temple(
+            session, temple_id=temple_id, changes={"active": payload.active}
+        )
+    except temple_admin.TempleAdminError as exc:
+        raise _temple_error(exc) from exc
+    await _publish(session)
+    return TempleAdminOut.model_validate(row)
+
+
+@router.patch(
+    "/{temple_id}/review",
+    response_model=TempleAdminOut,
+    summary="Flip the astrologer sign-off flag (owner or content reviewer)",
+)
+async def set_temple_reviewed(
+    temple_id: str, payload: ReviewedIn, session: SessionDep, operator: ReviewerDep
+) -> TempleAdminOut:
+    """Not part of PATCH /{id}, and not open to a temple_admin, on purpose.
+
+    ``reviewed`` asserts that an astrologer checked the devotional content
+    (GUARDRAILS §1) and it is served to clients. Letting the same role that
+    writes a temple's copy also certify it would make the flag self-issued and
+    therefore meaningless.
+    """
+    try:
+        row = await temple_admin.set_reviewed(
+            session, temple_id=temple_id, reviewed=payload.reviewed
+        )
+    except temple_admin.TempleAdminError as exc:
+        raise _temple_error(exc) from exc
+    await _publish(session)
+    return TempleAdminOut.model_validate(row)
+
+
+_MAX_IMAGE_BYTES = 4 * 1024 * 1024
+
+
+def _image_format(data: bytes) -> tuple[str, str] | None:
+    """(extension, content type) from the file's own bytes, or None.
+
+    WebP needs both halves of its header checked: ``RIFF`` alone is the generic
+    container magic that WAV and AVI also carry, so matching on it would let an
+    audio file be stored and later served as ``image/webp``.
+    """
+    if data.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "png", "image/png"
+    if data.startswith(b"\xff\xd8\xff"):
+        return "jpg", "image/jpeg"
+    if data.startswith(b"RIFF") and data[8:12] == b"WEBP":
+        return "webp", "image/webp"
+    return None
+
+
+@router.post(
+    "/{temple_id}/image",
+    response_model=TempleImageOut,
+    summary="Upload the temple photo (raw image bytes as the request body)",
+)
+async def upload_temple_image(
+    temple_id: str, request: Request, session: SessionDep, operator: TempleOperatorDep
+) -> TempleImageOut:
+    """The body is the file itself, not a multipart form: multipart would pull
+    in python-multipart, which is not a pinned dependency, for a single route a
+    console can serve with ``fetch(url, {method: 'POST', body: file})``.
+
+    The format is taken from the file's magic bytes, never from Content-Type —
+    the client's header is a claim, the first eight bytes are evidence.
+    """
+    operator.require_temple(temple_id)
+    if await temple_admin.get_temple(session, temple_id) is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Temple not found")
+
+    data = await request.body()
+    if not data:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Empty body")
+    if len(data) > _MAX_IMAGE_BYTES:
+        raise HTTPException(
+            status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="Image exceeds 4 MB"
+        )
+    detected = _image_format(data)
+    if detected is None:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Expected a PNG, JPEG or WebP"
+        )
+    extension, content_type = detected
+
+    storage = get_storage()
+    key = f"temples/{temple_id}.{extension}"
+    await to_thread.run_sync(partial(storage.put, key, data, content_type))
+    try:
+        await temple_admin.update_temple(
+            session, temple_id=temple_id, changes={"image_key": key}
+        )
+    except temple_admin.TempleAdminError as exc:
+        raise _temple_error(exc) from exc
+    await _publish(session)
+    return TempleImageOut(temple_id=temple_id, image_key=key, url=storage.url(key))
+
+
+# ---- Master offering catalogue (owner) ----
+# Registered before `/{temple_id}` so the catch-all never claims "/poojas".
+
+
+@router.get(
+    "/poojas", response_model=list[PoojaAdminOut], summary="The master catalogue"
+)
+async def list_master_poojas(
+    session: SessionDep, operator: TempleOperatorDep
+) -> list[PoojaAdminOut]:
+    return [PoojaAdminOut.model_validate(p) for p in await temple_admin.list_poojas(session)]
+
+
+@router.post(
+    "/poojas",
+    response_model=PoojaAdminOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Add a master offering (owner)",
+)
+async def create_master_pooja(
+    payload: PoojaAdminIn, session: SessionDep, operator: OwnerDep
+) -> PoojaAdminOut:
+    fields = payload.model_dump()
+    try:
+        row = await temple_admin.upsert_pooja(
+            session, key=fields.pop("key"), changes=fields, create=True
+        )
+    except temple_admin.TempleAdminError as exc:
+        raise _temple_error(exc) from exc
+    await _publish(session)
+    return PoojaAdminOut.model_validate(row)
+
+
+@router.patch(
+    "/poojas/{pooja_key}",
+    response_model=PoojaAdminOut,
+    summary="Edit a master offering (owner)",
+)
+async def update_master_pooja(
+    pooja_key: str, payload: PoojaAdminPatch, session: SessionDep, operator: OwnerDep
+) -> PoojaAdminOut:
+    try:
+        row = await temple_admin.upsert_pooja(
+            session,
+            key=pooja_key,
+            changes=payload.model_dump(exclude_unset=True),
+            create=False,
+        )
+    except temple_admin.TempleAdminError as exc:
+        raise _temple_error(exc) from exc
+    await _publish(session)
+    return PoojaAdminOut.model_validate(row)
+
+
+# ---- Per-temple catalogue overrides ----
+
+
+@router.get(
+    "/{temple_id}/overrides",
+    response_model=list[TemplePoojaOut],
+    summary="This temple's overrides of the master catalogue",
+)
+async def list_temple_overrides(
+    temple_id: str, session: SessionDep, operator: TempleOperatorDep
+) -> list[TemplePoojaOut]:
+    operator.require_temple(temple_id)
+    rows = await temple_admin.list_overrides(session, temple_id)
+    return [TemplePoojaOut.model_validate(r) for r in rows]
+
+
+@router.put(
+    "/{temple_id}/poojas/{pooja_key}",
+    response_model=TemplePoojaOut,
+    summary="Set this temple's price, lead time, or whether it offers this at all",
+)
+async def set_temple_override(
+    temple_id: str,
+    pooja_key: str,
+    payload: TemplePoojaIn,
+    session: SessionDep,
+    operator: TempleOperatorDep,
+) -> TemplePoojaOut:
+    operator.require_temple(temple_id)
+    try:
+        row = await temple_admin.set_override(
+            session,
+            temple_id=temple_id,
+            pooja_key=pooja_key,
+            amount_paise=payload.amount_paise,
+            lead_days=payload.lead_days,
+            active=payload.active,
+        )
+    except temple_admin.TempleAdminError as exc:
+        raise _temple_error(exc) from exc
+    await _publish(session)
+    return TemplePoojaOut.model_validate(row)
+
+
+@router.delete(
+    "/{temple_id}/poojas/{pooja_key}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Drop the override so the master entry applies again",
+)
+async def clear_temple_override(
+    temple_id: str, pooja_key: str, session: SessionDep, operator: TempleOperatorDep
+) -> None:
+    operator.require_temple(temple_id)
+    if not await temple_admin.clear_override(
+        session, temple_id=temple_id, pooja_key=pooja_key
+    ):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="No override to clear")
+    await _publish(session)
 
 
 # ---- Public app surface (Nithara): list / search / nearby / detail ----
