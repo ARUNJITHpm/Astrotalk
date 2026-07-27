@@ -41,6 +41,8 @@ _bookings = BookingsService()
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 # Owner-only: managing who may sign in is never delegated to a scoped role.
 OwnerDep = Annotated[Operator, Depends(require_operator("owner"))]
+# Any authenticated operator, whatever their role — used by /operators/me.
+AnyOperatorDep = Annotated[Operator, Depends(require_operator())]
 
 
 class LoginPayload(BaseModel):
@@ -371,6 +373,29 @@ async def operator_login(payload: OperatorLogin, session: SessionDep) -> dict:
     return {"token": token}
 
 
+@router.get("/operators/me", summary="Who the caller is and what they may touch")
+async def operator_me(operator: AnyOperatorDep) -> dict:
+    """The console's first call after sign-in (console plan Part 9).
+
+    Part 4 issues a session token but nothing told the holder what it is *for*,
+    so a console had no way to render a role-aware sidebar. This returns the
+    already-resolved ``Operator`` — no new authorisation logic, just the same
+    answer `require_operator` computes, made readable.
+
+    ``temple_ids`` is empty for an owner, who is unrestricted. A client must not
+    read "empty" as "no temples": `is_owner` is the field that distinguishes
+    them, and conflating the two is how a scoped operator becomes unscoped.
+    Because it takes any authenticated operator, an `X-Admin-Token` caller sees
+    ``operator_id: null`` with the owner role — they are a credential, not a row.
+    """
+    return {
+        "operator_id": operator.operator_id,
+        "roles": sorted(operator.roles),
+        "temple_ids": sorted(operator.temple_ids),
+        "is_owner": operator.is_owner,
+    }
+
+
 @router.post("/operators/accept", summary="Redeem an invitation and set a password")
 async def operator_accept(payload: OperatorAcceptIn, session: SessionDep) -> dict:
     try:
@@ -462,8 +487,17 @@ async def operator_revoke(role_id: int, session: SessionDep, operator: OwnerDep)
 
 @router.post("/operators/{operator_id}/active", summary="Enable or disable (owner)")
 async def operator_set_active(
-    operator_id: int, active: bool, session: SessionDep, operator: OwnerDep
+    operator_id: int, payload: ActiveIn, session: SessionDep, operator: OwnerDep
 ) -> dict:
+    """Takes ``{"active": bool}`` as a body.
+
+    It used to declare `active: bool` bare, which FastAPI reads as a QUERY
+    parameter — so this one endpoint wanted `?active=false` while its three
+    siblings (temples, astrologers, users) all take a body. Nothing called it
+    yet and no test covered it; the console is the first client, so it was
+    aligned rather than left as a trap.
+    """
+    active = payload.active
     try:
         row = await operators.set_active(session, operator_id=operator_id, active=active)
     except operators.OperatorError as exc:

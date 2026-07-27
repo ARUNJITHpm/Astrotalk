@@ -7,6 +7,9 @@ __pycache__/
 build/
 dist/
 
+# TypeScript incremental build state (app-nithara/, app-console/).
+*.tsbuildinfo
+
 # Virtual environments
 .venv/
 venv/

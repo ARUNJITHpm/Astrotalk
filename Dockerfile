@@ -20,7 +20,23 @@ ENV VITE_API_BASE=""
 RUN npm run build
 
 
-# ---- Stage 2: the app ----
+# ---- Stage 2: build the operator console ----
+# Same shape as the stage above, separate so a console-only change does not
+# invalidate the consumer app's npm layer (and vice versa). Vite's `base` puts
+# the output under /console-app/, which is where app/main.py mounts it.
+FROM node:20-slim AS console
+
+WORKDIR /build
+
+COPY app-console/package.json app-console/package-lock.json ./
+RUN npm ci
+
+COPY app-console/ ./
+ENV VITE_API_BASE=""
+RUN npm run build
+
+
+# ---- Stage 3: the app ----
 FROM python:3.12-slim
 
 ENV PYTHONUNBUFFERED=1 \
@@ -49,6 +65,7 @@ COPY . .
 # The frontend build, into the path app/main.py serves the SPA from. Copied
 # after the source so it survives even if a stale dist/ leaks into the context.
 COPY --from=frontend /build/dist ./app-nithara/dist
+COPY --from=console /build/dist ./app-console/dist
 
 EXPOSE 3000
 

@@ -167,14 +167,27 @@ _NO_STORE_PATHS = frozenset((
     "/admin", "/console", "/wa", "/whatsapp", "/prototype",
 ))
 
+# Content-hashed build output, safe to cache forever. Two entries because the
+# two frontends mount at different roots: Vite writes the console's assets under
+# its `base` (/console-app/assets/), so the consumer app's bare /assets/ prefix
+# would miss them and they would end up with no cache header at all.
+_IMMUTABLE_PREFIXES = ("/assets/", "/console-app/assets/")
+
+# The console is a client-routed SPA under one subpath, so EVERY path beneath it
+# serves the same shell and must never be stale. A prefix, not a member of the
+# set above: exact-matching "/console-app" would leave a deep link like
+# /console-app/bookings cacheable, which is how an operator ends up looking at
+# yesterday's build after a deploy.
+_NO_STORE_PREFIXES = ("/static", "/console-app")
+
 
 @app.middleware("http")
 async def _web_cache_headers(request, call_next):
     response = await call_next(request)
     path = request.url.path
-    if path.startswith("/assets/"):
+    if path.startswith(_IMMUTABLE_PREFIXES):
         response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
-    elif path.startswith("/static") or path in _NO_STORE_PATHS:
+    elif path.startswith(_NO_STORE_PREFIXES) or path in _NO_STORE_PATHS:
         response.headers["Cache-Control"] = "no-store"
     return response
 
@@ -239,6 +252,42 @@ async def admin_page() -> FileResponse:
 @app.get("/console", include_in_schema=False)
 async def console_page() -> FileResponse:
     return FileResponse(_WEB_DIR / "console.html")
+
+
+# The new React operator console (console plan Part 9), built from app-console/.
+# It lives under /console-app/ rather than /console so the hand-written page
+# above keeps working while sections migrate across; /console retires in Part 14.
+#
+# Its own client-side routes all serve this shell — unlike the consumer SPA, a
+# catch-all is safe here because the mount is scoped to a subpath that claims no
+# API route. Ordering still matters: this must come BEFORE the root mount below.
+_CONSOLE_DIR = _ROOT / "app-console" / "dist"
+_CONSOLE_INDEX = _CONSOLE_DIR / "index.html"
+
+if _CONSOLE_DIR.is_dir():
+    # Hashed assets under /console-app/assets/*, matching vite's `base`.
+    app.mount(
+        "/console-app/assets",
+        StaticFiles(directory=_CONSOLE_DIR / "assets"),
+        name="console_assets",
+    )
+
+
+@app.get("/console-app", include_in_schema=False)
+@app.get("/console-app/{_path:path}", include_in_schema=False)
+async def console_app_shell(_path: str = "") -> FileResponse:
+    """Serve the console shell for any of its client-side routes.
+
+    Unbuilt is a 503 with instructions, not a 404: "not found" sends whoever
+    hits it hunting for a missing route when the real answer is that nobody ran
+    the build. Same treatment as the consumer SPA above.
+    """
+    if not _CONSOLE_INDEX.is_file():
+        raise HTTPException(
+            status_code=503,
+            detail="Operator console not built — run `npm ci && npm run build` in app-console/.",
+        )
+    return FileResponse(_CONSOLE_INDEX)
 
 
 # The original design prototype, served as-is for eyeballing the intended UI

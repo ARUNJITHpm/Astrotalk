@@ -13,6 +13,8 @@ app-nithara/node_modules/
 app-nithara/dist/
 app-nithara/android/
 app-nithara/ios/
+app-console/node_modules/
+app-console/dist/
 
 # Python build/test artefacts.
 **/__pycache__/
