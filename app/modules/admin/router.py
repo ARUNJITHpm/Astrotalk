@@ -9,7 +9,7 @@ data.
 import hmac
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,9 +17,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 # Every table-owning module is reached through its router this way (app/main.py),
 # and without it create_all/autogenerate never see operators or their sessions.
 from app.modules.admin import models as _models  # noqa: F401
+from app.modules.admin import operators
 from app.modules.admin.auth import AdminGuard, admin_required
 from app.modules.admin.schemas import AdminOverview
 from app.modules.admin.service import AdminService
+from app.platform.admin_auth import Operator, require_operator
 from app.platform.config import get_settings
 from app.platform.db import get_session
 
@@ -28,6 +30,8 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 _service = AdminService()
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
+# Owner-only: managing who may sign in is never delegated to a scoped role.
+OwnerDep = Annotated[Operator, Depends(require_operator("owner"))]
 
 
 class LoginPayload(BaseModel):
@@ -94,3 +98,148 @@ async def admin_config() -> dict:
 async def overview(session: SessionDep) -> dict:
     """Full analytics payload: users, charts, chat volume, and LLM token usage."""
     return await _service.overview(session)
+
+
+# ---- Operator accounts (console plan Part 4) ----
+# Invite-only: the owner creates accounts, nobody self-registers. Sign-in and
+# accept are PUBLIC by necessity — you cannot present operator credentials
+# before you have any — and are rate-limited by their own failure modes:
+# login returns one indistinguishable error, accept needs an unguessable token.
+
+
+class OperatorLogin(BaseModel):
+    identifier: str  # email or mobile — whichever the owner invited them with
+    password: str
+
+
+class OperatorInviteIn(BaseModel):
+    email: str | None = None
+    phone: str | None = None
+    name: str = ""
+    role: str = "temple_admin"
+    temple_id: str | None = None
+
+
+class OperatorAcceptIn(BaseModel):
+    token: str
+    password: str
+
+
+class GrantIn(BaseModel):
+    role: str
+    temple_id: str | None = None
+
+
+@router.post("/operators/login", summary="Operator sign-in → bearer token")
+async def operator_login(payload: OperatorLogin, session: SessionDep) -> dict:
+    try:
+        token = await operators.login(
+            session, identifier=payload.identifier, password=payload.password
+        )
+    except operators.OperatorError:
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials"
+        ) from None
+    await session.commit()
+    return {"token": token}
+
+
+@router.post("/operators/accept", summary="Redeem an invitation and set a password")
+async def operator_accept(payload: OperatorAcceptIn, session: SessionDep) -> dict:
+    try:
+        operator = await operators.accept(
+            session, token=payload.token, password=payload.password
+        )
+    except operators.InviteInvalid as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except operators.OperatorError as exc:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
+    await session.commit()
+    return {"id": operator.id, "email": operator.email, "phone": operator.phone}
+
+
+@router.post(
+    "/operators/logout",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Drop the caller's console session",
+)
+async def operator_logout(
+    session: SessionDep,
+    authorization: Annotated[str | None, Header()] = None,
+) -> None:
+    """Revoke the presented session server-side rather than trusting the client
+    to forget it. Always 204: whether the token existed is not the caller's
+    business, and a failed logout must never leave a usable token behind."""
+    if authorization and authorization.lower().startswith("bearer "):
+        await operators.logout(session, authorization.split(None, 1)[1].strip())
+        await session.commit()
+
+
+@router.get("/operators", summary="Every operator and their grants (owner)")
+async def operator_list(session: SessionDep, operator: OwnerDep) -> list[dict]:
+    return await operators.listing(session)
+
+
+@router.post("/operators/invite", summary="Invite an operator by email or mobile (owner)")
+async def operator_invite(
+    payload: OperatorInviteIn, session: SessionDep, operator: OwnerDep
+) -> dict:
+    try:
+        row = await operators.invite(
+            session,
+            email=payload.email,
+            phone=payload.phone,
+            name=payload.name,
+            role=payload.role,
+            temple_id=payload.temple_id,
+            invited_by=operator.operator_id,
+        )
+    except operators.OperatorError as exc:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
+    await session.commit()
+    # The token is returned rather than emailed: there is no mail transport in
+    # this deployment yet, so the owner passes the link on themselves.
+    return {"invite_token": row.token, "expires_at": row.expires_at, "role": row.role}
+
+
+@router.post("/operators/{operator_id}/roles", summary="Grant a role (owner)")
+async def operator_grant(
+    operator_id: int, payload: GrantIn, session: SessionDep, operator: OwnerDep
+) -> dict:
+    try:
+        row = await operators.grant(
+            session, operator_id=operator_id, role=payload.role, temple_id=payload.temple_id
+        )
+    except operators.OperatorError as exc:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
+    await session.commit()
+    return {"id": row.id, "role": row.role, "temple_id": row.temple_id}
+
+
+@router.delete(
+    "/operators/roles/{role_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Revoke a role (owner)",
+)
+async def operator_revoke(role_id: int, session: SessionDep, operator: OwnerDep) -> None:
+    if not await operators.revoke(session, role_id=role_id):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Unknown role grant")
+    await session.commit()
+
+
+@router.post("/operators/{operator_id}/active", summary="Enable or disable (owner)")
+async def operator_set_active(
+    operator_id: int, active: bool, session: SessionDep, operator: OwnerDep
+) -> dict:
+    try:
+        row = await operators.set_active(session, operator_id=operator_id, active=active)
+    except operators.OperatorError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    await session.commit()
+    return {"id": row.id, "active": row.active}
