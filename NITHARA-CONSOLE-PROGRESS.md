@@ -497,10 +497,18 @@ missing.
   `e1f2a3b4c5d6`
 - A test pins that `/queue/export.csv` is not parsed as a `{booking_id}`
 
-> ⚠️ **`e1f2a3b4c5d6` has NOT been applied to production.** The app will fail
-> to read `pooja_bookings` on the live database until it is — but the deploy is
-> already blocked on `ADMIN_TOKEN`, so nothing is broken today. Both need doing
-> before the next push to `hf`.
+**`e1f2a3b4c5d6` applied to production** (owner approved, 2026-07-27). The
+table was empty, so nothing needed backfilling; `perform_on date NULL`,
+`operator_note text NOT NULL DEFAULT ''` and `updated_at timestamptz NULL` are
+present and every other row count is unchanged (13 users, 53 temples, 28
+astrologers, 4 offerings, 1 payment). Head is now `e1f2a3b4c5d6`.
+
+**The operator queries were then run against the real Postgres**, which is the
+first time any of Parts 5–7 had left SQLite. Three things could have been
+dialect-specific and were checked explicitly: the count-over-subquery that
+produces `total`, `IN ()` for the empty-scope branch, and comparing a
+`timestamptz` column against tz-aware Python datetimes for the IST date bounds.
+All behave. Case-insensitive ref lookup and the CSV shape were checked too.
 
 ---
 
@@ -527,9 +535,11 @@ a scratch database. Test migrations against a throwaway SQLite file first.
 - Part 14 (retire WAHA) must move `whatsapp_transport`'s default off `"waha"`
   (`config.py:122`) in the same commit, or a Space with no explicit setting
   falls through to a transport that no longer exists.
-- **Migration `e1f2a3b4c5d6` (Part 7) is pending on production.** Purely
-  additive; run it before the next deploy or the live app cannot read
-  `pooja_bookings`.
+- **Demo data is live on production** (`scripts/seed_demo_data.py`, 2026-07-27):
+  6 users, 24 pooja bookings, 22 payments, 6 consults, 1 partner, 3 festivals.
+  Every row is marked (`NTDEMO…` refs, `+9199000000…` phones, `order_demo_…`,
+  `[demo]`, `demo-…`), so `--purge` removes exactly those and nothing else.
+  **Remove it before launch.**
 - Baselines to hold: `ruff check app tests` ≤ 129; full suite green apart from
   the 2 pre-existing `tests/whatsapp/test_whatsapp.py` failures caused by local
   `.env` having `MOCK_WHATSAPP=false`.
