@@ -10,6 +10,20 @@ dist/
 # TypeScript incremental build state (app-nithara/, app-console/).
 *.tsbuildinfo
 
+# Generated PDFs. Each is built by a script in scripts/ from a tracked Markdown
+# source, so committing them stores a derived copy that goes stale the moment
+# its source changes — and they are the largest files in the repo by some way
+# (Tara_Content_Review.pdf alone was 862 KB). Rebuild any of them with the
+# matching `python scripts/build_*.py` / `generate_*.py`.
+#
+# NOT ignored: the two PDFs below have no generating script. They are sources,
+# not artefacts, so they stay tracked — losing them would mean losing the only
+# copy. The negations are belt-and-braces (git ignores .gitignore for files it
+# already tracks) but they state the intent where someone will look for it.
+docs/*.pdf
+!docs/Tara_AWS_Hosting_Guide.pdf
+!docs/Tara_Integration_Research_Report.pdf
+
 # Virtual environments
 .venv/
 venv/
