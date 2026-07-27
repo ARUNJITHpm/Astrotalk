@@ -324,7 +324,15 @@ ask before wiring the refund call; land everything else first.
 Tests in tests/bookings/.
 ```
 
-## Part 8 — Users, payments, feed, and auth hardening
+## Part 8 — Users, payments, feed, and auth hardening  ✅ DONE (`53aab44`)
+
+> **As built.** The auth-hardening half shipped early, in Part 4 — the
+> `chargemod` fallback is gone. Two items on the list below were deliberately
+> NOT built and want an explicit decision: a bulk CSV export of the devotee
+> register, and chart/family in user detail (a chart *is* birth data, and a
+> family member's nakshatram is derived from it — GUARDRAILS §4). See
+> `NITHARA-CONSOLE-PROGRESS.md`.
+
 ```
 --- Users (identity) ---
 GET /admin/users — paginated, searchable by phone/name. Today the only operator

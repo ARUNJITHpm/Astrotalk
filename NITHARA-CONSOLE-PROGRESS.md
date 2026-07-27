@@ -512,6 +512,87 @@ All behave. Case-insensitive ref lookup and the CSV shape were checked too.
 
 ---
 
+## Part 8 — Users, payments, entitlements, app feed (`53aab44`)
+
+### Findings
+
+- **A user who never chatted was invisible.** The only operator view was
+  `GET /admin/users-chats`, which lists people *with chat history*.
+- **There was no way to disable an account.** No column, no route.
+- **`granted_by="admin"` was fiction.** Declared in `GRANTED_BY`
+  (`commerce/models.py:23`) since the module was written, with nothing anywhere
+  that could produce one — a goodwill unlock or a comped report meant editing
+  the database by hand.
+- **The feed was a three-item literal** whose own docstring said "admin CRUD
+  layer on later" (`content/feed.py:9`).
+
+### Done
+
+| File | Change |
+|---|---|
+| `admin/router.py` | users register, detail, enable/disable; payment ledger; grant/revoke entitlements |
+| `identity/service.py` | `operator_search`, `set_active`; `active` enforced in `authenticate` and `get_session_user` |
+| `identity/models.py` | `users.active` |
+| `commerce/service.py` | `operator_payments`, `get_payment`, `revoke_entitlement` |
+| `content/models.py` | `FeedItem` |
+| `content/feed.py` | snapshot + seed fallback, matching the two registries |
+| `content/feed_admin.py` | **new** — feed writes and their two content rules |
+| `migrations/…f2a3b4c5d6e7` | `feed_items` (+ the 3 seed cards) and `users.active` |
+| `tests/admin/test_users_payments_feed.py` | **new**, 30 tests |
+
+**Disabling means now.** `set_active(False)` deletes the user's sessions *and*
+`get_session_user` re-checks the flag, so a signed-in device stops working on
+its next request rather than at the end of the session TTL. Login fails exactly
+like a wrong password, so the endpoint cannot be used to discover which numbers
+are registered-but-blocked.
+
+**A grant cannot lie about where it came from.** The console always writes
+`granted_by="admin"`; `granted_by` is not a request field. Letting it claim
+`purchase` or `referral` would forge the very audit trail that distinguishes a
+real payment from a comp. Revoking is a hard delete — `has_entitlement` reads
+every row for the pair, so a soft-deleted one would leave the feature open.
+
+**Two feed rules are enforced, not trusted.** `who_en` is required to create
+and cannot be blanked afterwards: a card with no attribution reads as an
+anonymous authority making claims (§1). And `likes`/`comments` are neither
+columns nor settable — inventing engagement counts is what §4 forbids, and a
+column would be an invitation to fill it in. The API keeps serving 0.
+
+**GUARDRAILS §4 on the user surface.** Search matches name and mobile only;
+searching by birth detail would put a date of birth in a query string. The list
+response carries no birth data; detail carries birth *place* only, because an
+operator handling "my chart looks wrong" needs it and nothing an operator does
+needs the date or time. Three tests assert the **absence** of those fields —
+the only way a later widening gets caught.
+
+### Review finding, fixed before commit
+
+The feed create schema silently dropped unknown fields, so `POST` with a
+`likes` count returned **201** and an operator would reasonably believe it had
+taken effect. Fixed, and applied wider than it was found: `TempleAdminIn`,
+`PoojaAdminIn`, `AstrologerAdminIn` and `FeedItemIn` all forbid extras now,
+matching their patch counterparts, which already did.
+
+### Deliberately not built
+
+Both are decisions for the owner rather than defaults for me to pick:
+
+- **Bulk CSV export of the devotee register.** Exporting phone numbers en
+  masse is a data-protection call, not a convenience feature.
+- **Chart and family in user detail.** A chart *is* birth data, and a family
+  member's nakshatram is derived from it. The plan listed them; §4 says no.
+
+### Verification
+
+- Full suite **492 pass**; ruff **123**
+- Migration verified on throwaway SQLite (upgrade → downgrade → upgrade), then
+  **applied to production**: head `f2a3b4c5d6e7`, 19 users all `active=true`,
+  3 feed cards imported with attribution intact, every other count unchanged
+- The seed cards import in the same upgrade that creates the table, so it is
+  never briefly empty in front of a running app
+
+---
+
 ## Migrations applied to production — 2026-07-27
 
 Owner approved running against the real database. Applied
