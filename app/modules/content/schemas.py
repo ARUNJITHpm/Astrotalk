@@ -24,6 +24,57 @@ class FeedItemOut(BaseModel):
     temple_id: str | None = None
 
 
+class FeedItemIn(BaseModel):
+    """Write a feed card (console plan Part 8).
+
+    ``likes``/``comments`` are absent on purpose: they are not stored and not
+    settable, because inventing engagement counts is what GUARDRAILS §4
+    forbids. The read shape keeps serving 0 until real reactions exist.
+
+    ``extra="forbid"`` so sending one is an error rather than a silent no-op —
+    an operator who types a like count and gets a 201 back would reasonably
+    believe it took effect.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    cat: str  # one of feed.CATEGORIES
+    title_en: str
+    who_en: str  # required — a card must say whose words it carries
+    title_ml: str = ""
+    body_en: str = ""
+    body_ml: str = ""
+    who_ml: str = ""
+    image: str = "i-fest"
+    glyph: str = "i-parasol"
+    live: bool = False
+    temple_id: str | None = None
+    published: bool = False  # new cards start as drafts
+    sort_order: int = 0
+
+
+class FeedItemPatch(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    cat: str | None = None
+    title_en: str | None = None
+    title_ml: str | None = None
+    body_en: str | None = None
+    body_ml: str | None = None
+    who_en: str | None = None
+    who_ml: str | None = None
+    image: str | None = None
+    glyph: str | None = None
+    live: bool | None = None
+    temple_id: str | None = None
+    sort_order: int | None = None
+
+
+class PublishedIn(BaseModel):
+    published: bool
+
+
 class ContentPostOut(BaseModel):
     """One piece of the daily pack, as shown in the /admin Content tab."""
 

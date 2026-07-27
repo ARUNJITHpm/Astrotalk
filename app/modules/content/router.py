@@ -18,13 +18,16 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import HTMLResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.content import share_cards
+from app.modules.content import feed, feed_admin, share_cards
 from app.modules.content.models import STUDIO_KINDS, ShareCard
 from app.modules.content.schemas import (
     ApprovePayload,
     ContentPostOut,
+    FeedItemIn,
     FeedItemOut,
+    FeedItemPatch,
     MarkPublishedPayload,
+    PublishedIn,
     RunDailySummary,
     ShareCardCreate,
     ShareCardOut,
@@ -38,7 +41,7 @@ from app.modules.content.service import (
 )
 from app.modules.identity.auth import CurrentUser
 from app.modules.identity.service import IdentityService
-from app.platform.admin_auth import AdminGuard
+from app.platform.admin_auth import AdminGuard, Operator, require_operator
 from app.platform.config import get_settings
 from app.platform.cron_auth import CronOrAdminGuard
 from app.platform.db import get_session
@@ -62,9 +65,111 @@ async def app_feed(
     from app.modules.content.feed import list_feed
 
     return list_feed(temple_id, cat)
+
+
 _identity = IdentityService()
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
+# The feed is editorial content, so a content_reviewer edits it alongside the
+# owner — the same pairing that gates a temple's `reviewed` flag in Part 5.
+FeedEditorDep = Annotated[
+    Operator, Depends(require_operator("owner", "content_reviewer"))
+]
+
+
+# ---- App feed CRUD (console plan Part 8) ----
+# feed.py's own docstring said "admin CRUD layer on later". This is it: the
+# three cards were a Python literal, so correcting a festival notice meant a
+# code change and a redeploy — the opposite of what a notices feed is for.
+#
+# Every write ends in _publish_feed, which commits and rebuilds the in-memory
+# snapshot GET /feed serves; without it an edit would not appear until restart.
+
+
+async def _publish_feed(session: AsyncSession) -> None:
+    await session.commit()
+    await feed.load(session)
+
+
+def _feed_error(exc: feed_admin.FeedAdminError) -> HTTPException:
+    code = (
+        status.HTTP_404_NOT_FOUND
+        if isinstance(exc, feed_admin.NotFound)
+        else status.HTTP_422_UNPROCESSABLE_ENTITY
+    )
+    return HTTPException(code, detail=str(exc))
+
+
+def _feed_out(row) -> dict:  # noqa: ANN001
+    return {
+        "id": row.id,
+        "cat": row.cat,
+        "image": row.image,
+        "glyph": row.glyph,
+        "live": row.live,
+        "title_en": row.title_en,
+        "title_ml": row.title_ml,
+        "body_en": row.body_en,
+        "body_ml": row.body_ml,
+        "who_en": row.who_en,
+        "who_ml": row.who_ml,
+        "temple_id": row.temple_id,
+        "published": row.published,
+        "sort_order": row.sort_order,
+        "updated_at": row.updated_at,
+    }
+
+
+@router.get("/feed/manage", summary="Every feed card, drafts included")
+async def manage_feed(session: SessionDep, operator: FeedEditorDep) -> list[dict]:
+    return [_feed_out(r) for r in await feed_admin.listing(session)]
+
+
+@router.post(
+    "/feed",
+    status_code=status.HTTP_201_CREATED,
+    summary="Write a new feed card",
+)
+async def create_feed_item(
+    payload: FeedItemIn, session: SessionDep, operator: FeedEditorDep
+) -> dict:
+    fields = payload.model_dump()
+    try:
+        row = await feed_admin.create(session, item_id=fields.pop("id"), **fields)
+    except feed_admin.FeedAdminError as exc:
+        raise _feed_error(exc) from exc
+    await _publish_feed(session)
+    return _feed_out(row)
+
+
+@router.patch("/feed/{item_id}", summary="Edit a feed card")
+async def update_feed_item(
+    item_id: str, payload: FeedItemPatch, session: SessionDep, operator: FeedEditorDep
+) -> dict:
+    try:
+        row = await feed_admin.update(
+            session, item_id=item_id, changes=payload.model_dump(exclude_unset=True)
+        )
+    except feed_admin.FeedAdminError as exc:
+        raise _feed_error(exc) from exc
+    await _publish_feed(session)
+    return _feed_out(row)
+
+
+@router.post("/feed/{item_id}/published", summary="Publish or withdraw a card")
+async def set_feed_published(
+    item_id: str, payload: PublishedIn, session: SessionDep, operator: FeedEditorDep
+) -> dict:
+    """Withdrawing is the only removal on offer. Pulling a wrong notice off the
+    app should not destroy the text that then has to be corrected."""
+    try:
+        row = await feed_admin.update(
+            session, item_id=item_id, changes={"published": payload.published}
+        )
+    except feed_admin.FeedAdminError as exc:
+        raise _feed_error(exc) from exc
+    await _publish_feed(session)
+    return _feed_out(row)
 
 
 def _public_base(request: Request) -> str:

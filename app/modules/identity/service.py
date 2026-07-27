@@ -453,7 +453,10 @@ class IdentityService:
         or an account with no stored hash (pre-auth rows must reset first).
         """
         user = await self.get_user_by_phone(session, phone)
-        if user is None:
+        # A disabled account fails exactly like a wrong password: the caller
+        # gets one indistinguishable answer, so this cannot be used to discover
+        # which numbers are registered-but-blocked.
+        if user is None or not user.active:
             return None
         if _TESTING_SKIP_PASSWORD:  # pragma: no cover - testing escape hatch, off
             return user
@@ -527,7 +530,14 @@ class IdentityService:
         if expires < datetime.now(UTC):
             await session.execute(delete(Session).where(Session.id == login.id))
             return None
-        return await session.get(User, login.user_id)
+        user = await session.get(User, login.user_id)
+        # A disabled account stops working on the next request, not whenever
+        # its token happens to expire. `set_active` also deletes the rows; this
+        # is the belt to that braces, and it covers a session created in the
+        # same instant the account was switched off.
+        if user is None or not user.active:
+            return None
+        return user
 
     async def revoke_session(self, session: AsyncSession, token: str) -> None:
         """Delete a session token (logout) — immediate revocation, idempotent."""
@@ -883,6 +893,70 @@ class IdentityService:
     # The admin module is allowed cross-module READS for its dashboards
     # (Tara-Project-Documentation.md §2). It reaches these numbers only through
     # this public method — never by touching the users/charts tables directly.
+
+    # ---- operator console (console plan Part 8) ----
+    # The only operator view of users was GET /admin/users-chats, which lists
+    # people who have chat history — a user who signed up and never chatted was
+    # invisible. These are the public methods the admin module composes; it
+    # never touches this module's tables.
+    #
+    # GUARDRAILS §4 runs through all of them: birth data (dob, time, place,
+    # coordinates) never enters a URL, a query string, a log line, or a list
+    # response. It appears only in one user's detail, fetched by id.
+
+    async def operator_search(
+        self,
+        session: AsyncSession,
+        *,
+        q: str | None = None,
+        active: bool | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> tuple[int, list[User]]:
+        """Paged user search by name or mobile, plus the total before paging.
+
+        ``q`` is matched against name and phone only. Searching by birth detail
+        is not offered: it would put a date of birth in a query string, which is
+        exactly what §4 forbids, and no operator task needs it.
+        """
+        limit = max(1, min(limit, 200))
+        query = select(User)
+        if q and q.strip():
+            term = f"%{q.strip()}%"
+            query = query.where(User.name.ilike(term) | User.phone.ilike(term))
+        if active is not None:
+            query = query.where(User.active.is_(active))
+
+        total = (
+            await session.execute(select(func.count()).select_from(query.subquery()))
+        ).scalar_one()
+        rows = (
+            await session.execute(
+                query.order_by(User.created_at.desc()).limit(limit).offset(max(0, offset))
+            )
+        ).scalars().all()
+        return total, list(rows)
+
+    async def set_active(
+        self, session: AsyncSession, *, user_id: int, active: bool
+    ) -> User:
+        """Enable or disable an account.
+
+        Disabling drops every live session as well as blocking the next login —
+        otherwise a disabled user keeps working for up to the session TTL, which
+        is not what anyone means by "disable".
+        """
+        user = await session.get(User, user_id)
+        if user is None:
+            raise LookupError("unknown user")
+        user.active = active
+        if not active:
+            for row in (
+                await session.execute(select(Session).where(Session.user_id == user_id))
+            ).scalars().all():
+                await session.delete(row)
+        await session.flush()
+        return user
 
     async def admin_metrics(self, session: AsyncSession) -> dict[str, Any]:
         """Aggregate user/chart/session stats for the admin dashboard.

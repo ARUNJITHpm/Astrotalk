@@ -28,7 +28,13 @@ class AstrologerOut(BaseModel):
 
 class AstrologerAdminIn(BaseModel):
     """Onboard an astrologer. Every seeded entry is a generated placeholder, so
-    this is how the first real practitioner gets into the directory."""
+    this is how the first real practitioner gets into the directory.
+
+    ``extra="forbid"`` like the patch shape: an unknown field should be an
+    error, not a value silently dropped while the caller gets a 201 back.
+    """
+
+    model_config = ConfigDict(extra="forbid")
 
     id: str
     name: str

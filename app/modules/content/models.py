@@ -10,7 +10,7 @@ this file only declares the ORM mapping.
 
 from datetime import UTC, date, datetime
 
-from sqlalchemy import Text, UniqueConstraint
+from sqlalchemy import DateTime, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.platform.db import Base
@@ -38,6 +38,49 @@ STUDIO_STATUSES = ("draft", "approved", "published")
 
 def _utcnow() -> datetime:
     return datetime.now(UTC)
+
+
+class FeedItem(Base):
+    """One notices/articles card in the app feed.
+
+    Was ``FEED_ITEMS``, a three-item literal in feed.py whose own docstring
+    said "admin CRUD layer on later" — this is that. Column names match the
+    seed dict key-for-key so the registry round-trips a row into the shape
+    ``list_feed`` has always returned.
+
+    ``likes``/``comments`` are deliberately NOT columns. They were hardcoded 0
+    because inventing engagement counts is forbidden (GUARDRAILS §4); the API
+    keeps serving 0 until real reactions exist, and a column here would be an
+    invitation to type a number into it.
+    """
+
+    __tablename__ = "feed_items"
+
+    id: Mapped[str] = mapped_column(primary_key=True)  # "pooram-ilanjithara"
+    cat: Mapped[str] = mapped_column(index=True)  # one of feed.CATEGORIES
+    image: Mapped[str] = mapped_column(default="i-fest")  # app art key
+    glyph: Mapped[str] = mapped_column(default="i-parasol")
+    live: Mapped[bool] = mapped_column(default=False)
+    title_en: Mapped[str]
+    title_ml: Mapped[str] = mapped_column(default="")
+    body_en: Mapped[str] = mapped_column(Text, default="")
+    body_ml: Mapped[str] = mapped_column(Text, default="")
+    # WHO is speaking. The honesty rule (GUARDRAILS §1): a notice is attributed
+    # to the temple it came from, and anything in Nithara's own voice says so —
+    # never a fabricated named authority.
+    who_en: Mapped[str] = mapped_column(default="")
+    who_ml: Mapped[str] = mapped_column(default="")
+    temple_id: Mapped[str | None] = mapped_column(index=True, default=None)
+    # Unpublished cards are drafts an operator is still writing; the app never
+    # sees them. Distinct from deletion, which is not offered.
+    published: Mapped[bool] = mapped_column(default=False)
+    sort_order: Mapped[int] = mapped_column(default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, onupdate=_utcnow
+    )
 
 
 class ContentPost(Base):

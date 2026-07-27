@@ -61,19 +61,26 @@ configure_logging()
 
 
 async def _load_directories() -> None:
-    """Cache the temple and astrologer directories into the process.
+    """Cache the temple and astrologer directories, and the app feed.
 
-    Both are read synchronously from inside the chat turn, so they are snapshots
-    rather than per-call queries (see each module's ``registry.py``). An empty
-    table falls back to that module's curated seed, so a failure here must never
-    stop the app booting — the fallback still serves a working directory.
+    All three are read synchronously — the directories from inside the chat
+    turn, the feed from a route with no session — so they are snapshots rather
+    than per-call queries (see each module's ``registry.py``, and
+    ``content/feed.py``). An empty table falls back to that module's curated
+    seed, so a failure here must never stop the app booting: the fallback still
+    serves working content.
     """
     from app.modules.astrologers import registry as astrologers_registry
+    from app.modules.content import feed as content_feed
     from app.modules.temples import registry as temples_registry
     from app.platform.db import async_session_factory
 
     log = get_logger(__name__)
-    for name, registry in (("temple", temples_registry), ("astrologer", astrologers_registry)):
+    for name, registry in (
+        ("temple", temples_registry),
+        ("astrologer", astrologers_registry),
+        ("feed", content_feed),
+    ):
         try:
             async with async_session_factory() as session:
                 loaded = await registry.load(session)

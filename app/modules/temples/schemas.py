@@ -108,7 +108,14 @@ class PoojaCatalogueOut(BaseModel):
 
 
 class TempleAdminIn(BaseModel):
-    """Create a directory temple. Column names, not the app's display names."""
+    """Create a directory temple. Column names, not the app's display names.
+
+    ``extra="forbid"`` like the patch shape: a field the schema does not know
+    should be an error, not a value silently dropped on the floor while the
+    caller gets a 201 and assumes it landed.
+    """
+
+    model_config = ConfigDict(extra="forbid")
 
     id: str
     name: str
@@ -199,6 +206,8 @@ class PoojaAdminIn(BaseModel):
     """A master offering. ``amount_paise``, not rupees: the wire contract for
     the *app* is whole rupees (PoojaCatalogueItem.amount) but that is a lossy
     rendering, and the console is where the authoritative figure is set."""
+
+    model_config = ConfigDict(extra="forbid")
 
     key: str
     name: str

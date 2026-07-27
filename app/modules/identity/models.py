@@ -44,6 +44,10 @@ class User(Base):
     tz: Mapped[str]
     # White-label tenant this account belongs to (orgs module, Part 4a).
     # Null = Tara-direct user. Plain int — orgs owns its own table.
+    # Operator switch (console plan Part 8). There was no way to disable an
+    # account at all. False blocks login AND is checked when a bearer session is
+    # resolved, so an already-signed-in device stops working too.
+    active: Mapped[bool] = mapped_column(default=True)
     org_id: Mapped[int | None] = mapped_column(nullable=True, index=True, default=None)
     # Part 4c: whether this customer explicitly allows their org's astrologer
     # to read their chat transcripts. Off by default; only the customer can

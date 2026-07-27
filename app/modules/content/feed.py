@@ -12,6 +12,11 @@ Categories match the app: Festival · Darshan · AstroTalk. ``temple_id`` (when
 set) points at a real seed temple so the card's "View temple" opens it.
 """
 
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.modules.content.models import FeedItem
+
 CATEGORIES = ("Festival", "Darshan", "AstroTalk")
 
 FEED_ITEMS: list[dict] = [
@@ -63,11 +68,77 @@ FEED_ITEMS: list[dict] = [
 ]
 
 
+def current() -> list[dict]:
+    """The feed the app should be served right now.
+
+    ``None`` snapshot = the table was never imported, so serve the curated seed.
+    Same fallback as the temple and astrologer registries, and for the same
+    reason: every test builds a fresh database and seeds no feed, so they keep
+    exercising exactly the behaviour this had when it *was* a literal.
+    """
+    return list(FEED_ITEMS) if _snapshot is None else _snapshot
+
+
 def list_feed(temple_id: str | None = None, cat: str | None = None) -> list[dict]:
     """The curated feed, optionally filtered by temple or category."""
-    items = FEED_ITEMS
+    items = current()
     if temple_id:
         items = [a for a in items if a["temple_id"] == temple_id]
     if cat:
         items = [a for a in items if a["cat"].lower() == cat.lower()]
     return list(items)
+
+
+# ---- database-backed feed (console plan Part 8) ----
+# The list above is now the import fixture and the empty-table fallback; the
+# live feed is a snapshot of `feed_items`, refreshed at startup and after every
+# operator write. `list_feed` is synchronous and called from a route with no
+# session, so a snapshot keeps that signature rather than rippling async out.
+
+_snapshot: list[dict] | None = None
+
+
+def row_to_dict(item: "FeedItem") -> dict:
+    """A FeedItem row in the exact shape the seed literal produces."""
+    return {
+        "id": item.id,
+        "cat": item.cat,
+        "image": item.image,
+        "glyph": item.glyph,
+        "live": item.live,
+        "title_en": item.title_en,
+        "title_ml": item.title_ml,
+        "body_en": item.body_en,
+        "body_ml": item.body_ml,
+        "who_en": item.who_en,
+        "who_ml": item.who_ml,
+        # Always zero, never stored: real reactions do not exist yet, and an
+        # invented engagement count is exactly what GUARDRAILS §4 forbids.
+        "likes": 0,
+        "comments": 0,
+        "temple_id": item.temple_id,
+    }
+
+
+async def load(session: "AsyncSession") -> int:
+    """Refresh the snapshot from the database. Returns the published count."""
+    global _snapshot
+    total = (await session.execute(select(func.count()).select_from(FeedItem))).scalar_one()
+    if not total:
+        _snapshot = None  # never imported → serve the curated seed
+        return 0
+    rows = (
+        await session.execute(
+            select(FeedItem)
+            .where(FeedItem.published.is_(True))
+            .order_by(FeedItem.sort_order, FeedItem.id)
+        )
+    ).scalars().all()
+    _snapshot = [row_to_dict(r) for r in rows]
+    return len(rows)
+
+
+def reset() -> None:
+    """Drop the snapshot (tests, and after a destructive operator edit)."""
+    global _snapshot
+    _snapshot = None

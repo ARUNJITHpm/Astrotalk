@@ -23,10 +23,10 @@ import secrets
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.commerce.models import Entitlement, Payment
+from app.modules.commerce.models import PAYMENT_STATUSES, Entitlement, Payment
 from app.platform import metrics
 from app.platform.config import get_settings
 from app.platform.logging_config import get_logger
@@ -264,6 +264,63 @@ class CommerceService:
             await session.flush()
 
     # ---- entitlements ----
+
+    # ---- operator console (console plan Part 8) ----
+    # `granted_by="admin"` has been a declared value in GRANTED_BY since the
+    # module was written, with no route anywhere that could produce one — a
+    # goodwill unlock, a comped report, a failed payment made good by hand all
+    # had to be done in the database. These are the public methods the admin
+    # module composes; it never reads commerce's tables.
+
+    async def operator_payments(
+        self,
+        session: AsyncSession,
+        *,
+        status: str | None = None,
+        user_id: int | None = None,
+        product: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> tuple[int, list[Payment]]:
+        """A filtered, paged slice of payments plus the total before paging."""
+        if status is not None and status not in PAYMENT_STATUSES:
+            raise UnknownProduct(f"unknown payment status: {status}")
+        limit = max(1, min(limit, 200))
+        query = select(Payment)
+        if status:
+            query = query.where(Payment.status == status)
+        if user_id is not None:
+            query = query.where(Payment.user_id == user_id)
+        if product:
+            query = query.where(Payment.product == product)
+
+        total = (
+            await session.execute(select(func.count()).select_from(query.subquery()))
+        ).scalar_one()
+        rows = (
+            await session.execute(
+                query.order_by(Payment.created_at.desc())
+                .limit(limit)
+                .offset(max(0, offset))
+            )
+        ).scalars().all()
+        return total, list(rows)
+
+    async def get_payment(self, session: AsyncSession, payment_id: int) -> Payment | None:
+        return await session.get(Payment, payment_id)
+
+    async def revoke_entitlement(
+        self, session: AsyncSession, *, entitlement_id: int
+    ) -> bool:
+        """Withdraw a grant. A real DELETE, not a flag: `has_entitlement` is the
+        single unlock check and reads every row for the pair, so a soft-deleted
+        row would keep the feature open — the opposite of revoking it."""
+        row = await session.get(Entitlement, entitlement_id)
+        if row is None:
+            return False
+        await session.delete(row)
+        metrics.increment("commerce.entitlements_revoked")
+        return True
 
     async def grant_entitlement(
         self,

@@ -7,9 +7,10 @@ data.
 """
 
 import hmac
+from datetime import datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -21,6 +22,9 @@ from app.modules.admin import operators
 from app.modules.admin.auth import AdminGuard, admin_required
 from app.modules.admin.schemas import AdminOverview
 from app.modules.admin.service import AdminService
+from app.modules.bookings.service import BookingsService
+from app.modules.commerce.service import CommerceService
+from app.modules.identity.service import IdentityService
 from app.platform.admin_auth import Operator, require_operator
 from app.platform.config import get_settings
 from app.platform.db import get_session
@@ -28,6 +32,11 @@ from app.platform.db import get_session
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 _service = AdminService()
+# Composed, never reached into: the admin module owns no domain data and talks
+# to each module through its public service only (AGENTS.md).
+_identity = IdentityService()
+_commerce = CommerceService()
+_bookings = BookingsService()
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 # Owner-only: managing who may sign in is never delegated to a scoped role.
@@ -38,6 +47,21 @@ class LoginPayload(BaseModel):
     # The owner's configured email.
     username: str
     password: str
+
+
+class ActiveIn(BaseModel):
+    active: bool
+
+
+class EntitlementIn(BaseModel):
+    """A hand-granted unlock. ``granted_by`` is not a field: the console always
+    records ``admin``, because letting it claim `purchase` or `referral` would
+    forge the audit trail that tells the three apart."""
+
+    user_id: int
+    product_key: str
+    reason: str = ""
+    expires_at: datetime | None = None
 
 
 @router.post("/login", summary="Owner login (email + password) → admin token")
@@ -98,6 +122,209 @@ async def admin_config() -> dict:
 async def overview(session: SessionDep) -> dict:
     """Full analytics payload: users, charts, chat volume, and LLM token usage."""
     return await _service.overview(session)
+
+
+# ---- Users and payments (console plan Part 8) ----
+# Owner-only. A temple_admin runs a temple; the devotee register and the
+# payment ledger are not theirs to read.
+#
+# The admin module owns no domain data — it composes IdentityService and
+# CommerceService, never their tables (AGENTS.md). GUARDRAILS §4 shapes the
+# surface: birth data never enters a URL, a query string or a list response,
+# and appears only in one user's detail fetched by id.
+
+
+@router.get("/users", summary="Search the devotee register (owner)")
+async def list_users(
+    session: SessionDep,
+    operator: OwnerDep,
+    q: Annotated[str | None, Query(description="name or mobile")] = None,
+    active: Annotated[bool | None, Query()] = None,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> dict:
+    """The only operator view of users was ``/admin/users-chats``, which lists
+    people who have chat history — someone who signed up and never chatted was
+    invisible."""
+    total, rows = await _identity.operator_search(
+        session, q=q, active=active, limit=limit, offset=offset
+    )
+    return {
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "items": [
+            {
+                "id": u.id,
+                "name": u.name,
+                "phone": u.phone,
+                "active": u.active,
+                "org_id": u.org_id,
+                "created_at": u.created_at,
+            }
+            for u in rows
+        ],
+    }
+
+
+@router.get("/users/{user_id}", summary="One devotee, with their activity (owner)")
+async def user_detail(user_id: int, session: SessionDep, operator: OwnerDep) -> dict:
+    """Birth PLACE is included here and nowhere else — an operator handling a
+    "my chart looks wrong" report needs it. Date and time of birth are not:
+    nothing an operator does requires them, and §4 keeps them out of every
+    surface that does not strictly need them."""
+    user = await _identity.get_user(session, user_id)
+    if user is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    entitlements = await _commerce.list_entitlements(session, user_id)
+    _, payments = await _commerce.operator_payments(session, user_id=user_id, limit=50)
+    bookings = await _bookings.list_for_user(session, user_id)
+    await session.commit()  # list_for_user reconciles payment states
+    return {
+        "id": user.id,
+        "name": user.name,
+        "phone": user.phone,
+        "active": user.active,
+        "birth_place": user.birth_place,
+        "tz": user.tz,
+        "org_id": user.org_id,
+        "transcript_consent": user.transcript_consent,
+        "created_at": user.created_at,
+        "bookings": bookings,
+        "payments": [
+            {
+                "id": p.id,
+                "product": p.product,
+                "amount_paise": p.amount_paise,
+                "status": p.status,
+                "razorpay_order_id": p.razorpay_order_id,
+                "created_at": p.created_at,
+                "paid_at": p.paid_at,
+            }
+            for p in payments
+        ],
+        "entitlements": [
+            {
+                "id": e.id,
+                "product_key": e.product_key,
+                "granted_by": e.granted_by,
+                "source": e.source,
+                "expires_at": e.expires_at,
+                "created_at": e.created_at,
+            }
+            for e in entitlements
+        ],
+    }
+
+
+@router.post("/users/{user_id}/active", summary="Enable or disable an account (owner)")
+async def set_user_active(
+    user_id: int, payload: ActiveIn, session: SessionDep, operator: OwnerDep
+) -> dict:
+    """Disabling drops every live session as well as blocking the next login —
+    otherwise the account keeps working for up to the session TTL, which is not
+    what anyone means by "disable"."""
+    try:
+        user = await _identity.set_active(session, user_id=user_id, active=payload.active)
+    except LookupError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    await session.commit()
+    return {"id": user.id, "active": user.active}
+
+
+@router.get("/payments", summary="The payment ledger (owner)")
+async def list_payments(
+    session: SessionDep,
+    operator: OwnerDep,
+    payment_status: Annotated[
+        str | None, Query(alias="status", description="created|paid|failed")
+    ] = None,
+    user_id: Annotated[int | None, Query()] = None,
+    product: Annotated[str | None, Query()] = None,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> dict:
+    try:
+        total, rows = await _commerce.operator_payments(
+            session,
+            status=payment_status,
+            user_id=user_id,
+            product=product,
+            limit=limit,
+            offset=offset,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
+    return {
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "items": [
+            {
+                "id": p.id,
+                "user_id": p.user_id,
+                "product": p.product,
+                "amount_paise": p.amount_paise,
+                "currency": p.currency,
+                "status": p.status,
+                "razorpay_order_id": p.razorpay_order_id,
+                "razorpay_payment_id": p.razorpay_payment_id,
+                "created_at": p.created_at,
+                "paid_at": p.paid_at,
+            }
+            for p in rows
+        ],
+    }
+
+
+@router.post("/entitlements", summary="Grant an entitlement by hand (owner)")
+async def grant_entitlement(
+    payload: EntitlementIn, session: SessionDep, operator: OwnerDep
+) -> dict:
+    """``granted_by="admin"`` has been a declared value since the module was
+    written with no route that could produce one, so a goodwill unlock or a
+    comped report meant editing the database.
+
+    Always recorded as ``admin`` — the console cannot claim a grant came from a
+    purchase or a referral, because that would forge the audit trail that
+    distinguishes them. ``source`` is the operator's free-text reason.
+    """
+    user = await _identity.get_user(session, payload.user_id)
+    if user is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="User not found")
+    row = await _commerce.grant_entitlement(
+        session,
+        user_id=payload.user_id,
+        product_key=payload.product_key,
+        granted_by="admin",
+        source=payload.reason or f"granted by operator {operator.operator_id or 'token'}",
+        expires_at=payload.expires_at,
+    )
+    await session.commit()
+    return {
+        "id": row.id,
+        "user_id": row.user_id,
+        "product_key": row.product_key,
+        "granted_by": row.granted_by,
+        "source": row.source,
+        "expires_at": row.expires_at,
+    }
+
+
+@router.delete(
+    "/entitlements/{entitlement_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Withdraw a grant (owner)",
+)
+async def revoke_entitlement(
+    entitlement_id: int, session: SessionDep, operator: OwnerDep
+) -> None:
+    if not await _commerce.revoke_entitlement(session, entitlement_id=entitlement_id):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Unknown entitlement")
+    await session.commit()
 
 
 # ---- Operator accounts (console plan Part 4) ----
