@@ -593,6 +593,44 @@ Both are decisions for the owner rather than defaults for me to pick:
 
 ---
 
+## Local Docker verification — 2026-07-27
+
+Docker Desktop is installed on the dev machine now, so the image no longer has
+to reach the HF Space to get its first real test. `scripts/container_smoke.sh`
+builds on that: it boots `nithara:local` four times against a **scratch SQLite
+database inside the container** and runs 38 checks. `.dockerignore` excludes
+`.env`, so the container carries no credentials of its own and cannot reach
+Neon even though the host's `.env` points there.
+
+**38/38 pass.** Migrations run at boot through `f2a3b4c5d6e7`; the three
+registries load (53 temples, 28 astrologers, 3 feed cards); `/`, `/prototype`
+and `/feed` serve; all ten console routes answer with a token and 401 without.
+
+The four phases exist to answer one deploy question — what happens when
+`ADMIN_TOKEN` is missing, which is the live Space's state since Part 4 removed
+the `chargemod` fallback:
+
+| Phase | Config | Result |
+|---|---|---|
+| 1 | `ADMIN_TOKEN` set | every console route answers |
+| 2 | nothing configured | every console route 401s; `/health` and `/` still fine — locked, not bricked |
+| 3 | password set, **no token** | owner gets a named diagnostic; still no token issued |
+| 4 | fully configured | owner signs in, token opens the console |
+
+**Phase 3 corrected a wrong assumption of mine.** I had asserted `POST
+/admin/login` should return 503 when `ADMIN_TOKEN` is unset. It returns **401**,
+because `admin/router.py:79` checks credentials *before* config state. That is
+the better contract and the test now pins it: an anonymous prober sees a plain
+401 and learns nothing about the deployment, while the owner who proves who
+they are gets 503 naming `ADMIN_TOKEN` — actionable to the one person who can
+act, opaque to everyone else. Verified it hands out no token on that path.
+
+Two environment notes, both recorded in `docs/AGENTS.md`: the CLI is not on
+`PATH`, and a stopped `docker-desktop` WSL distro makes every command return
+`500 … /_ping`, which reads like a broken build rather than a stopped engine.
+
+---
+
 ## Migrations applied to production — 2026-07-27
 
 Owner approved running against the real database. Applied
