@@ -348,6 +348,75 @@ the console on a deployment that never ran `a7b8c9d0e1f2` swaps 53 temples for
 
 ---
 
+## Part 6 — Astrologer admin API (`9059633`)
+
+### Findings
+
+- **The module had no admin-gated route at all.** `astrologers/router.py` never
+  imported a guard; all six routes were public reads or user-scoped bookings.
+- **An astrologer could not see their own diary.** Bookings were only ever
+  queryable by the user who made them (`/bookings/me`), so nothing anywhere
+  answered "who is coming at 10:30".
+- **Nothing recorded that a consult happened.** The status vocabulary was
+  `confirmed | cancelled`, and only the booking's own user could change it.
+- **Consult windows were baked into `seed_data._morning_windows()` /
+  `_evening_windows()`** and could not be edited by anyone.
+
+### Done
+
+| File | Change |
+|---|---|
+| `astrologers/admin.py` | **new** — data access + validation |
+| `astrologers/router.py` | 8 owner-only routes before the `/{astrologer_id}` catch-all |
+| `astrologers/models.py` | `BOOKING_STATES` / `TERMINAL_STATES` |
+| `astrologers/service.py` | `cancel` hardened against the widened vocabulary |
+| `platform/storage.py` | `sniff_image` + `ImageRejected`, lifted out of Part 5 |
+| `tests/astrologers/test_astrologer_admin.py` | **new**, 28 tests |
+
+**Owner-only, deliberately.** Unlike temples there is no scoped role: a
+`temple_admin` runs a temple, and the astrologer directory is one editorial
+surface, not fifty-three of them. A test pins the 403.
+
+**Key design decision — nothing returns to `confirmed`.** An operator may move
+a consult to `cancelled`, `completed` or `no_show`, and may correct one
+terminal state to another (marking `no_show` by mistake has to be fixable). It
+may never go back: `astro_bookings` is unique on (astrologer_id, starts_at) and
+a closed row still holds its slot, so reviving one from the console could
+re-seat a consult somebody else has since booked. The user booking path revives
+deliberately, through `service.book`, which checks the slot is still open first.
+
+Only `cancelled` frees a time — a completed consult occupied it. Pinned.
+
+**Availability is a PUT, not a PATCH.** "These are my hours" is how a person
+thinks about it, and a partial update makes removing a window awkward. Already
+booked consults are untouched, because a booking holds an absolute instant
+rather than a reference to a window: narrowing the schedule stops new bookings
+and cancels nothing. Also pinned.
+
+A window shorter than one consult is rejected rather than stored — it yields
+zero slots, so the astrologer looks booked solid forever with nothing anywhere
+saying why.
+
+### Review finding, fixed before commit
+
+`service.cancel` rejected only the already-cancelled case, because that was the
+only closed state there was. Widening the vocabulary would have let a **user**
+cancel a consult an operator had recorded as `completed` — rewriting history,
+and freeing a slot that was genuinely used. It now refuses every terminal
+state, with a test.
+
+### Verification
+
+- `tests/astrologers` **45 pass**; full suite **429 pass**
+- ruff **125** — unchanged from Part 5, three below the 128 baseline
+- Route-ordering pin for `/astrologers/manage` vs `/{astrologer_id}`
+- A test asserts the public `AstrologerOut` still hides `price_paise_per_min`,
+  `availability` and `active`, so widening the directory dict can never widen
+  the API (the same guarantee Part 2 established)
+- No migration; nothing applied to production
+
+---
+
 ## Migrations applied to production — 2026-07-27
 
 Owner approved running against the real database. Applied

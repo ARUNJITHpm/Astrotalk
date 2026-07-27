@@ -266,7 +266,13 @@ at router.py:152-154). Tests in tests/temples/ covering the 401-without-token
 path, happy path, and validation failures.
 ```
 
-## Part 6 — Astrologer admin API
+## Part 6 — Astrologer admin API  ✅ DONE (`9059633`)
+
+> **As built.** `PATCH /astro-bookings/{id}` became
+> `PATCH /astrologers/bookings/{id}`, and it may only set a *terminal* state —
+> nothing returns to `confirmed`, because a closed row still holds its slot.
+> See `NITHARA-CONSOLE-PROGRESS.md`.
+
 ```
 Add operator-gated routes to app/modules/astrologers/router.py, owner-only
 (require_operator("owner")) — a temple admin has no business editing the
