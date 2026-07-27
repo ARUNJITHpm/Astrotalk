@@ -29,6 +29,39 @@ class StorageKeyError(ValueError):
     """Raised for keys that are absolute, escape the root, or are empty."""
 
 
+class ImageRejected(ValueError):
+    """An upload that is not an image we are willing to store and serve back."""
+
+
+# Operator photo uploads (temples, astrologers). 4 MB is generous for a
+# directory photo and small enough that a bad request cannot exhaust memory.
+IMAGE_MAX_BYTES = 4 * 1024 * 1024
+
+
+def sniff_image(data: bytes) -> tuple[str, str]:
+    """``(extension, content type)`` read from the file's own bytes.
+
+    Never from a ``Content-Type`` header: the header is the client's claim, the
+    first bytes are evidence, and whatever is stored here is later served back
+    with a type of our choosing.
+
+    WebP needs both halves of its header checked — ``RIFF`` alone is the generic
+    container magic that WAV and AVI also carry, so matching on it would accept
+    an audio file and serve it as ``image/webp``.
+    """
+    if not data:
+        raise ImageRejected("empty upload")
+    if len(data) > IMAGE_MAX_BYTES:
+        raise ImageRejected(f"image exceeds {IMAGE_MAX_BYTES // (1024 * 1024)} MB")
+    if data.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "png", "image/png"
+    if data.startswith(b"\xff\xd8\xff"):
+        return "jpg", "image/jpeg"
+    if data.startswith(b"RIFF") and data[8:12] == b"WEBP":
+        return "webp", "image/webp"
+    raise ImageRejected("expected a PNG, JPEG or WebP")
+
+
 def _clean_key(key: str) -> str:
     """Normalise and validate a storage key (defends the local impl against
     path traversal — /media/{key} serves straight from this namespace)."""

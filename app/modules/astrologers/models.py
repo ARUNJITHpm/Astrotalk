@@ -29,6 +29,18 @@ def _utcnow() -> datetime:
     return datetime.now(UTC)
 
 
+# A consult's lifecycle. It was ``confirmed`` and ``cancelled`` only, because
+# the user who booked was the only party who could ever change it; console plan
+# Part 6 adds the two outcomes an operator records after the fact.
+#
+# TERMINAL_STATES are what an operator may set. ``confirmed`` is not among them
+# on purpose: astro_bookings is unique on (astrologer_id, starts_at) and a
+# cancelled row still holds its slot, so reviving one from the console would
+# re-seat a consult somebody else may have booked since.
+BOOKING_STATES = ("confirmed", "cancelled", "completed", "no_show")
+TERMINAL_STATES = ("cancelled", "completed", "no_show")
+
+
 class Astrologer(Base):
     """One astrologer in the directory.
 
@@ -86,6 +98,6 @@ class AstroBooking(Base):
     user_phone: Mapped[str] = mapped_column(index=True)
     starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     duration_min: Mapped[int] = mapped_column(default=30)
-    status: Mapped[str] = mapped_column(default="confirmed")  # confirmed | cancelled
+    status: Mapped[str] = mapped_column(default="confirmed")  # one of BOOKING_STATES
     note: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)

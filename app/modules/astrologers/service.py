@@ -34,7 +34,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.astrologers import registry
-from app.modules.astrologers.models import AstroBooking
+from app.modules.astrologers.models import TERMINAL_STATES, AstroBooking
 
 _EARTH_RADIUS_KM = 6371.0
 # India Standard Time — fixed +05:30, no DST, so a constant offset is exact.
@@ -232,8 +232,13 @@ class AstrologersService:
         booking = await session.get(AstroBooking, booking_id)
         if booking is None or booking.user_phone != user_phone:
             raise AstroBookingNotFound("booking not found")
-        if booking.status == "cancelled":
-            raise AstroBookingError("booking is already cancelled")
+        if booking.status in TERMINAL_STATES:
+            # Was "already cancelled", which was the only closed state there
+            # was. Console plan Part 6 added `completed` and `no_show`, and a
+            # user must not be able to cancel a consult an operator has already
+            # recorded as having happened — that rewrites history, and it would
+            # free a slot that was genuinely used.
+            raise AstroBookingError(f"booking is already {booking.status}")
         booking.status = "cancelled"
         await session.flush()
         return booking

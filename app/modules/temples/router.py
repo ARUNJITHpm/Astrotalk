@@ -55,7 +55,7 @@ from app.platform import metrics
 from app.platform.admin_auth import AdminGuard, Operator, require_operator
 from app.platform.config import get_settings
 from app.platform.db import get_session
-from app.platform.storage import get_storage
+from app.platform.storage import ImageRejected, get_storage, sniff_image
 
 router = APIRouter(prefix="/temples", tags=["temples"])
 
@@ -394,25 +394,6 @@ async def set_temple_reviewed(
     return TempleAdminOut.model_validate(row)
 
 
-_MAX_IMAGE_BYTES = 4 * 1024 * 1024
-
-
-def _image_format(data: bytes) -> tuple[str, str] | None:
-    """(extension, content type) from the file's own bytes, or None.
-
-    WebP needs both halves of its header checked: ``RIFF`` alone is the generic
-    container magic that WAV and AVI also carry, so matching on it would let an
-    audio file be stored and later served as ``image/webp``.
-    """
-    if data.startswith(b"\x89PNG\r\n\x1a\n"):
-        return "png", "image/png"
-    if data.startswith(b"\xff\xd8\xff"):
-        return "jpg", "image/jpeg"
-    if data.startswith(b"RIFF") and data[8:12] == b"WEBP":
-        return "webp", "image/webp"
-    return None
-
-
 @router.post(
     "/{temple_id}/image",
     response_model=TempleImageOut,
@@ -424,27 +405,18 @@ async def upload_temple_image(
     """The body is the file itself, not a multipart form: multipart would pull
     in python-multipart, which is not a pinned dependency, for a single route a
     console can serve with ``fetch(url, {method: 'POST', body: file})``.
-
-    The format is taken from the file's magic bytes, never from Content-Type —
-    the client's header is a claim, the first eight bytes are evidence.
     """
     operator.require_temple(temple_id)
     if await temple_admin.get_temple(session, temple_id) is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Temple not found")
 
     data = await request.body()
-    if not data:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Empty body")
-    if len(data) > _MAX_IMAGE_BYTES:
+    try:
+        extension, content_type = sniff_image(data)
+    except ImageRejected as exc:
         raise HTTPException(
-            status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="Image exceeds 4 MB"
-        )
-    detected = _image_format(data)
-    if detected is None:
-        raise HTTPException(
-            status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Expected a PNG, JPEG or WebP"
-        )
-    extension, content_type = detected
+            status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
 
     storage = get_storage()
     key = f"temples/{temple_id}.{extension}"
