@@ -39,6 +39,14 @@ console. Both build to a gitignored `dist/` that Docker produces in its own
 Node stage.
 **Hosting** A single Docker image on a Hugging Face Space (`talk-to/nitara`),
 config in the root `README.md` YAML frontmatter. **Not AWS.**
+Docker Desktop (WSL2) **is** installed on the dev machine, so build and run the
+image locally before pushing rather than letting the Space build be the first
+test. The CLI is not on `PATH` — it lives at
+`%LOCALAPPDATA%\Programs\DockerDesktop\resources\bin\docker.exe`. If every
+command returns `500 … /_ping`, the `docker-desktop` WSL distro is stopped
+(`wsl --list --verbose`); restarting Docker Desktop fixes it. Never pipe
+`docker build` into `tail`/`Select-Object`: the exit code then comes from the
+pager, so a failed build reads as a success.
 
 ## Product promises (from `NITHARA-BUILD-PLAN.md`; treat as requirements)
 - **Bilingual by default.** Every user-facing string in the consumer app ships

@@ -586,18 +586,26 @@ revisited later. Parts 5–8 are independent of each other once 4 lands.
 - **Parts 1–3:** `pytest tests/temples tests/astrologers tests/bookings` passes
   **unchanged**; `python scripts/migrate.py` on a scratch DB lands 53 temples
   and 28 astrologers with the same ids the app already serves.
-- **Parts 4–7:** new tests per module — 401 without a token, happy path,
-  validation failure. `ruff check app tests` (**129** pre-existing findings;
-  the count must not grow — `ruff check .` reports 462 because it also walks
-  the local `vinimon/` venv, so always scope it) and `mypy app`.
-- **Parts 8–12:** `npx vitest run` in app-console/, plus one manual end-to-end
+- **Parts 4–8:** new tests per module — 401 without a token, 403 for the wrong
+  role, happy path, validation failure. `ruff check app tests` (**123**
+  findings as of Part 8, down from a 129 baseline; the count must not grow —
+  `ruff check .` reports 462 because it also walks the local `vinimon/` venv,
+  so always scope it) and `mypy app`.
+- **Parts 9–13:** `npx vitest run` in app-console/, plus one manual end-to-end
   pass: create a temple in the console → see it in the app at `/` → book its
   pooja → watch it land in the console queue → move its status.
-- **Part 13:** Docker is **not installed on this machine** — the HF Space build
-  is the first real test, as it was for the Nithara frontend stage. Then check
-  `/`, `/console`, `/prototype` and the API routes in a **browser**.
-- **Final:** full `pytest` — 263 pass today, plus 2 pre-existing WhatsApp
-  failures caused by local `.env` having `MOCK_WHATSAPP=false`.
+- **Part 14:** Docker **is** installed on this machine (Docker Desktop, WSL2
+  backend), so build and run the image locally before pushing — the HF Space
+  build is no longer the first real test. Two things to know: the CLI is not on
+  `PATH` (it lives at
+  `%LOCALAPPDATA%\Programs\DockerDesktop\resources\bin\docker.exe`), and if the
+  `docker-desktop` WSL distro is Stopped every engine call returns
+  `500 … /_ping` — check `wsl --list --verbose` before assuming a build broke.
+  Never pipe `docker build` into `tail`/`Select-Object`: the exit code then
+  comes from the pager and a failed build reads as a success. Then check `/`,
+  `/console`, `/prototype` and the API routes in a **browser**.
+- **Final:** full `pytest` — 492 pass as of Part 8, plus 2 pre-existing
+  WhatsApp failures caused by local `.env` having `MOCK_WHATSAPP=false`.
 
 ---
 
