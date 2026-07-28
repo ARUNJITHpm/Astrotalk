@@ -52,6 +52,12 @@ code() { # code <path> [header...]
 
 body() { curl -s "http://localhost:$PORT$1" "${@:2}"; }
 
+# One response header, lowercased, so a check reads the same on any curl build.
+header() { # header <path> <header-name>
+  curl -s -D - -o /dev/null "http://localhost:$PORT$1" \
+    | tr -d '\r' | grep -i "^$2:" | cut -d' ' -f2- | tr 'A-Z' 'a-z'
+}
+
 start() { # start <extra env flags...>
   cleanup
   docker run -d --name "$NAME" -p "$PORT:3000" \
@@ -89,6 +95,38 @@ check "GET /temples → 53"          53  "$(body '/temples?limit=200' | grep -o 
 check "GET /astrologers → 28"      28  "$(body /astrologers | grep -o '"id":' | wc -l | tr -d ' ')"
 
 echo
+echo "--- the React operator console at /console-app (Part 9) ---"
+check "GET /console-app"              200 "$(code /console-app)"
+check "trailing slash"                200 "$(code /console-app/)"
+# react-router owns everything under the prefix: a bookmarked section is the
+# normal way an operator returns to work, so a deep link must reach the shell.
+check "deep link /console-app/people/users" 200 "$(code /console-app/people/users)"
+check "deep link /console-app/bookings"     200 "$(code /console-app/bookings)"
+check "the shell is the console, not the PWA" "yes" \
+  "$(body /console-app | grep -qi 'Nithara Console' && echo yes || echo no)"
+check "console and consumer app are different pages" "different" \
+  "$( [ "$(body / | md5sum)" = "$(body /console-app | md5sum)" ] && echo same || echo different )"
+# Exact-matching "/console-app" would leave deep links cacheable — how an
+# operator ends up on yesterday's build after a deploy.
+check "shell is no-store"             "no-store" "$(header /console-app 'cache-control')"
+check "deep link is no-store too"     "no-store" \
+  "$(header /console-app/bookings/payments 'cache-control')"
+# Vite content-hashes these, and they live under the console's own base — the
+# consumer app's bare /assets/ prefix would miss them entirely.
+CONSOLE_JS=$(body /console-app | grep -oE '/console-app/assets/[^"]+\.js' | head -1)
+check "shell references a hashed bundle" "yes" \
+  "$( [ -n "$CONSOLE_JS" ] && echo yes || echo no )"
+check "that bundle is served"         200 "$(code "$CONSOLE_JS")"
+check "and cached immutably"          "yes" \
+  "$(header "$CONSOLE_JS" 'cache-control' | grep -q immutable && echo yes || echo no)"
+# The mount is scoped to a subpath precisely so a catch-all cannot turn a
+# typo'd API call into an HTML 200.
+check "the console did not swallow the API" "no" \
+  "$(curl -s -D - -o /dev/null "http://localhost:$PORT/admin/users" \
+      | grep -qi 'content-type: text/html' && echo yes || echo no)"
+check "the old /console still works"  200 "$(code /console)"
+
+echo
 echo "--- console routes WITH the token ---"
 check "GET /admin/users"           200 "$(code /admin/users "${AUTH[@]}")"
 check "GET /admin/payments"        200 "$(code /admin/payments "${AUTH[@]}")"
@@ -99,6 +137,11 @@ check "GET /temples/poojas"        200 "$(code /temples/poojas "${AUTH[@]}")"
 check "GET /astrologers/manage"    200 "$(code /astrologers/manage "${AUTH[@]}")"
 check "GET /content/feed/manage"   200 "$(code /content/feed/manage "${AUTH[@]}")"
 check "GET /admin/operators"       200 "$(code /admin/operators "${AUTH[@]}")"
+# The console's first call after sign-in. An X-Admin-Token caller is a
+# credential rather than a row, so it is an owner with a null operator_id.
+check "GET /admin/operators/me"    200 "$(code /admin/operators/me "${AUTH[@]}")"
+check "…reports owner"             "yes" \
+  "$(body /admin/operators/me "${AUTH[@]}" | grep -q '"is_owner":true' && echo yes || echo no)"
 check "GET /admin/overview"        200 "$(code /admin/overview "${AUTH[@]}")"
 check "/temples/manage → 53 rows"  53 \
   "$(body /temples/manage "${AUTH[@]}" | grep -o '"reviewed"' | wc -l | tr -d ' ')"
@@ -110,6 +153,7 @@ check "GET /bookings/queue"        401 "$(code /bookings/queue)"
 check "GET /temples/manage"        401 "$(code /temples/manage)"
 check "GET /astrologers/manage"    401 "$(code /astrologers/manage)"
 check "GET /content/feed/manage"   401 "$(code /content/feed/manage)"
+check "GET /admin/operators/me"    401 "$(code /admin/operators/me)"
 
 echo
 echo "--- a WRONG token is refused ---"
@@ -124,6 +168,9 @@ if ! start; then exit 1; fi
 echo "  container healthy"
 check "GET /health still fine"     200 "$(code /health)"
 check "GET / still fine"           200 "$(code /)"
+# Locked, not bricked: the console must still LOAD so an operator can read the
+# sign-in error, rather than 404ing and looking like a broken deploy.
+check "the console still loads"    200 "$(code /console-app)"
 check "an empty token authenticates nobody" 401 "$(code /admin/users -H 'X-Admin-Token: ')"
 check "no token → 401"             401 "$(code /admin/users)"
 check "old backdoor → 401"         401 "$(code /admin/users -H 'X-Admin-Token: chargemod')"
