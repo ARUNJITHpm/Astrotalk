@@ -82,15 +82,14 @@ export const NAV: NavGroup[] = [
   {
     title: 'Bookings',
     items: [
-      { path: '/bookings', label: 'Pooja bookings', roles: ['temple_admin'] },
-      { path: '/bookings/worklist', label: 'Temple worklist', roles: ['temple_admin'] },
       {
-        path: '/bookings/consults',
-        label: 'Consults',
-        roles: [],
-        stub: true,
-        blurb: 'Astrologer bookings and the consultation diary.',
+        path: '/bookings',
+        label: 'Pooja bookings',
+        roles: ['temple_admin'],
+        children: ['/bookings/:bookingId'],
       },
+      { path: '/bookings/worklist', label: 'Temple worklist', roles: ['temple_admin'] },
+      { path: '/bookings/consults', label: 'Consults', roles: [] },
       { path: '/bookings/payments', label: 'Payments', roles: [] },
     ],
   },

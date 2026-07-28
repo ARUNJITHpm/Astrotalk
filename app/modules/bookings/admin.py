@@ -210,6 +210,26 @@ async def set_note(
     return booking
 
 
+async def set_perform_on(
+    session: AsyncSession, *, booking: PoojaBooking, perform_on: date_type | None
+) -> PoojaBooking:
+    """Give a booking the date it is to be performed on, or take it away.
+
+    ``worklist`` reports how many bookings carry no date, because they appear on
+    no sheet at any date and a silently omitted booking is a pooja nobody
+    performs. Until console plan Part 11 nothing could act on that count: the
+    field is set by the app at booking time and ``perform_on`` was optional, so
+    every booking made before it existed was permanently unschedulable.
+
+    ``when_label`` is deliberately left alone. It is the free text the devotee
+    was shown, and rewriting it here would make the console's record disagree
+    with the confirmation they are holding.
+    """
+    booking.perform_on = perform_on
+    await session.flush()
+    return booking
+
+
 async def worklist(
     session: AsyncSession,
     *,

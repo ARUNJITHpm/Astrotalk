@@ -24,7 +24,7 @@ import {
   patchFestival,
   type Festival,
 } from '../../api/temples'
-import { Field, Problem } from './bits'
+import { Field, Problem } from '../bits'
 
 function today(): string {
   const now = new Date()

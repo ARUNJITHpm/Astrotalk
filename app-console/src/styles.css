@@ -640,6 +640,125 @@ ul.banner {
   border-radius: var(--radius);
 }
 
+/* ---- bookings section (Part 11) ---- */
+
+.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.quickfilters {
+  margin: 12px 0 0;
+}
+
+.pager {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.deftrow {
+  display: flex;
+  gap: 12px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.deftrow:last-of-type {
+  border-bottom: none;
+}
+
+.deftrow__label {
+  flex: 0 0 110px;
+  color: var(--ink-soft);
+  font-size: 12px;
+  padding-top: 2px;
+}
+
+.deftrow__value {
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+
+.confirmbox {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+
+.badge--off {
+  opacity: 0.6;
+  text-decoration: line-through;
+}
+
+.starblock {
+  margin-bottom: 20px;
+}
+
+.starblock__title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 6px;
+  padding-bottom: 4px;
+  border-bottom: 2px solid var(--line);
+  font-size: 15px;
+}
+
+.starblock__count {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.sheet {
+  padding: 18px 20px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.sheet__title {
+  margin: 0 0 2px;
+  font-size: 17px;
+}
+
+/* The worklist is carried into a temple on paper: drop the chrome, keep the
+   sheet, and never split a star's group across a page break. */
+@media print {
+  .sidebar,
+  .noprint {
+    display: none !important;
+  }
+
+  .shell {
+    display: block;
+  }
+
+  .content {
+    padding: 0;
+  }
+
+  .sheet {
+    border: none;
+    padding: 0;
+  }
+
+  .starblock {
+    break-inside: avoid;
+  }
+
+  .table th {
+    text-transform: none;
+  }
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #12181e;

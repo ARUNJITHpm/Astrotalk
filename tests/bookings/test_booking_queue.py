@@ -400,6 +400,83 @@ async def test_the_worklist_counts_what_it_cannot_place(api, session):
     assert (body["total"], body["undated"]) == (1, 1)
 
 
+async def test_the_export_honours_every_filter_the_queue_does(api, session):
+    """It used to take four of them and ignore the rest. FastAPI drops unknown
+    query params silently, so a console exporting "what is on screen" handed
+    back a wider file with no sign it had been widened — a settlement document
+    that disagrees with the screen is worse than no export."""
+    await _booking(session, pooja_key="archana", perform_on=date(2026, 8, 1))
+    await _booking(session, pooja_key="pushpanjali", perform_on=date(2026, 8, 1))
+    await _booking(session, pooja_key="archana", perform_on=date(2026, 9, 1))
+
+    everything = await api.get("/bookings/queue/export.csv", headers=ADMIN)
+    assert len(everything.text.strip().splitlines()) == 4  # header + 3
+
+    narrowed = await api.get(
+        "/bookings/queue/export.csv?pooja_key=archana"
+        "&perform_from=2026-08-01&perform_to=2026-08-01",
+        headers=ADMIN,
+    )
+    assert narrowed.status_code == 200
+    lines = narrowed.text.strip().splitlines()
+    assert len(lines) == 2
+    assert "archana" in lines[1]
+
+
+async def test_an_undated_booking_can_finally_be_given_a_day(api, session):
+    """Console plan Part 11. The worklist has always reported how many bookings
+    it cannot place, and nothing could act on that count: `perform_on` is set by
+    the app at booking time, so every booking made before the field existed was
+    permanently unschedulable and appeared on no sheet at any date."""
+    booking = await _booking(session)  # no perform_on
+    assert (
+        await api.get("/bookings/queue/worklist?day=2026-08-01", headers=ADMIN)
+    ).json()["undated"] == 1
+
+    r = await api.patch(
+        f"/bookings/queue/{booking.id}/perform-on",
+        json={"perform_on": "2026-08-01"},
+        headers=ADMIN,
+    )
+    assert r.status_code == 200
+    assert r.json()["perform_on"] == "2026-08-01"
+    # The display text the devotee was shown is left exactly as it was: the
+    # console's record must not disagree with the confirmation they hold.
+    assert r.json()["when_label"] == "28 Jul, 6:00 AM"
+
+    body = (
+        await api.get("/bookings/queue/worklist?day=2026-08-01", headers=ADMIN)
+    ).json()
+    assert (body["total"], body["undated"]) == (1, 0)
+
+
+async def test_a_wrong_perform_date_can_be_cleared(api, session):
+    booking = await _booking(session, perform_on=date(2026, 8, 1))
+    r = await api.patch(
+        f"/bookings/queue/{booking.id}/perform-on",
+        json={"perform_on": None},
+        headers=ADMIN,
+    )
+    assert r.status_code == 200
+    assert r.json()["perform_on"] is None
+
+
+async def test_dating_a_booking_is_scoped_like_every_other_write(api, session):
+    booking = await _booking(session, temple_id="other-temple")
+    headers = await _operator(session)
+    r = await api.patch(
+        f"/bookings/queue/{booking.id}/perform-on",
+        json={"perform_on": "2026-08-01"},
+        headers=headers,
+    )
+    assert r.status_code == 404  # not theirs to see, let alone schedule
+    assert (
+        await api.patch(
+            f"/bookings/queue/{booking.id}/perform-on", json={"perform_on": None}
+        )
+    ).status_code == 401
+
+
 async def test_the_worklist_leaves_out_unpaid_and_cancelled_work(api, session):
     await _booking(session, perform_on=date(2026, 8, 1), state="wait")
     await _booking(session, perform_on=date(2026, 8, 1), state="cancelled")

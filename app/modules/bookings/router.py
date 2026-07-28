@@ -24,6 +24,7 @@ from app.modules.bookings.schemas import (
     BookingCreate,
     BookingNoteIn,
     BookingOut,
+    BookingScheduleIn,
     BookingSettingsIn,
     BookingStatusIn,
     OperatorBookingDetail,
@@ -168,17 +169,35 @@ async def export_bookings(
     operator: QueueDep,
     temple_id: OptStr = None,
     state: OptStr = None,
+    pooja_key: OptStr = None,
+    ref: OptStr = None,
+    phone: OptStr = None,
     booked_from: OptDate = None,
     booked_to: OptDate = None,
+    perform_from: OptDate = None,
+    perform_to: OptDate = None,
 ) -> Response:
+    """Takes every filter `/queue` takes, deliberately.
+
+    It used to accept four of them and ignore the rest, which FastAPI drops
+    silently — so a console that exported "what the screen is showing" would
+    hand an operator a wider file than the one they were looking at, with no
+    sign anything had been widened. A settlement document that quietly disagrees
+    with the screen is worse than no export.
+    """
     try:
         _, rows = await booking_admin.queue(
             session,
             temple_ids=operator.visible_temple_ids(),
             temple_id=temple_id,
             state=state,
+            pooja_key=pooja_key,
+            ref=ref,
+            user_id=await _resolve_user_filter(session, phone),
             booked_from=booked_from,
             booked_to=booked_to,
+            perform_from=perform_from,
+            perform_to=perform_to,
             # Not a page: an accountant reconciling a month wants every row the
             # filter matched, and a CSV silently cut at 200 would be worse than
             # no export at all.
@@ -326,6 +345,37 @@ async def set_booking_note(
             session, temple_ids=operator.visible_temple_ids(), booking_id=booking_id
         )
         booking = await booking_admin.set_note(session, booking=booking, note=payload.note)
+    except booking_admin.BookingAdminError as exc:
+        raise _admin_error(exc) from exc
+    detail = await _detail(session, booking)
+    await session.commit()
+    return detail
+
+
+@router.patch(
+    "/queue/{booking_id}/perform-on",
+    response_model=OperatorBookingDetail,
+    summary="Set (or clear) the day a booking is to be performed",
+)
+async def set_booking_perform_on(
+    booking_id: int,
+    payload: BookingScheduleIn,
+    session: SessionDep,
+    operator: QueueDep,
+) -> OperatorBookingDetail:
+    """The remedy for the ``undated`` count the worklist reports.
+
+    ``perform_on`` is set by the app at booking time and is optional, so every
+    booking made before it existed sits on no sheet at any date. Nothing could
+    fix that until now.
+    """
+    try:
+        booking = await booking_admin.get_one(
+            session, temple_ids=operator.visible_temple_ids(), booking_id=booking_id
+        )
+        booking = await booking_admin.set_perform_on(
+            session, booking=booking, perform_on=payload.perform_on
+        )
     except booking_admin.BookingAdminError as exc:
         raise _admin_error(exc) from exc
     detail = await _detail(session, booking)

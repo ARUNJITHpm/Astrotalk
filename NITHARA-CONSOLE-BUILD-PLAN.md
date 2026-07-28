@@ -456,7 +456,15 @@ Build the TEMPLES group against the Part 5 API:
 Vitest tests for the list filters and the editor's save path.
 ```
 
-## Part 11 — Bookings section
+## Part 11 — Bookings section  ✅ DONE
+
+> **As built.** Two backend additions the screens could not do without:
+> `PATCH /bookings/queue/{id}/perform-on`, because the worklist had always
+> reported how many bookings it could not place and nothing could act on that
+> count; and the CSV export now takes every filter the queue takes, having
+> silently ignored five of them. Refunds still stop at bookkeeping — see
+> `NITHARA-CONSOLE-PROGRESS.md`.
+
 ```
 Build the BOOKINGS group against the Part 7 API. This is the operational heart
 of the product — treat it as the most important screen in the console.

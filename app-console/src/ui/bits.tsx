@@ -1,6 +1,6 @@
-// Small pieces the five TEMPLES screens share.
+// Small pieces the section screens share.
 
-import { ApiError } from '../../api/client'
+import { ApiError } from '../api/client'
 
 /**
  * Whatever went wrong, in the operator's terms.

@@ -17,7 +17,7 @@ import {
   type TempleFilter,
   type Tri,
 } from '../../lib/temple'
-import { Badge, Problem } from './bits'
+import { Badge, Problem } from '../bits'
 
 function TriFilter({
   label,

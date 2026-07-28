@@ -17,7 +17,7 @@ import {
   patchPartner,
   type Partner,
 } from '../../api/temples'
-import { Badge, Field, Problem } from './bits'
+import { Badge, Field, Problem } from '../bits'
 
 function embedSnippet(slug: string): string {
   return `<iframe src="${window.location.origin}/widget/panchangam?temple=${slug}" width="320" height="200" frameborder="0"></iframe>`

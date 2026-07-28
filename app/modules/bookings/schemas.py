@@ -109,6 +109,13 @@ class BookingNoteIn(BaseModel):
     note: str
 
 
+class BookingScheduleIn(BaseModel):
+    """The day to perform on. Explicitly nullable — clearing a wrong date has to
+    be possible, and it is different from leaving the field out."""
+
+    perform_on: date | None
+
+
 class BookingSettingsIn(BaseModel):
     """The fee in paise, matching the column. Every other money value in the
     app is stored in paise; a rupee field here would be the one that rounds."""

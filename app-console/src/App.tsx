@@ -15,6 +15,11 @@ import { Guard } from './ui/Guard'
 import { Login } from './ui/Login'
 import { Shell } from './ui/Shell'
 import { Stub } from './ui/Stub'
+import { BookingDetail } from './ui/bookings/BookingDetail'
+import { BookingQueue } from './ui/bookings/BookingQueue'
+import { Consults } from './ui/bookings/Consults'
+import { Payments } from './ui/bookings/Payments'
+import { Worklist } from './ui/bookings/Worklist'
 import { Festivals } from './ui/temples/Festivals'
 import { Partners } from './ui/temples/Partners'
 import { PoojaCatalogue } from './ui/temples/PoojaCatalogue'
@@ -30,6 +35,11 @@ const SCREENS: Record<string, React.ComponentType> = {
   '/temples/poojas': PoojaCatalogue,
   '/temples/festivals': Festivals,
   '/temples/partners': Partners,
+  '/bookings': BookingQueue,
+  '/bookings/:bookingId': BookingDetail,
+  '/bookings/worklist': Worklist,
+  '/bookings/consults': Consults,
+  '/bookings/payments': Payments,
 }
 
 function NotFound() {

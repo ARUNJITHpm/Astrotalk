@@ -795,6 +795,76 @@ fall through its "not in the IA" branch and render for anyone signed in. Exact
 matches beat patterns, so `/temples/festivals` stays its own section instead of
 resolving to a temple named "festivals".
 
+---
+
+## Part 11 — the BOOKINGS section — 2026-07-28
+
+The operational heart: the queue, one booking's detail, the printable temple
+worklist, the astrologer diary, and the payment ledger. 32 console tests added
+(88 → 120) and 4 backend (40 → 44 in `tests/bookings`). Full suite 515 green;
+`ruff check app tests` still 123.
+
+### Two backend additions, both gaps the screens exposed
+
+**`PATCH /bookings/queue/{id}/perform-on`.** The worklist has always reported an
+`undated` count — bookings with no `perform_on`, which appear on no sheet at any
+date — and nothing could ever act on it. The field is set by the app at booking
+time and was added later than bookings themselves, so every older booking was
+permanently unschedulable. `when_label` is deliberately left alone: it is the
+free text the devotee was shown, and rewriting it would make the console's
+record disagree with the confirmation they are holding. The detail screen shows
+both, so they can be compared rather than silently merged.
+
+**The CSV export took four filters and ignored the rest.** FastAPI drops unknown
+query params without complaint, so a console exporting "what is on screen" would
+have handed an accountant a wider file than the one they were looking at, with
+nothing to indicate it had been widened. It now accepts every filter `/queue`
+does. A settlement document that quietly disagrees with the screen is worse than
+no export.
+
+### What the transition buttons do and do not offer
+
+`nextStates` mirrors `OPERATOR_TRANSITIONS` in `bookings/models.py`. Two
+absences are the point and are explained on screen rather than left as buttons
+that 409:
+
+- Nothing can be moved to **`ok`** — that word means the payment reconciler saw
+  a captured payment, so a booking marked paid by hand would be
+  indistinguishable from a mistaken click.
+- Nothing can be moved to **`wait`** — you cannot un-pay an order.
+
+**`refunded` is bookkeeping.** It records that a refund was issued in the
+Razorpay dashboard; nothing moves money, and picking it shows a warning saying
+so before the operator confirms. Wiring a real refund call touches payments and
+is gated on human approval (`AGENTS.md`), so the screen states the limitation
+instead of implying a capability. A button labelled "Refund" that does not
+refund is the worst lie a console can tell.
+
+### Smaller decisions
+
+- **The worklist prints.** It is carried into a temple on paper, so the print
+  stylesheet drops the sidebar and every control, and `break-inside: avoid`
+  keeps one star's group off two pages.
+- **Consults are a different machine.** Nothing returns to `confirmed`:
+  `astro_bookings` is unique on (astrologer_id, starts_at) and a cancelled row
+  still holds its slot, so reviving one would re-seat a consult somebody else
+  may have booked since.
+- **Filters go to the server, not the browser.** The queue is paged and scoped
+  in the query; a client-side filter would only ever narrow the page on screen.
+  Every filter change resets the offset — narrowing while on page 7 is the
+  classic way a working filter looks broken.
+- **Payments carry no revoke.** Withdrawing an entitlement needs its id, which
+  is only visible on a devotee's own record (Part 12). A "revoke by id" box on
+  the ledger would be an invitation to withdraw the wrong person's access.
+- **The booking detail shows a name and a mobile, and no birth data.**
+  Performing a pooja does not need a birth date, time or place (GUARDRAILS §4).
+
+### Shared UI moved
+
+`ui/temples/bits.tsx` → `ui/bits.tsx`. Bookings screens use the same `Problem`,
+`Field` and `Badge`, and importing them from a temples-named module was the kind
+of thing that stops being obvious a month later.
+
 ## Standing items
 - **`ADMIN_TOKEN` is not set on the live Space.** `"chargemod"` was removed in
   Part 4, so pushing to `hf` before the owner adds that secret leaves only the

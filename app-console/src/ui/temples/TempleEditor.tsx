@@ -40,7 +40,7 @@ import {
   minutesToClock,
   parseCoords,
 } from '../../lib/temple'
-import { Badge, Field, Problem } from './bits'
+import { Badge, Field, Problem } from '../bits'
 
 const ID_RE = /^[a-z0-9][a-z0-9-]{1,60}$/
 

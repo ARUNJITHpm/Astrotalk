@@ -24,7 +24,7 @@ import {
 } from '../../api/temples'
 import { useAuth } from '../../lib/auth'
 import { readDays, readPaise } from '../../lib/temple'
-import { Badge, Field, Problem } from './bits'
+import { Badge, Field, Problem } from '../bits'
 
 function MasterRow({ pooja, editable }: { pooja: Pooja; editable: boolean }) {
   const queryClient = useQueryClient()
