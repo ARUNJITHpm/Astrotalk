@@ -290,6 +290,39 @@ class TemplesService:
             "districts_visited": len(districts),
         }
 
+    async def visit_stats_by_user(self, session) -> dict[int, dict]:
+        """``visit_stats`` for everybody at once, in one query.
+
+        Console plan Part 12's engagement page needs this for every user, and
+        calling ``visit_stats`` in a loop is one round trip per devotee — the
+        shape of query that is fine on a laptop and takes the process down on a
+        register of any size. The district lookup stays in Python because
+        districts live in the in-memory directory snapshot, not in a column of
+        ``temple_visits``.
+        """
+        from sqlalchemy import select
+
+        from app.modules.temples.models import TempleVisit
+
+        rows = (
+            await session.execute(select(TempleVisit.user_id, TempleVisit.temple_id))
+        ).all()
+        seen: dict[int, set[str]] = {}
+        for user_id, temple_id in rows:
+            seen.setdefault(user_id, set()).add(temple_id)
+        out: dict[int, dict] = {}
+        for user_id, temple_ids in seen.items():
+            districts = {
+                t["district"]
+                for tid in temple_ids
+                if (t := self.get_temple(tid)) is not None and t.get("district")
+            }
+            out[user_id] = {
+                "temples_visited": len(temple_ids),
+                "districts_visited": len(districts),
+            }
+        return out
+
     # ---- partnership data, exposed for the notifications module (Part 3).
     # Plain dicts/strs out — other modules never touch this module's tables.
 

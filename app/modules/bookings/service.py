@@ -15,7 +15,7 @@ are reached only through their public services (AGENTS.md).
 
 import secrets
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.bookings.models import BookingSettings, PoojaBooking
@@ -108,6 +108,26 @@ class BookingsService:
         the listing so a just-captured payment is reflected."""
         rows = await self.list_for_user(session, user_id)
         return sum(1 for b in rows if b["state"] == "ok")
+
+    async def counts_by_user(self, session: AsyncSession) -> dict[int, int]:
+        """Confirmed-pooja counts for every user, in one query (PUBLIC).
+
+        Console plan Part 12. ``count_for_user`` reconciles payment state as it
+        goes, which is right for one profile and impossible for a whole register
+        — so this counts only states that are already settled, and a payment
+        captured in the last few seconds may be missing from the aggregate until
+        that user's own listing next reconciles it. That is the honest trade for
+        one query instead of one per devotee; nothing here is used to decide
+        whether a person paid.
+        """
+        rows = (
+            await session.execute(
+                select(PoojaBooking.user_id, func.count(PoojaBooking.id))
+                .where(PoojaBooking.state.in_(("ok", "completed")))
+                .group_by(PoojaBooking.user_id)
+            )
+        ).all()
+        return {user_id: count for user_id, count in rows}
 
     async def list_for_user(self, session: AsyncSession, user_id: int) -> list[dict]:
         rows = list(

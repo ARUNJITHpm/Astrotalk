@@ -96,16 +96,12 @@ export const NAV: NavGroup[] = [
   {
     title: 'People',
     items: [
-      { path: '/people/users', label: 'Users', roles: [] },
+      { path: '/people/users', label: 'Users', roles: [], children: ['/people/users/:userId'] },
       { path: '/people/astrologers', label: 'Astrologers', roles: [] },
       { path: '/people/operators', label: 'Operators', roles: [] },
-      {
-        path: '/people/engagement',
-        label: 'Engagement',
-        roles: ['support'],
-        stub: true,
-        blurb: 'Check-ins, streaks and milestones.',
-      },
+      // Owner-only, like the rest of the group: the aggregate names individual
+      // devotees and their mobiles, which is not a support-level surface.
+      { path: '/people/engagement', label: 'Engagement', roles: [] },
     ],
   },
   {

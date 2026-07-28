@@ -203,10 +203,43 @@ class CommunityService:
 
     async def _compute_streak(self, session: AsyncSession, user_id: int) -> int:
         """Consecutive days ending today (or yesterday if not yet seen today)."""
-        days = await self._checkin_days(session, user_id)
+        return self.streak_from_days(await self._checkin_days(session, user_id))
+
+    async def get_streak(self, session: AsyncSession, user_id: int) -> StreakOut:
+        streak = await self._compute_streak(session, user_id)
+        checked_today = date_type.today() in await self._checkin_days(session, user_id)
+        return StreakOut(streak=streak, checked_in_today=checked_today)
+
+    async def checkin_days_by_user(
+        self, session: AsyncSession
+    ) -> dict[int, set[date_type]]:
+        """Every user's check-in days, in one query (PUBLIC).
+
+        Console plan Part 12. Streaks are computed by walking backwards through
+        a set of dates, which cannot be expressed as a GROUP BY — so the rows
+        come back whole and the folding happens here rather than as one query
+        per devotee.
+        """
+        rows = (
+            await session.execute(select(UserCheckin.user_id, UserCheckin.day))
+        ).all()
+        out: dict[int, set[date_type]] = {}
+        for user_id, day in rows:
+            out.setdefault(user_id, set()).add(day)
+        return out
+
+    @staticmethod
+    def streak_from_days(days: set[date_type], today: date_type | None = None) -> int:
+        """Consecutive days ending today, or yesterday if not yet seen today.
+
+        The same rule as ``_compute_streak``, over days already in hand. Today
+        is a parameter so an aggregate computes every user's streak against one
+        instant — a run that straddled midnight would otherwise credit some
+        users a day the others did not get.
+        """
         if not days:
             return 0
-        today = date_type.today()
+        today = today or date_type.today()
         cursor = today if today in days else today - timedelta(days=1)
         if cursor not in days:
             return 0
@@ -215,11 +248,6 @@ class CommunityService:
             streak += 1
             cursor -= timedelta(days=1)
         return streak
-
-    async def get_streak(self, session: AsyncSession, user_id: int) -> StreakOut:
-        streak = await self._compute_streak(session, user_id)
-        checked_today = date_type.today() in await self._checkin_days(session, user_id)
-        return StreakOut(streak=streak, checked_in_today=checked_today)
 
     async def record_checkin(self, session: AsyncSession, user_id: int) -> None:
         """Mark the caller present today (idempotent). PUBLIC so other modules —

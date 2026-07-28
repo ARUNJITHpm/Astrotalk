@@ -11,13 +11,13 @@ import {
   applyFilter,
   goToPage,
   isFiltered,
-  money,
   nextStates,
   pageSummary,
   performLabel,
   queueQuery,
   stateLabel,
 } from '../lib/booking'
+import { money, readDays, readPaise } from '../lib/money'
 import { NAKSHATRAMS, nakLabel } from '../lib/nakshatrams'
 
 describe('the filter bar', () => {
@@ -131,5 +131,35 @@ describe('display', () => {
     expect(nakLabel(21)).toBe('Thiruvonam · തിരുവോണം')
     expect(nakLabel(null)).toBe('No star')
     expect(nakLabel(27)).toBe('No star')
+  })
+})
+
+describe('readPaise / readDays', () => {
+  it('treats an empty box as inherit, not as zero', () => {
+    // The distinction the whole override model rests on. Zero is a free
+    // offering; blank means "whatever the master catalogue says", so that a
+    // later repricing still reaches this temple.
+    expect(readPaise('')).toEqual({ value: null, ok: true })
+    expect(readPaise('0')).toEqual({ value: 0, ok: true })
+  })
+
+  it('converts rupees to paise, fractions included', () => {
+    expect(readPaise('12.50')).toEqual({ value: 1250, ok: true })
+    expect(readPaise('101')).toEqual({ value: 10100, ok: true })
+  })
+
+  it('refuses text that is not a number instead of sending null', () => {
+    // Number('abc') is NaN, JSON.stringify(NaN) is null, and the server reads
+    // that null as "inherit" — a silent repricing rather than a rejection.
+    for (const bad of ['abc', '1,000', '-5', '1 2']) {
+      expect(readPaise(bad).ok, bad).toBe(false)
+    }
+  })
+
+  it('wants whole days', () => {
+    expect(readDays('3')).toEqual({ value: 3, ok: true })
+    expect(readDays('')).toEqual({ value: null, ok: true })
+    expect(readDays('1.5').ok).toBe(false)
+    expect(readDays('-1').ok).toBe(false)
   })
 })

@@ -13,7 +13,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 
 import { grantEntitlement, listPayments, type PaymentQuery } from '../../api/bookings'
-import { money, whenStamp } from '../../lib/booking'
+import { whenStamp } from '../../lib/booking'
+import { money } from '../../lib/money'
 import { Field, Problem } from '../bits'
 import { StateBadge } from './bits'
 

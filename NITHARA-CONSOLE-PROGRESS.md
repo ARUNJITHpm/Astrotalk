@@ -865,7 +865,100 @@ refund is the worst lie a console can tell.
 `Field` and `Badge`, and importing them from a temples-named module was the kind
 of thing that stops being obvious a month later.
 
+---
+
+## Part 12 — the PEOPLE section — 2026-07-28
+
+Users (list + detail), Astrologers, Operators and Engagement. 41 console tests
+added (120 → 161) and 23 backend (515 → 538); `ruff check app tests` still 123.
+
+### Two decisions the owner made, and what they cost
+
+The plan asked for "user detail with bookings, family, entitlements", and Part 8
+had deliberately built none of the family half — a family member's nakshatram is
+derived from birth data (GUARDRAILS §4). Asked directly, the owner chose **family
+and the full chart**, and added a requirement the plan did not have: an operator
+must be able to **set up** a family member's details for booking.
+
+That write half is the reason for the whole feature. Someone rings the temple and
+says "book it for my mother, her star is Pooram, she's about sixty" — and until
+now only the devotee's own app could record any of it, which is no use mid-call.
+
+The owner also chose to **build the engagement aggregate** rather than leave the
+section stubbed.
+
+### `family_members.dob` — a date, not an age
+
+New nullable column, migration `a3b4c5d6e7f8`. A date because an age is right for
+one year and silently wrong after it, and this is the field a star-day reminder
+would be computed from. The console derives and displays the age; nothing stores
+it. Left empty when only an approximate age is known — inventing a birthday to
+record "about sixty" corrupts the one field that matters.
+
+It is birth data, so §4 applies to it exactly as to `users.dob`. The tests assert
+the *absence*: no birth date reaches `/admin/users`, no route accepts one as a
+query string, and the engagement page carries none.
+
+### The chart is behind a click
+
+`GET /admin/users/{id}/chart`, a separate request against one named user id —
+never part of the detail payload, never in a list. The screen says what it is
+before showing it, because an operator answering "when is my pooja" has no
+business seeing a natal chart, and a panel that loads one on every page view
+makes that unavoidable rather than a choice.
+
+### The engagement aggregate is four queries, not four per devotee
+
+`GET /admin/engagement`. Every engagement figure the product had was per-caller
+(`/community/streak`, `/identity/me/milestones`), so a devotee could see their own
+streak and nobody could see whether the feature worked at all.
+
+Each module hands over its own table in one aggregate call — `visit_stats_by_user`,
+`counts_by_user`, `checkin_days_by_user`, `user_index` — and the folding happens
+in `AdminService`. A loop over users would be fine on a laptop and would take the
+process down on a real register. Three details worth keeping:
+
+- **One instant for every streak.** A run straddling midnight would otherwise
+  credit some users a day the rest missed, and the leaderboard would reorder for
+  no reason. `today` is a parameter.
+- **`user_index` exists because `operator_search` clamps to 200.** That clamp is
+  right for an HTTP endpoint and wrong for an aggregate, which would have counted
+  the first 200 devotees while reporting a total in the thousands.
+- **The page says when it is showing a sample.** Bounded at 5000 users, and
+  `truncated` drives a banner rather than implying totality.
+- **A quiet devotee is a zero, not an omission.** Dropping them would make these
+  totals disagree with the register with no way to tell why.
+
+### Engagement is owner-only, against the plan's sketch
+
+The IA had it pencilled in for `support` while it was a stub. Built, it names
+individual devotees and their mobile numbers and the route behind it is
+owner-gated — so showing it to support would be the sidebar promising a page the
+server refuses. A nav test now pins the whole PEOPLE group as owner-only.
+
+### Smaller things
+
+- **`lib/money.ts`.** `readPaise` / `readDays` / `money` lived in the temples
+  module, which stopped making sense the moment an astrologer's per-minute rate
+  was read by the same function. Three sections price things now.
+- **An astrologer's `rating` is editable in the API and is not on the form.** It
+  is a number a devotee reads as other devotees' opinion, and there is no review
+  data behind it (GUARDRAILS §1).
+- **Availability is checked before it is sent.** The column is JSON and the
+  server stores what it is handed, so a reversed window or a consult longer than
+  the window holding it produces no bookable slots at all — indistinguishable
+  from "nobody wants this astrologer" until somebody reads the JSON.
+- **Role grants are validated in both directions**, mirroring `_validate_grant`:
+  an unscoped `temple_admin` sees nothing and reads as a broken account, and a
+  temple on any other role is a scope nothing reads.
+- **The invite token is shown on screen.** There is no mail transport on this
+  deployment, and saying so beats a "check your inbox" that never arrives.
+
 ## Standing items
+- **Two migrations are unapplied in production**, both additive and both
+  reversible: `e1f2a3b4c5d6` (Part 7's booking operator columns — the whole
+  bookings queue depends on it) and `a3b4c5d6e7f8` (Part 12's
+  `family_members.dob`). `docs/AGENTS.md` gates running them on human approval.
 - **`ADMIN_TOKEN` is not set on the live Space.** `"chargemod"` was removed in
   Part 4, so pushing to `hf` before the owner adds that secret leaves only the
   `admin_phones` session as a way in.

@@ -729,6 +729,26 @@ ul.banner {
   font-size: 17px;
 }
 
+/* ---- people section (Part 12) ---- */
+
+/* A card nested inside a card (the "add someone" panel on the family board)
+   would otherwise read as a second, unrelated section. */
+.card .card {
+  margin: 12px 0 0;
+  background: var(--bg);
+}
+
+.card__title .cell__ml {
+  display: inline;
+  margin-left: 8px;
+  font-weight: 400;
+}
+
+.card__head .row {
+  align-items: center;
+  gap: 8px;
+}
+
 /* The worklist is carried into a temple on paper: drop the chrome, keep the
    sheet, and never split a star's group across a page break. */
 @media print {

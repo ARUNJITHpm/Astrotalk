@@ -25,13 +25,13 @@ import {
   applyFilter,
   goToPage,
   isFiltered,
-  money,
   pageSummary,
   performLabel,
   queueQuery,
   stateLabel,
   today,
 } from '../../lib/booking'
+import { money } from '../../lib/money'
 import { nakLabel } from '../../lib/nakshatrams'
 import { Problem } from '../bits'
 import { StateBadge } from './bits'

@@ -23,6 +23,10 @@ class MemberCreate(BaseModel):
     name: str = ""
     rel: str = "rMother"  # relation key from the app (rMother, rSpouse, …)
     nak: int | None = Field(default=None, ge=0, le=26)
+    # A birth DATE, never an age: an age is right for one year and wrong after.
+    # Optional because it is usually not known, and inventing one to record an
+    # approximate age would corrupt the field a star day is computed from.
+    dob: date | None = None
 
 
 class MemberUpdate(BaseModel):
@@ -31,10 +35,16 @@ class MemberUpdate(BaseModel):
     name: str | None = None
     rel: str | None = None
     nak: int | None = Field(default=None, ge=0, le=26)
+    dob: date | None = None
 
 
 class MemberOut(BaseModel):
-    """A family-board row. ``self`` marks the account holder's own row."""
+    """A family-board row. ``self`` marks the account holder's own row.
+
+    ``dob`` is birth data (GUARDRAILS §4), so this shape belongs only in one
+    person's own response or one user's operator detail — never in a list of
+    users, and never reachable from a URL that names it.
+    """
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -42,6 +52,7 @@ class MemberOut(BaseModel):
     name: str
     rel: str
     nak: int | None
+    dob: date | None = None
     is_self: bool = Field(serialization_alias="self")
 
 

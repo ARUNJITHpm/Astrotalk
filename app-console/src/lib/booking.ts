@@ -134,15 +134,6 @@ export function pageSummary(total: number, offset: number, shown: number): strin
 
 // ---- display ----
 
-/** Paise → "₹1,234.50", trailing ".00" dropped. Display only. */
-export function money(paise: number): string {
-  const rupees = paise / 100
-  return `₹${rupees.toLocaleString('en-IN', {
-    minimumFractionDigits: Number.isInteger(rupees) ? 0 : 2,
-    maximumFractionDigits: 2,
-  })}`
-}
-
 /**
  * When the pooja is to be performed.
  *

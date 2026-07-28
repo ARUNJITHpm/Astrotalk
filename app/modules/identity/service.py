@@ -587,7 +587,14 @@ class IdentityService:
 
     @staticmethod
     def _member_out(m: FamilyMember) -> dict:
-        return {"id": m.id, "name": m.name, "rel": m.rel, "nak": m.nak, "is_self": m.is_self}
+        return {
+            "id": m.id,
+            "name": m.name,
+            "rel": m.rel,
+            "nak": m.nak,
+            "dob": m.dob,
+            "is_self": m.is_self,
+        }
 
     async def ensure_self_member(
         self, session: AsyncSession, user: User
@@ -633,7 +640,12 @@ class IdentityService:
         if count >= self.MEMBER_LIMIT:
             raise ValueError("member limit reached")
         member = FamilyMember(
-            user_id=user_id, name=data.name, rel=data.rel, nak=data.nak, is_self=False
+            user_id=user_id,
+            name=data.name,
+            rel=data.rel,
+            nak=data.nak,
+            dob=getattr(data, "dob", None),
+            is_self=False,
         )
         session.add(member)
         await session.flush()
@@ -661,8 +673,13 @@ class IdentityService:
         # The self row's relation stays rSelf; everything else is editable.
         if "rel" in changes and changes["rel"] is not None and not member.is_self:
             member.rel = changes["rel"]
+        # `nak` and `dob` are set by key rather than by value: null is a real
+        # value for both — "we asked and they do not know" — and is different
+        # from leaving the field out of the payload.
         if "nak" in changes:
             member.nak = changes["nak"]
+        if "dob" in changes:
+            member.dob = changes["dob"]
         await session.flush()
         return self._member_out(member)
 
@@ -714,6 +731,31 @@ class IdentityService:
 
     async def milestones(self, session: AsyncSession, user_id: int) -> list[dict]:
         return self._milestone_list(await self._counters(session, user_id))
+
+    def milestones_from_counters(self, counters: dict) -> list[dict]:
+        """Badge progress from counters somebody else already gathered (PUBLIC).
+
+        Console plan Part 12's engagement aggregate holds every user's counters
+        in memory already; this exposes the badge definitions without a second
+        round of per-user queries, so the console cannot end up with its own
+        copy of the thresholds that then drifts from the app's.
+        """
+        return self._milestone_list(counters)
+
+    async def operator_members(
+        self, session: AsyncSession, user_id: int
+    ) -> list[dict] | None:
+        """One user's family board, for an operator (console plan Part 12).
+
+        ``list_members`` takes a ``User`` because it lazily creates the self row;
+        this is the by-id door for the admin module, which holds an id and not
+        an object. Returns None when there is no such user, so the route can
+        tell "no family" from "no user".
+        """
+        user = await self.get_user(session, user_id)
+        if user is None:
+            return None
+        return await self.list_members(session, user)
 
     async def members_with_nakshatram(
         self, session: AsyncSession, user_ids: list[int]
@@ -903,6 +945,29 @@ class IdentityService:
     # GUARDRAILS §4 runs through all of them: birth data (dob, time, place,
     # coordinates) never enters a URL, a query string, a log line, or a list
     # response. It appears only in one user's detail, fetched by id.
+
+    async def user_index(
+        self, session: AsyncSession, *, limit: int
+    ) -> tuple[int, dict[int, tuple[str, str]]]:
+        """Every user as ``id → (name, phone)``, up to ``limit``, plus the true
+        total before that limit (PUBLIC).
+
+        Console plan Part 12's engagement aggregate needs the register in one
+        read, and ``operator_search`` will not give it: that method clamps to
+        200 because it backs an HTTP endpoint, so an aggregate built on it would
+        count the first 200 devotees while reporting a total in the thousands —
+        a figure nobody could act on. Returning the total separately lets the
+        caller say it is showing a sample instead of implying totality.
+
+        Name and phone only. No birth data leaves this method (GUARDRAILS §4).
+        """
+        total = (await session.execute(select(func.count(User.id)))).scalar_one()
+        rows = (
+            await session.execute(
+                select(User.id, User.name, User.phone).order_by(User.id).limit(limit)
+            )
+        ).all()
+        return total, {uid: (name, phone) for uid, name, phone in rows}
 
     async def operator_search(
         self,

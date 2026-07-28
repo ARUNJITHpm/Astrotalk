@@ -23,7 +23,8 @@ import {
   setBookingStatus,
   setPerformOn,
 } from '../../api/bookings'
-import { money, nextStates, stateLabel, whenStamp } from '../../lib/booking'
+import { nextStates, stateLabel, whenStamp } from '../../lib/booking'
+import { money } from '../../lib/money'
 import { nakLabel } from '../../lib/nakshatrams'
 import { Problem } from '../bits'
 import { StateBadge } from './bits'

@@ -18,12 +18,11 @@ import {
   listPoojas,
   listTemples,
   patchPooja,
-  rupees,
   setOverride,
   type Pooja,
 } from '../../api/temples'
 import { useAuth } from '../../lib/auth'
-import { readDays, readPaise } from '../../lib/temple'
+import { readDays, readPaise, rupees } from '../../lib/money'
 import { Badge, Field, Problem } from '../bits'
 
 function MasterRow({ pooja, editable }: { pooja: Pooja; editable: boolean }) {

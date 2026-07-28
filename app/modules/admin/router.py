@@ -24,6 +24,7 @@ from app.modules.admin.schemas import AdminOverview
 from app.modules.admin.service import AdminService
 from app.modules.bookings.service import BookingsService
 from app.modules.commerce.service import CommerceService
+from app.modules.identity.schemas import MemberCreate, MemberOut, MemberUpdate
 from app.modules.identity.service import IdentityService
 from app.platform.admin_auth import Operator, require_operator
 from app.platform.config import get_settings
@@ -233,6 +234,125 @@ async def set_user_active(
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     await session.commit()
     return {"id": user.id, "active": user.active}
+
+
+# ---- One user's family board and chart (console plan Part 12) ----
+# Owner-only, and reachable only through a user id that is already in the path
+# of an owner-gated route. Both carry birth data, so GUARDRAILS §4 shapes them:
+# they never appear in a list, a search result or a query string, and the
+# operator has to have navigated to one named person to see either.
+#
+# The write half exists because an operator taking a booking over the phone is
+# told "book it for my mother, her star is Pooram" — and until now only the
+# devotee's own app could record that, which is no use mid-call.
+
+
+@router.get(
+    "/users/{user_id}/family",
+    response_model=list[MemberOut],
+    summary="One user's family board (owner)",
+)
+async def user_family(user_id: int, session: SessionDep, operator: OwnerDep) -> list[dict]:
+    members = await _identity.operator_members(session, user_id)
+    if members is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="User not found")
+    await session.commit()  # the self row is created on first read
+    return members
+
+
+@router.post(
+    "/users/{user_id}/family",
+    response_model=MemberOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Add someone to a user's family board (owner)",
+)
+async def add_family_member(
+    user_id: int, payload: MemberCreate, session: SessionDep, operator: OwnerDep
+) -> dict:
+    if await _identity.get_user(session, user_id) is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="User not found")
+    try:
+        out = await _identity.add_member(session, user_id, payload)
+    except ValueError as exc:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Family board is full"
+        ) from exc
+    await session.commit()
+    return out
+
+
+@router.patch(
+    "/users/{user_id}/family/{member_id}",
+    response_model=MemberOut,
+    summary="Correct a family member's name, relation, star or birth date (owner)",
+)
+async def edit_family_member(
+    user_id: int,
+    member_id: int,
+    payload: MemberUpdate,
+    session: SessionDep,
+    operator: OwnerDep,
+) -> dict:
+    out = await _identity.update_member(
+        session, user_id, member_id, payload.model_dump(exclude_unset=True)
+    )
+    if out is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Member not found")
+    await session.commit()
+    return out
+
+
+@router.delete(
+    "/users/{user_id}/family/{member_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Remove a family member (owner)",
+)
+async def remove_family_member(
+    user_id: int, member_id: int, session: SessionDep, operator: OwnerDep
+) -> None:
+    result = await _identity.delete_member(session, user_id, member_id)
+    if result == "not_found":
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Member not found")
+    if result == "self":
+        # The account holder's own row is the one a booking defaults to; deleting
+        # it would leave the account unable to book for itself.
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="The account holder's own row cannot be removed",
+        )
+    await session.commit()
+
+
+@router.get("/users/{user_id}/chart", summary="One user's natal chart (owner)")
+async def user_chart(user_id: int, session: SessionDep, operator: OwnerDep) -> dict:
+    """The computed chart, for answering a question about a reading.
+
+    Returned only for a single named user an operator has already opened. It is
+    not searchable, not exported, and not present in any list — a chart is birth
+    data by another name.
+    """
+    if await _identity.get_user(session, user_id) is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="User not found")
+    chart = await _identity.get_chart(session, user_id)
+    if chart is None:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND, detail="No chart has been computed for this user"
+        )
+    return {"computed_at": chart.computed_at, "natal": chart.natal_json}
+
+
+@router.get("/engagement", summary="Check-ins, streaks and milestones (owner)")
+async def engagement(
+    session: SessionDep,
+    operator: OwnerDep,
+    limit: Annotated[int, Query(ge=1, le=200)] = 25,
+) -> dict:
+    """Console plan Part 12.
+
+    Every engagement figure the product had was per-caller, so a devotee could
+    see their own streak and nobody could see whether the feature worked at all.
+    """
+    return await _service.engagement(session, limit=limit)
 
 
 @router.get("/payments", summary="The payment ledger (owner)")

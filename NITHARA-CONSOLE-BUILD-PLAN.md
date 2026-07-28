@@ -476,7 +476,17 @@ of the product — treat it as the most important screen in the console.
 Vitest tests for the filter state and a status transition.
 ```
 
-## Part 12 — People section
+## Part 12 — People section  ✅ DONE
+
+> **As built,** after two decisions the owner took explicitly (2026-07-28):
+> the user detail **does** show family and the chart, and Engagement got a real
+> backend aggregate rather than staying a stub. The family board became
+> **writable** by an operator — the reason for the whole feature is a booking
+> taken over the phone — which needed a new `dob` column.
+>
+> ⚠️ Migration `a3b4c5d6e7f8` (`family_members.dob`) is **not yet applied to
+> production**, and neither is Part 7's `e1f2a3b4c5d6`.
+
 ```
 Build the PEOPLE group against Parts 6 and 8.
 - Users: search by phone/name, detail with bookings, family, entitlements.

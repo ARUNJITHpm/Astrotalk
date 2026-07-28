@@ -13,7 +13,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 
 import { astrologerDiary, listAstrologers, setConsultStatus } from '../../api/bookings'
-import { CONSULT_TARGETS, money, stateLabel, whenStamp } from '../../lib/booking'
+import { CONSULT_TARGETS, stateLabel, whenStamp } from '../../lib/booking'
+import { money } from '../../lib/money'
 import { Problem } from '../bits'
 import { StateBadge } from './bits'
 

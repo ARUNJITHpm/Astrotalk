@@ -148,45 +148,6 @@ export function hoursProblem(hours: number[][]): string | null {
   return null
 }
 
-// ---- money and lead times ----
-
-/**
- * A number typed into a box that also accepts "leave it empty".
- *
- * The three outcomes are genuinely different and collapsing any two of them
- * causes a real bug. Empty means INHERIT the master value, which the wire
- * carries as null. Nonsense also produces null once it has been through
- * `Number()` and `JSON.stringify` — and the server reads that null as inherit
- * for an override, or writes it straight over a NOT NULL column for a master
- * offering. So nonsense has to be caught here, before either happens.
- */
-export interface Entry {
-  /** null means inherit. Only meaningful when `ok`. */
-  value: number | null
-  ok: boolean
-}
-
-const BLANK: Entry = { value: null, ok: true }
-const BAD: Entry = { value: null, ok: false }
-
-/** Rupees as typed → paise. Fractions are allowed; ₹12.50 is 1250 paise. */
-export function readPaise(text: string): Entry {
-  const trimmed = text.trim()
-  if (!trimmed) return BLANK
-  const rupees = Number(trimmed)
-  if (!Number.isFinite(rupees) || rupees < 0) return BAD
-  return { value: Math.round(rupees * 100), ok: true }
-}
-
-/** A whole number of days, never negative. */
-export function readDays(text: string): Entry {
-  const trimmed = text.trim()
-  if (!trimmed) return BLANK
-  const days = Number(trimmed)
-  if (!Number.isInteger(days) || days < 0) return BAD
-  return { value: days, ok: true }
-}
-
 // ---- coordinates ----
 
 export interface LatLng {

@@ -20,6 +20,11 @@ import { BookingQueue } from './ui/bookings/BookingQueue'
 import { Consults } from './ui/bookings/Consults'
 import { Payments } from './ui/bookings/Payments'
 import { Worklist } from './ui/bookings/Worklist'
+import { Astrologers } from './ui/people/Astrologers'
+import { Engagement } from './ui/people/Engagement'
+import { Operators } from './ui/people/Operators'
+import { UserDetail } from './ui/people/UserDetail'
+import { UserList } from './ui/people/UserList'
 import { Festivals } from './ui/temples/Festivals'
 import { Partners } from './ui/temples/Partners'
 import { PoojaCatalogue } from './ui/temples/PoojaCatalogue'
@@ -40,6 +45,11 @@ const SCREENS: Record<string, React.ComponentType> = {
   '/bookings/worklist': Worklist,
   '/bookings/consults': Consults,
   '/bookings/payments': Payments,
+  '/people/users': UserList,
+  '/people/users/:userId': UserDetail,
+  '/people/astrologers': Astrologers,
+  '/people/operators': Operators,
+  '/people/engagement': Engagement,
 }
 
 function NotFound() {

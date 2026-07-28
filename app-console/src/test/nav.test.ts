@@ -54,9 +54,20 @@ describe('role visibility', () => {
 
   it('lets support read but not administer', () => {
     expect(canAccess(itemForPath('/system/chat')!, SUPPORT)).toBe(true)
-    expect(canAccess(itemForPath('/people/engagement')!, SUPPORT)).toBe(true)
     expect(canAccess(itemForPath('/people/operators')!, SUPPORT)).toBe(false)
     expect(canAccess(itemForPath('/temples')!, SUPPORT)).toBe(false)
+  })
+
+  it('keeps the whole PEOPLE group owner-only', () => {
+    // Engagement was pencilled in for `support` while it was a stub. Built, it
+    // names individual devotees and their mobile numbers, and the route behind
+    // it is owner-gated — so showing it to support would be the sidebar
+    // promising a page the server refuses.
+    for (const item of NAV.find((g) => g.title === 'People')!.items) {
+      expect(canAccess(item, SUPPORT), item.path).toBe(false)
+      expect(canAccess(item, TEMPLE_ADMIN), item.path).toBe(false)
+      expect(canAccess(item, OWNER), item.path).toBe(true)
+    }
   })
 
   it('shows every role a dashboard', () => {

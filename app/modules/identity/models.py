@@ -68,6 +68,12 @@ class FamilyMember(Base):
     additional rows are relatives (mother, spouse, child…). Exactly one row per
     account has ``is_self=True``; it is created lazily and cannot be deleted.
     ``nak`` is the janma nakshatram index (0–26) or null until known.
+
+    ``dob`` is a DATE and not an age (console plan Part 12): an age is right for
+    one year and silently wrong after that, and this is the field a star-day
+    reminder would be computed from. It is birth data, so GUARDRAILS §4 applies
+    to it exactly as to ``User.dob`` — one person's detail, fetched by id, never
+    a URL or a list response.
     """
 
     __tablename__ = "family_members"
@@ -79,6 +85,7 @@ class FamilyMember(Base):
     name: Mapped[str] = mapped_column(default="")
     rel: Mapped[str] = mapped_column(default="rSelf")  # relation key from the app
     nak: Mapped[int | None] = mapped_column(nullable=True, default=None)
+    dob: Mapped[date | None] = mapped_column(nullable=True, default=None)
     is_self: Mapped[bool] = mapped_column(default=False)
     created_at: Mapped[datetime] = mapped_column(default=_utcnow)
 
