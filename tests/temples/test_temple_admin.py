@@ -538,6 +538,50 @@ async def test_the_partner_list_hides_other_temples_contacts(api, session):
     assert (await api.get("/temples/partners/theirs/qr.png", headers=headers)).status_code == 403
 
 
+async def test_the_festival_calendar_can_be_read_back(api, session):
+    """Console plan Part 10. Festivals were write-only — POST, PATCH and DELETE
+    existed but nothing enumerated them, so an operator had no way to find the
+    id of the row they wanted to fix. Past days are included on purpose: a date
+    typed as last year instead of next is exactly the entry needing a correction.
+    """
+    session.add(TempleFestival(temple_id="test-temple", name="Past", day=date(2020, 1, 1)))
+    session.add(TempleFestival(temple_id="test-temple", name="Soon", day=date(2026, 9, 1)))
+    session.add(TempleFestival(temple_id="other-temple", name="Theirs", day=date(2026, 8, 1)))
+    await session.commit()
+
+    assert (await api.get("/temples/festivals")).status_code == 401
+
+    listed = await api.get("/temples/festivals", headers=ADMIN)
+    assert listed.status_code == 200
+    assert [f["name"] for f in listed.json()] == ["Past", "Theirs", "Soon"]  # by day
+
+    one = await api.get("/temples/festivals?temple_id=other-temple", headers=ADMIN)
+    assert [f["name"] for f in one.json()] == ["Theirs"]
+
+
+async def test_the_festival_calendar_is_scoped_to_the_operators_temples(api, session):
+    session.add(TempleFestival(temple_id="test-temple", name="Mine", day=date(2026, 9, 1)))
+    session.add(TempleFestival(temple_id="other-temple", name="Theirs", day=date(2026, 8, 1)))
+    await session.commit()
+    headers = await _scoped_operator(session, "test-temple")
+
+    listed = await api.get("/temples/festivals", headers=headers)
+    assert [f["name"] for f in listed.json()] == ["Mine"]
+    # Naming someone else's temple is a mistake worth a 403, not an empty list:
+    # silence would read as "that temple has no festivals".
+    assert (
+        await api.get("/temples/festivals?temple_id=other-temple", headers=headers)
+    ).status_code == 403
+
+
+async def test_the_festivals_path_is_not_shadowed_by_the_catch_all(api):
+    """`/temples/festivals` must not resolve to a temple whose id is
+    "festivals" — the same route-ordering trap `/temples/poojas` is pinned for."""
+    listed = await api.get("/temples/festivals", headers=ADMIN)
+    assert listed.status_code == 200
+    assert listed.json() == []
+
+
 async def test_a_temple_admin_cannot_edit_another_temples_festival(api, session):
     session.add(
         TempleFestival(temple_id="other-temple", name="Utsavam", day=date(2026, 9, 1))

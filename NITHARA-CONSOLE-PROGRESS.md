@@ -728,6 +728,73 @@ path** for both directories.
 Note for future work: the local `.env` `DATABASE_URL` points at production, not
 a scratch database. Test migrations against a throwaway SQLite file first.
 
+---
+
+## Part 10 — the TEMPLES section — 2026-07-28
+
+Five screens against the Part 5 API: the directory list, the temple editor, the
+pooja catalogue, partners & QR, and festivals. 53 console tests added (35 → 88);
+`ruff check app tests` still 123.
+
+### One backend addition
+
+Festivals were **write-only**. `POST /temples/partners/{slug}/festivals`,
+`PATCH /temples/festivals/{id}` and `DELETE` all existed, and the microsite
+could render the next few — but no route enumerated them, so the console had no
+way to learn the id of the row an operator wanted to fix. `GET
+/temples/festivals` is that missing half, scoped by `visible_temple_ids()` and
+returning past days as well as future ones: a date typed as last year instead of
+next is exactly the entry that needs correcting, and it is only findable if it
+is still on screen. Naming a temple you do not manage is a 403 rather than an
+empty list, because silence there reads as "that temple has no festivals".
+
+### The map-picker is a paste box, deliberately
+
+The plan said "map-picker for lat/lng". It is a field that accepts whatever the
+operator pasted — a Maps share link, the address bar, or a plain
+`9.9312, 76.2673` — parsed by `parseCoords` in `app-console/src/lib/temple.ts`.
+
+An operator locating a temple is already in Google Maps; that is where the
+satellite view and the Malayalam place names are. An embedded map would mean a
+tile provider, an API key and an external request from a back-office tool, to
+rebuild a worse version of the tab they already have open. When a share link
+carries both `@lat,lng` (the camera) and `!3d!4d` (the pin), the pin wins.
+
+### Three things worth knowing about the editor
+
+- **Save sends a diff, not the form.** `PATCH /temples/{id}` reads
+  `model_dump(exclude_unset=True)` and treats an explicit `null` as *clear this
+  column*, so a payload restating every field would wipe a temple's darshan
+  windows every time somebody fixed a typo in its name. `diffTemple` is that
+  rule, tested apart from the screen. Save is disabled when the diff is empty —
+  a Save that fires no request but reports success is how an operator comes to
+  believe an edit landed.
+- **Sign-off and listing are not part of Save.** They have their own routes and
+  their own roles. A `temple_admin` sees the review button disabled and is told
+  why: the role that writes a temple's story must not be the one asserting an
+  astrologer checked it (GUARDRAILS §1).
+- **Cleared coordinates are blocked client-side.** An emptied number input is
+  `NaN`, `JSON.stringify` turns that into `null`, and a null latitude reaches
+  the server's range check as a `TypeError` — a 500 rather than a 422.
+
+### The money rule
+
+Blank means *inherit the master value*; `0` is a free offering; nonsense is
+neither. All three used to collapse into `null` on the wire, which the server
+reads as inherit for an override and writes over a NOT NULL column for a master
+offering. `readPaise` / `readDays` return the three cases separately and the
+Save buttons refuse the third.
+
+### Routing
+
+`nav.ts` gained `children` — routes that belong to a section but are not sidebar
+entries (`/temples/new`, `/temples/:templeId`). They are declared in the nav
+table rather than added straight to the router because `Guard` decides what a
+path needs by looking it up there; a route the table did not know about would
+fall through its "not in the IA" branch and render for anyone signed in. Exact
+matches beat patterns, so `/temples/festivals` stays its own section instead of
+resolving to a temple named "festivals".
+
 ## Standing items
 - **`ADMIN_TOKEN` is not set on the live Space.** `"chargemod"` was removed in
   Part 4, so pushing to `hf` before the owner adds that secret leaves only the

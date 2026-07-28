@@ -319,6 +319,327 @@ body {
   font-size: 12px;
 }
 
+/* ---- temples section (Part 10) ---- */
+
+.page__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.section__title {
+  margin: 28px 0 10px;
+  font-size: 16px;
+}
+
+.btn--inline {
+  width: auto;
+  margin-top: 0;
+  display: inline-block;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.btn--danger {
+  border-color: var(--warn);
+  color: var(--warn);
+}
+
+.btn[disabled] {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+  padding: 14px 16px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.toolbar__field {
+  display: block;
+}
+
+.toolbar__field--grow {
+  flex: 1;
+  min-width: 220px;
+}
+
+.toolbar__field > span,
+.field__hint,
+.count {
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+
+.toolbar__field > span {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.toolbar__field input,
+.toolbar__field select,
+.field select,
+.field textarea,
+.table input,
+.table select {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font: inherit;
+  background: var(--panel);
+  color: var(--ink);
+}
+
+.count {
+  margin: 14px 0 8px;
+}
+
+/* Malayalam script needs a font that actually has it; the system UI stack
+   silently falls back to boxes on some Windows installs. Sizing up a little
+   too — the conjuncts are dense at 14px. */
+.field--ml input,
+.field--ml textarea,
+.input--ml,
+.cell__ml {
+  font-family: 'Noto Sans Malayalam', 'Manjari', 'Nirmala UI', system-ui, sans-serif;
+  font-size: 15px;
+}
+
+.field__tag {
+  margin-left: 6px;
+  font-style: normal;
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+.field__hint {
+  display: block;
+  margin-top: 4px;
+}
+
+.field__error {
+  margin: 4px 0 0;
+  color: var(--warn);
+  font-size: 12px;
+}
+
+.tablewrap {
+  overflow-x: auto;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table th,
+.table td {
+  padding: 10px 14px;
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+
+.table th {
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.table tr:last-child td {
+  border-bottom: none;
+}
+
+.row--off td {
+  opacity: 0.55;
+}
+
+.celllink {
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.cell__ml,
+.cell__sub {
+  display: block;
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+
+.cell__acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.input--num {
+  max-width: 110px;
+}
+
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--ink-soft);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.badge--on {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.empty {
+  padding: 24px;
+  color: var(--ink-soft);
+  text-align: center;
+}
+
+/* ---- forms ---- */
+
+.card {
+  padding: 16px 18px;
+  margin-bottom: 16px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.card__title {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+
+.card > legend,
+.card > summary {
+  padding: 0 6px;
+  color: var(--ink-soft);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  cursor: default;
+}
+
+.card > summary {
+  cursor: pointer;
+  margin-bottom: 8px;
+}
+
+.grid2,
+.grid3 {
+  display: grid;
+  gap: 0 16px;
+}
+
+.grid2 {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.grid3 {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.row--wrap {
+  flex-wrap: wrap;
+}
+
+.row > input {
+  flex: 1;
+}
+
+.row--window {
+  margin-bottom: 8px;
+}
+
+.row--window input {
+  flex: 0 0 auto;
+}
+
+.row__dash {
+  color: var(--ink-soft);
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.check input {
+  width: auto;
+}
+
+.formfoot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0 24px;
+}
+
+.banner--ok {
+  background: #e8f3ec;
+  color: #1e6b43;
+}
+
+.banner ul,
+ul.banner {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.snippet {
+  overflow-x: auto;
+  padding: 10px 12px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font-size: 12px;
+}
+
+.photo {
+  display: block;
+  max-width: 320px;
+  margin-bottom: 10px;
+  border-radius: var(--radius);
+}
+
+.qr {
+  width: 180px;
+  padding: 8px;
+  background: #fff;
+  border-radius: var(--radius);
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #12181e;
@@ -338,5 +659,14 @@ body {
 
   .tile--warn {
     border-color: #4a3a24;
+  }
+
+  .banner--ok {
+    background: #17301f;
+    color: #7fc79b;
+  }
+
+  .snippet {
+    background: #0f151b;
   }
 }

@@ -89,6 +89,28 @@ async def list_partners(session: AsyncSession) -> list[TemplePartner]:
     )
 
 
+async def list_festivals(
+    session: AsyncSession, *, temple_ids: frozenset[str] | None = None
+) -> list[TempleFestival]:
+    """The whole festival calendar, soonest first — including days now past.
+
+    ``temple_ids=None`` means unrestricted (an owner); an **empty** set means
+    this operator manages nothing and must see nothing. Same distinction
+    ``Operator.visible_temple_ids()`` draws, and collapsing the two here would
+    hand a scoped operator every temple's calendar.
+
+    Past festivals are returned rather than filtered out: this is the list an
+    operator corrects entries in, and a date entered as last year instead of
+    next is precisely the mistake they need to be able to see.
+    """
+    if temple_ids is not None and not temple_ids:
+        return []
+    query = select(TempleFestival).order_by(TempleFestival.day, TempleFestival.id)
+    if temple_ids is not None:
+        query = query.where(TempleFestival.temple_id.in_(temple_ids))
+    return list((await session.execute(query)).scalars().all())
+
+
 async def add_festival(
     session: AsyncSession, *, temple_id: str, name: str, day: date_type, name_ml: str = ""
 ) -> TempleFestival:

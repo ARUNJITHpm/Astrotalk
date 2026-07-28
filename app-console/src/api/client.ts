@@ -11,6 +11,11 @@ import { authHeaders, clearToken } from '../lib/session'
 
 const BASE = (import.meta.env.VITE_API_BASE ?? '').replace(/\/$/, '')
 
+/** An API path as an absolute URL. For the few calls that cannot go through
+ *  `api()` — a binary download, an `<img src>` — and would otherwise ignore
+ *  VITE_API_BASE and quietly work only when the console is same-origin. */
+export const apiUrl = (path: string): string => `${BASE}${path}`
+
 export class ApiError extends Error {
   constructor(
     public status: number,

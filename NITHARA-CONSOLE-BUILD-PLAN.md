@@ -435,7 +435,14 @@ SYSTEM      Integrations     health + live/mock status pills                    
             Settings         service fee, admin token, roles
 ```
 
-## Part 10 — Temples section
+## Part 10 — Temples section  ✅ DONE
+
+> **As built.** One backend addition was needed: festivals had POST, PATCH and
+> DELETE but nothing that could list them, so an operator had no way to name the
+> row they wanted to correct. `GET /temples/festivals` fills that in, scoped the
+> same way the rest of the section is. The map-picker is a paste box rather than
+> an embedded map — see `NITHARA-CONSOLE-PROGRESS.md` for why.
+
 ```
 Build the TEMPLES group against the Part 5 API:
 - All temples: searchable/filterable table (district, deity, reviewed, active).

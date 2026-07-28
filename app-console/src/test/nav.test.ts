@@ -10,6 +10,7 @@ import { describe, expect, it } from 'vitest'
 import {
   NAV,
   allNavItems,
+  allRoutes,
   canAccess,
   firstReachablePath,
   itemForPath,
@@ -135,5 +136,39 @@ describe('the table itself', () => {
         expect(itemForPath(item.path)).toBe(item)
       }
     }
+  })
+})
+
+describe('detail routes', () => {
+  it('gives a detail page its section’s permissions', () => {
+    // /temples/:templeId is never in the sidebar, so nothing else would notice
+    // it being reachable by a role that cannot open the list it belongs to.
+    expect(itemForPath('/temples/tsr-guruvayur')).toBe(itemForPath('/temples'))
+    expect(canAccess(itemForPath('/temples/tsr-guruvayur')!, TEMPLE_ADMIN)).toBe(true)
+    expect(canAccess(itemForPath('/temples/tsr-guruvayur')!, REVIEWER)).toBe(false)
+  })
+
+  it('does not let the pattern swallow a sibling section', () => {
+    // `/temples/festivals` and `/temples/poojas` both match `/temples/:templeId`.
+    // Resolving them to the editor would hand them the editor's roles, which is
+    // not the same set — and would render the wrong screen besides.
+    for (const path of ['/temples/festivals', '/temples/poojas', '/temples/partners']) {
+      expect(itemForPath(path)?.path).toBe(path)
+    }
+  })
+
+  it('leaves an unknown path unresolved rather than guessing', () => {
+    expect(itemForPath('/nonsense')).toBeUndefined()
+    expect(itemForPath('/temples/a/b')).toBeUndefined()
+  })
+
+  it('routes every child, and every route is guarded by a real item', () => {
+    const routes = allRoutes()
+    expect(routes.length).toBeGreaterThan(allNavItems().length)
+    for (const { path, item } of routes) {
+      expect(allNavItems()).toContain(item)
+      expect(new Set(routes.map((r) => r.path)).has(path)).toBe(true)
+    }
+    expect(new Set(routes.map((r) => r.path)).size).toBe(routes.length)
   })
 })

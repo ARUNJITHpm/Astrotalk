@@ -225,6 +225,33 @@ async def update_partner(
     return PartnerOut.model_validate(partner)
 
 
+@router.get(
+    "/festivals",
+    response_model=list[FestivalOut],
+    summary="The festival calendar for the temples this operator manages",
+)
+async def list_festivals(
+    session: SessionDep,
+    operator: TempleOperatorDep,
+    temple_id: str | None = Query(default=None, description="narrow to one temple"),
+) -> list[FestivalOut]:
+    """Console plan Part 10 needs this; nothing before it did.
+
+    Festivals were write-only: the console could add one and the microsite
+    could render the next few, but no route enumerated them — so the PATCH and
+    DELETE below had no way for an operator to name the row they meant. This is
+    the missing half, scoped the same way the rest of the section is.
+    """
+    visible = operator.visible_temple_ids()
+    if temple_id is not None:
+        # Checked rather than intersected: asking for a temple you do not manage
+        # is a mistake worth a 403, not a silently empty list.
+        operator.require_temple(temple_id)
+        visible = frozenset({temple_id})
+    rows = await partners.list_festivals(session, temple_ids=visible)
+    return [FestivalOut.model_validate(r) for r in rows]
+
+
 @router.patch(
     "/festivals/{festival_id}",
     response_model=FestivalOut,

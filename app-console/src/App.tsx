@@ -9,16 +9,27 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 
 import { useAuth } from './lib/auth'
-import { allNavItems } from './lib/nav'
+import { allRoutes } from './lib/nav'
 import { Dashboard } from './ui/Dashboard'
 import { Guard } from './ui/Guard'
 import { Login } from './ui/Login'
 import { Shell } from './ui/Shell'
 import { Stub } from './ui/Stub'
+import { Festivals } from './ui/temples/Festivals'
+import { Partners } from './ui/temples/Partners'
+import { PoojaCatalogue } from './ui/temples/PoojaCatalogue'
+import { TempleEditor } from './ui/temples/TempleEditor'
+import { TempleList } from './ui/temples/TempleList'
 
 /** Real screens, keyed by path. Anything absent renders a stub. */
 const SCREENS: Record<string, React.ComponentType> = {
   '/': Dashboard,
+  '/temples': TempleList,
+  '/temples/new': TempleEditor,
+  '/temples/:templeId': TempleEditor,
+  '/temples/poojas': PoojaCatalogue,
+  '/temples/festivals': Festivals,
+  '/temples/partners': Partners,
 }
 
 function NotFound() {
@@ -48,12 +59,12 @@ export default function App() {
   return (
     <Routes>
       <Route element={<Shell />}>
-        {allNavItems().map((item) => {
-          const Screen = SCREENS[item.path] ?? Stub
+        {allRoutes().map(({ path }) => {
+          const Screen = SCREENS[path] ?? Stub
           return (
             <Route
-              key={item.path}
-              path={item.path}
+              key={path}
+              path={path}
               element={
                 <Guard>
                   <Screen />
