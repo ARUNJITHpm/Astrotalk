@@ -25,6 +25,12 @@ const EXTRA_EN = {
   boardFull: 'Your family list is full.',
   bookFailed: 'The booking didn’t go through — please try again.',
   bookPendingNote: 'Awaiting payment. It is confirmed once payment completes.',
+  // Razorpay has taken the money but our confirmation has not landed yet. Says
+  // what is true without claiming the booking is confirmed, and without
+  // implying anything went wrong.
+  bookReceivedNote: 'Payment received. The temple confirms this shortly — your reference is below.',
+  payFailed: 'The payment didn’t go through. Your booking is saved — you can pay from Poojas.',
+  payUnavailable: 'Couldn’t open payment just now. Your booking is saved — you can pay from Poojas.',
   dateTbc: 'To be confirmed',
   loadFailed: 'Couldn’t load that — pull to retry.',
   // The prototype's copy named a star the user never gave ("…suits Rohini").
@@ -59,6 +65,9 @@ const EXTRA_ML = {
   boardFull: 'കുടുംബ പട്ടിക നിറഞ്ഞു.',
   bookFailed: 'ബുക്കിംഗ് നടന്നില്ല — വീണ്ടും ശ്രമിക്കൂ.',
   bookPendingNote: 'പണമടയ്ക്കൽ കാത്തിരിക്കുന്നു. പൂർത്തിയായാൽ സ്ഥിരീകരിക്കും.',
+  bookReceivedNote: 'പണം ലഭിച്ചു. ക്ഷേത്രം ഉടൻ സ്ഥിരീകരിക്കും — റഫറൻസ് താഴെ.',
+  payFailed: 'പണമടയ്ക്കൽ നടന്നില്ല. ബുക്കിംഗ് സേവ് ചെയ്തിട്ടുണ്ട് — പൂജകൾ എന്നതിൽ നിന്ന് അടയ്ക്കാം.',
+  payUnavailable: 'പേയ്‌മെന്റ് തുറക്കാനായില്ല. ബുക്കിംഗ് സേവ് ചെയ്തിട്ടുണ്ട് — പൂജകൾ എന്നതിൽ നിന്ന് അടയ്ക്കാം.',
   dateTbc: 'തീയതി സ്ഥിരീകരിക്കാനുണ്ട്',
   loadFailed: 'ലോഡ് ചെയ്യാനായില്ല — വീണ്ടും ശ്രമിക്കൂ.',
   nitharaBlurb:

@@ -47,6 +47,11 @@ export interface PoojaCatalogue {
   temple_id: string
   days_until: number | null
   poojas: PoojaCatalogueItem[]
+  /** The booking fee added on top of the chosen offering. Served here because
+   *  the app must show a total before an order exists, and the console can
+   *  change this figure (PUT /bookings/settings) — a hardcoded 15 went stale
+   *  the moment that screen shipped. */
+  service_fee_paise: number
 }
 
 export interface CheckinResult {

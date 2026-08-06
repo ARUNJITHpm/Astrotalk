@@ -605,11 +605,19 @@ async def temple_by_qr(token: str, session: SessionDep) -> dict:
 
 @router.get("/{temple_id}/poojas", response_model=PoojaCatalogueOut)
 async def temple_poojas(
+    session: SessionDep,
     temple_id: str,
     nak: int | None = Query(default=None, ge=0, le=26, description="star to book for"),
 ) -> dict:
     """A temple's offering catalogue. With ``nak`` given, each offering is locked
-    when its lead time can't be met before that star's next recurrence."""
+    when its lead time can't be met before that star's next recurrence.
+
+    Carries the booking fee too. The app has to show a total before an order
+    exists, and its only other option was to hardcode 15 — which stopped being
+    true the moment the console could change it.
+    """
+    from app.modules.bookings.service import service_fee_paise
+
     temple = _service.get_temple(temple_id)
     if temple is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Temple not found")
@@ -618,7 +626,9 @@ async def temple_poojas(
         star_day = await _engine.next_nakshatram_day(nak)
         if star_day is not None:
             days_until = (star_day - date.today()).days
-    return _service.pooja_catalogue(temple, days_until=days_until)
+    catalogue = _service.pooja_catalogue(temple, days_until=days_until)
+    catalogue["service_fee_paise"] = await service_fee_paise(session)
+    return catalogue
 
 
 @router.post("/{temple_id}/checkin", response_model=CheckinOut)

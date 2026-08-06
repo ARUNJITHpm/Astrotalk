@@ -99,6 +99,13 @@ class PoojaCatalogueOut(BaseModel):
     temple_id: str
     days_until: int | None = None
     poojas: list[PoojaCatalogueItem]
+    # The booking fee added on top of whichever offering is chosen. It is here
+    # because the app has to show a total BEFORE the order exists, and the only
+    # other way to know it was to hardcode 15 — which stopped being true the
+    # moment the console could change it (PUT /bookings/settings). A price shown
+    # on a payment screen that differs from the price charged is not a rounding
+    # problem, it is a false statement.
+    service_fee_paise: int = 0
 
 
 # ---- operator console (console plan Part 5) ----
