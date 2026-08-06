@@ -1238,11 +1238,65 @@ the console's simulator, which drives the same brain.
 footers, the stale-setting warning and the health probe); `ruff check app tests`
 down to 122 from 123.
 
+## Container verification — 2026-08-06
+
+The first time the image has been built on this machine since console Part 9.
+Everything from Parts 9-15 — the `/console` mount, all four sections, the
+retired pages, the WAHA removal — had only ever been exercised by pytest and
+vitest. **63 checks, 0 failures**, image 342 MB.
+
+### A virtualenv was shipping in every image
+
+`.dockerignore` excluded `.venv/` and `venv/`. The venv this project actually
+uses is called `vinimon/`, and Docker matches names — it cannot recognise a
+virtualenv. So `COPY . .` was carrying **23,522 files** of Windows virtualenv
+(`Scripts/*.exe`, a platform-specific `Lib/site-packages`) into a Linux image,
+on every build, in a layer that then had to be pushed to the Space.
+
+That is almost certainly why the 2026-07-27 build attempt died: the WSL VM gets
+3 GB on this 6 GB machine, and 23.5k files of context is a bad way to spend it
+before the first layer starts. With the fix the whole context is **1.15 MB**.
+
+`var/` (local object storage — generated cards and PDFs from a previous run) and
+`evals/results/` went too. Both are runtime state, and baking one machine's into
+the image is how a stale card ends up served in production.
+
+### Both pending migrations ran clean at boot
+
+The one thing this could not have shown any other way. `scripts/migrate.py` runs
+at container start, and the log carries the full chain against a fresh database:
+
+```
+Running upgrade d0e1f2a3b4c5 -> e1f2a3b4c5d6, operator columns on pooja_bookings
+Running upgrade e1f2a3b4c5d6 -> f2a3b4c5d6e7, app feed out of a Python constant…
+Running upgrade f2a3b4c5d6e7 -> a3b4c5d6e7f8, a date of birth on the family board
+```
+
+Both revisions still unapplied in production — Part 7's `e1f2a3b4c5d6` and Part
+12's `a3b4c5d6e7f8` — applied without incident, followed by the registries
+loading 53 temples, 28 astrologers and 3 feed cards. That is not proof they are
+safe against the live data, but it removes the "does this chain even run"
+question from the approval.
+
+### What the console checks actually proved
+
+Thirteen checks on `/console`: the shell, a trailing slash, two deep links, that
+it is the console and not the PWA, that the shell is `no-store` and its deep
+links are too, that the hashed bundle is served, cached immutably, and is
+**JavaScript rather than the HTML shell** — that last one catches the assets
+mount and the catch-all being registered in the wrong order, which would boot
+the console to a blank page with a 200 and no clue why.
+
+Eight more on the retirement: all three old addresses 308 to the right place,
+`/console-app` is gone, `/static` still serves the white-label surface, and the
+deleted pages really are deleted.
+
 ## Standing items
 - **Two migrations are unapplied in production**, both additive and both
   reversible: `e1f2a3b4c5d6` (Part 7's booking operator columns — the whole
   bookings queue depends on it) and `a3b4c5d6e7f8` (Part 12's
   `family_members.dob`). `docs/AGENTS.md` gates running them on human approval.
+  Both ran clean at container boot against a fresh database on 2026-08-06.
 - **`ADMIN_TOKEN` is not set on the live Space.** `"chargemod"` was removed in
   Part 4, so pushing to `hf` before the owner adds that secret leaves only the
   `admin_phones` session as a way in.

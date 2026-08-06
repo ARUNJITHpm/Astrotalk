@@ -25,6 +25,20 @@ app-console/dist/
 **/*.egg-info/
 .venv/
 venv/
+# The venv this project actually uses. Docker cannot recognise a virtualenv —
+# it only matches names — so EVERY venv directory has to be listed here by hand,
+# and this one is not called .venv. Left out, `COPY . .` shipped 23,522 files of
+# Windows virtualenv (Scripts/*.exe, a platform-specific Lib/site-packages) into
+# a Linux image, on every build, in a layer that then had to be pushed.
+# If you make a venv under another name, add it here too.
+vinimon/
+
+# Local object storage (MOCK_STORAGE=true writes generated cards and PDFs here)
+# and eval output. Both are runtime state produced by a previous run — nothing
+# reads them at boot, and baking one machine's into the image is how a stale
+# card ends up served in production.
+var/
+evals/results/
 
 # Local state that must never bake into an image. Secrets come from the
 # platform (HF Space secrets), never from a file in the build context.
