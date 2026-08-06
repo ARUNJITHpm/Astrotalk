@@ -1291,12 +1291,59 @@ Eight more on the retirement: all three old addresses 308 to the right place,
 `/console-app` is gone, `/static` still serves the white-label surface, and the
 deleted pages really are deleted.
 
+## Migration to production — 2026-08-06
+
+`a3b4c5d6e7f8` (`family_members.dob`) applied. Production is at head.
+
+### The standing note was wrong, and checking first is why we know
+
+It had said **two** migrations were pending, and that Part 7's `e1f2a3b4c5d6`
+was one of them — "the whole bookings queue depends on it". Querying
+`alembic_version` before touching anything showed production sitting at
+`f2a3b4c5d6e7`, two revisions further on than the note claimed:
+
+| revision | note said | actually |
+|---|---|---|
+| `e1f2a3b4c5d6` — booking operator columns | pending | **applied** 2026-07-27 |
+| `f2a3b4c5d6e7` — feed_items + `users.active` | (unlisted) | **applied** 2026-07-27 |
+| `a3b4c5d6e7f8` — `family_members.dob` | pending | pending → applied today |
+
+`05ece8b` and `772b111` had recorded both as applied at the time; the standing
+list simply never caught up, and it was then repeated in three separate reports.
+The bookings section had been working in production the whole time.
+
+### What ran
+
+Generated offline first with `alembic upgrade f2a3b4c5d6e7:head --sql`, so the
+exact statements were visible before anything connected:
+
+```sql
+BEGIN;
+ALTER TABLE family_members ADD COLUMN dob DATE;
+UPDATE alembic_version SET version_num='a3b4c5d6e7f8'
+  WHERE alembic_version.version_num = 'f2a3b4c5d6e7';
+COMMIT;
+```
+
+One nullable column, no default, no backfill. On Postgres that is a
+metadata-only change — instant, no table rewrite. The DDL and the version bump
+commit together, so `alembic current` returning `a3b4c5d6e7f8 (head)` is itself
+the confirmation that the column landed.
+
+`family_members` (2 rows) was dumped to `var/backups/` first. `var/` is
+gitignored and now `.dockerignore`d, so the dump stays on this machine — which
+is right, it holds devotee data.
+
+Run with plain `alembic upgrade head`, not `scripts/migrate.py`. The latter is
+the container entrypoint and carries stamp-or-upgrade logic that has caused an
+incident before; there was no reason to involve it for a one-line change.
+
 ## Standing items
-- **Two migrations are unapplied in production**, both additive and both
-  reversible: `e1f2a3b4c5d6` (Part 7's booking operator columns — the whole
-  bookings queue depends on it) and `a3b4c5d6e7f8` (Part 12's
-  `family_members.dob`). `docs/AGENTS.md` gates running them on human approval.
-  Both ran clean at container boot against a fresh database on 2026-08-06.
+- ~~Two migrations unapplied in production.~~ **Resolved 2026-08-06: production
+  is at head (`a3b4c5d6e7f8`).** This entry was wrong for nine days — two of the
+  three revisions it listed had been applied on 2026-07-27 and it never caught
+  up. When adding a "pending migration" note here, check `alembic current`
+  against the target before writing it down, and again before repeating it.
 - **`ADMIN_TOKEN` is not set on the live Space.** `"chargemod"` was removed in
   Part 4, so pushing to `hf` before the owner adds that secret leaves only the
   `admin_phones` session as a way in.
