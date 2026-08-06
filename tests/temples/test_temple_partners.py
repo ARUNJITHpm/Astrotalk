@@ -148,10 +148,15 @@ async def test_partner_console_and_public_pages(session):
             )
             assert created.status_code == 201
 
+            # Relative to today, not a literal date. The microsite lists only
+            # UPCOMING festivals, so a hardcoded day silently becomes a failing
+            # test the morning after it passes — which is exactly what
+            # "2026-08-01" did on 2026-08-06.
+            upcoming = (date.today() + timedelta(days=30)).isoformat()
             fest = await client.post(
                 "/temples/partners/padmanabha/festivals", headers=admin,
                 json={"name": "Painkuni Utsavam", "name_ml": "പൈങ്കുനി ഉത്സവം",
-                      "day": "2026-08-01"},
+                      "day": upcoming},
             )
             assert fest.status_code == 201
 

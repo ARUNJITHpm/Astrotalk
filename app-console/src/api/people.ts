@@ -10,7 +10,7 @@
 // need their own request against one named user id, which is what keeps them
 // out of every list, log line and query string.
 
-import { api, apiDelete, apiGet, apiPatch, apiPost, qs } from './client'
+import { apiDelete, apiGet, apiPatch, apiPost, apiPut, qs } from './client'
 
 // ---- users ----
 
@@ -216,10 +216,7 @@ export const setAstrologerActive = (id: string, active: boolean) =>
  *  because "these are my hours" is how a person states it. Already-booked
  *  consults hold an absolute instant and are never cancelled by narrowing. */
 export const replaceAvailability = (id: string, windows: AvailabilityWindow[]) =>
-  api<Astrologer>(`/astrologers/${encodeURIComponent(id)}/availability`, {
-    method: 'PUT',
-    body: JSON.stringify({ windows }),
-  })
+  apiPut<Astrologer>(`/astrologers/${encodeURIComponent(id)}/availability`, { windows })
 
 // ---- operators ----
 

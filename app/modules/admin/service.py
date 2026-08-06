@@ -67,6 +67,22 @@ class AdminService:
             },
         }
 
+    def integrations(self) -> dict[str, Any]:
+        """Just which services are live, for callers who need the flag and not
+        the analytics.
+
+        ``overview`` carries this alongside the devotee counts, the chat volume
+        and the token spend. The console needs the flag on two screens a
+        content_reviewer can open — a publish button has to say whether it will
+        really post — and pulling the whole analytics payload to read one
+        boolean would hand a reviewer the register's size as a side effect.
+
+        Credential presence is deliberately NOT here. Whether a key is
+        configured stays with ``overview``, which is owner-gated in the console.
+        """
+        status = self._system_status()
+        return {"app_env": status["app_env"], "integrations": status["integrations"]}
+
     async def overview(self, session: AsyncSession) -> dict[str, Any]:
         """Assemble the whole dashboard payload from the module reads."""
         users = await self._identity.admin_metrics(session)

@@ -7,6 +7,7 @@
 
 import { describe, expect, it } from 'vitest'
 
+import { SCREENS } from '../App'
 import {
   NAV,
   allNavItems,
@@ -127,9 +128,21 @@ describe('the table itself', () => {
     expect(new Set(paths).size).toBe(paths.length)
   })
 
-  it('gives every stub a blurb, so no section is a bare dead end', () => {
-    for (const item of allNavItems().filter((i) => i.stub)) {
-      expect(item.blurb, `${item.path} has no blurb`).toBeTruthy()
+  it('has a screen behind every route it declares', () => {
+    // The placeholder that stood in for unbuilt sections is gone as of Part 13,
+    // so a nav entry with no screen no longer degrades gracefully — it renders
+    // "no such page" to whoever clicked it in the sidebar.
+    for (const { path } of allRoutes()) {
+      expect(SCREENS[path], `${path} has no screen`).toBeTruthy()
+    }
+  })
+
+  it('declares a route for every screen', () => {
+    // The other direction. A screen the table does not know about is a screen
+    // with no guard: Guard resolves permissions by looking the path up here.
+    const declared = new Set(allRoutes().map((r) => r.path))
+    for (const path of Object.keys(SCREENS)) {
+      expect(declared.has(path), `${path} is routed but not in the IA`).toBe(true)
     }
   })
 

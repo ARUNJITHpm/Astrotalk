@@ -97,9 +97,19 @@ class ContentService:
     async def approve(
         self, session: AsyncSession, post_id: int, body: str | None = None
     ) -> ContentPostOut:
-        """Mark a draft approved, optionally applying the admin's inline edit."""
+        """Mark a draft approved, optionally applying the admin's inline edit.
+
+        ``failed`` is accepted alongside ``draft``/``approved``, and that is the
+        retry path. A publish that fell over — the channel API timed out, the
+        token had expired — left the piece as ``failed``, and every route out of
+        that status was closed: approve refused it, publish only takes
+        ``approved``, mark-published only takes ``approved``/``draft``, and
+        ``run_daily`` skips any platform that already has a row for the day
+        whatever its status. One transient network error stranded the piece
+        permanently, with no way to see why from the console.
+        """
         post = await self._get(session, post_id)
-        if post.status not in ("draft", "approved"):
+        if post.status not in ("draft", "approved", "failed"):
             raise InvalidTransition(f"cannot approve a {post.status} post")
         if body is not None and body.strip():
             post.body = body.strip()

@@ -44,6 +44,11 @@ SessionDep = Annotated[AsyncSession, Depends(get_session)]
 OwnerDep = Annotated[Operator, Depends(require_operator("owner"))]
 # Any authenticated operator, whatever their role — used by /operators/me.
 AnyOperatorDep = Annotated[Operator, Depends(require_operator())]
+# The chat explorer. A support operator exists to answer "what did Tara tell my
+# mother", so reading the transcript is their job; a temple_admin's is not, and
+# the coarse AdminGuard these two routes carried let them read every devotee's
+# conversation with the product.
+SupportDep = Annotated[Operator, Depends(require_operator("support"))]
 
 
 class LoginPayload(BaseModel):
@@ -98,19 +103,17 @@ async def admin_login_endpoint(payload: LoginPayload) -> dict:
 
 @router.get(
     "/users-chats",
-    dependencies=[AdminGuard],
-    summary="Fetch all users who have chat logs",
+    summary="Fetch all users who have chat logs (owner or support)",
 )
-async def get_users_chats(session: SessionDep) -> list[dict]:
+async def get_users_chats(session: SessionDep, operator: SupportDep) -> list[dict]:
     return await _service.get_users_chats(session)
 
 
 @router.get(
     "/user-chat/{phone}",
-    dependencies=[AdminGuard],
-    summary="Fetch raw chat log for a specific user",
+    summary="Fetch raw chat log for a specific user (owner or support)",
 )
-async def get_user_chat(phone: str, session: SessionDep) -> list[dict]:
+async def get_user_chat(phone: str, session: SessionDep, operator: SupportDep) -> list[dict]:
     return await _service.get_user_chat(session, phone)
 
 
@@ -119,6 +122,19 @@ async def admin_config() -> dict:
     """Unauthenticated: lets the dashboard page decide whether to prompt for a
     token before its first data call. Reveals nothing but the on/off policy."""
     return {"token_required": admin_required()}
+
+
+@router.get("/integrations", summary="Which services are live vs mocked")
+async def integrations(operator: AnyOperatorDep) -> dict:
+    """The live/mock flags on their own, for any signed-in operator.
+
+    Console plan Part 13. Two screens a content_reviewer can open need to know
+    whether a publish or a notification run will really reach anybody, and the
+    only place that fact lived was ``/overview`` — beside the devotee count, the
+    chat volume and the token spend. Reading one boolean should not hand over
+    the size of the register.
+    """
+    return _service.integrations()
 
 
 @router.get("/overview", response_model=AdminOverview, dependencies=[AdminGuard])

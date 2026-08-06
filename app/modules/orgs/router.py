@@ -33,7 +33,7 @@ from app.modules.orgs.schemas import (
     SlotOut,
 )
 from app.modules.orgs.service import OrgError, OrgsService
-from app.platform.admin_auth import AdminGuard
+from app.platform.admin_auth import require_operator
 from app.platform.db import get_session
 
 router = APIRouter(prefix="/orgs", tags=["orgs"])
@@ -42,6 +42,13 @@ router = APIRouter(prefix="/orgs", tags=["orgs"])
 whitelabel_router = APIRouter(tags=["orgs"])
 
 _service = OrgsService()
+
+# Creating a tenant, listing every tenant and moving one between plans are
+# commercial decisions about the business, not operational ones about a temple.
+# They carried `AdminGuard` ("any authenticated operator"), which meant a
+# support account could read the whole customer list and change what a customer
+# is billed.
+OwnerGuard = Depends(require_operator("owner"))
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 
@@ -52,7 +59,7 @@ _WEB_DIR = Path(__file__).resolve().parents[2] / "web"
     "",
     response_model=OrgOut,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[AdminGuard],
+    dependencies=[OwnerGuard],
 )
 async def create_org(payload: OrgCreate, session: SessionDep) -> OrgOut:
     owner_user_id = None
@@ -84,7 +91,7 @@ async def create_org(payload: OrgCreate, session: SessionDep) -> OrgOut:
     return OrgOut.model_validate(org)
 
 
-@router.get("", response_model=list[OrgOut], dependencies=[AdminGuard])
+@router.get("", response_model=list[OrgOut], dependencies=[OwnerGuard])
 async def list_orgs(session: SessionDep) -> list[OrgOut]:
     return [OrgOut.model_validate(o) for o in await _service.list_orgs(session)]
 
@@ -257,7 +264,7 @@ async def subscribe(
 
 @router.post(
     "/{handle}/plan",
-    dependencies=[AdminGuard],
+    dependencies=[OwnerGuard],
     summary="Ops lever: set an org's plan/billing state manually (admin)",
 )
 async def set_plan(handle: str, payload: dict, session: SessionDep) -> dict:

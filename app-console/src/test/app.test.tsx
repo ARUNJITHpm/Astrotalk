@@ -206,13 +206,14 @@ describe('session lifetime', () => {
   })
 })
 
-describe('stub sections', () => {
-  it('name what will live there instead of dead-ending', async () => {
+describe('the carried-over sections', () => {
+  it('render their own screen rather than a placeholder', async () => {
     sessionStorage.setItem('nithara.console.token', 'the-admin-token')
     sessionStorage.setItem('nithara.console.token_kind', 'admin_token')
     vi.stubGlobal('fetch', stubApi(OWNER))
     renderAt('/system/integrations')
     expect(await screen.findByRole('heading', { name: 'Integrations' })).toBeVisible()
-    expect(screen.getByText(/live\/mock status/i)).toBeVisible()
+    // The wording the placeholder used. Its absence is the assertion.
+    expect(screen.queryByText(/not built yet/i)).toBeNull()
   })
 })

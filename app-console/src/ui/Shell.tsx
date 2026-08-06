@@ -40,17 +40,10 @@ export function Shell() {
                   to={item.path}
                   end={item.path === '/'}
                   className={({ isActive }) =>
-                    [
-                      'navitem',
-                      isActive ? 'navitem--on' : '',
-                      item.stub ? 'navitem--stub' : '',
-                    ]
-                      .filter(Boolean)
-                      .join(' ')
+                    ['navitem', isActive ? 'navitem--on' : ''].filter(Boolean).join(' ')
                   }
                 >
                   {item.label}
-                  {item.stub && <span className="navitem__soon">soon</span>}
                 </NavLink>
               ))}
             </div>

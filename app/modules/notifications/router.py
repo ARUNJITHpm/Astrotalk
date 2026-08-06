@@ -2,7 +2,8 @@
 
 POST /notifications/run-festivals is a scheduled "cron endpoint" — an
 external scheduler (the same one that fires /content/run-daily) calls it
-each morning with the X-Cron-Token; admins can trigger it manually too.
+each morning with the X-Cron-Token; the owner can trigger it manually from
+the console's Channels → Notifications screen.
 """
 
 from datetime import date
@@ -18,10 +19,17 @@ from app.modules.notifications.schemas import (
     NakshatramReminderSummary,
 )
 from app.modules.notifications.service import NotificationsService
-from app.platform.cron_auth import CronOrAdminGuard
+from app.platform.cron_auth import require_cron_or_operator
 from app.platform.db import get_session
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
+
+# Owner, not "any operator". Both runs put messages on real devotees' phones,
+# and GUARDRAILS §3 makes the first live WhatsApp send a human-approval gate —
+# a decision that belongs to the person who owns the number, not to whoever
+# happens to be signed in. The cron branch is untouched: the scheduler holds a
+# secret, not a role.
+CronOrOwnerGuard = Depends(require_cron_or_operator("owner"))
 
 _service = NotificationsService()
 
@@ -47,7 +55,7 @@ async def register_device(
 @router.post(
     "/run-nakshatram-reminders",
     response_model=NakshatramReminderSummary,
-    dependencies=[CronOrAdminGuard],
+    dependencies=[CronOrOwnerGuard],
     summary="Push star-day reminders T-3 days out (scheduled; idempotent)",
 )
 async def run_nakshatram_reminders(
@@ -61,7 +69,7 @@ async def run_nakshatram_reminders(
 
 @router.post(
     "/run-festivals",
-    dependencies=[CronOrAdminGuard],
+    dependencies=[CronOrOwnerGuard],
     summary="Send T-3-day festival updates to subscribers (scheduled; idempotent)",
 )
 async def run_festivals(

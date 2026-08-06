@@ -2,9 +2,10 @@
 
 Access levels:
   - POST /content/run-daily — the scheduled trigger (X-Cron-Token; an external
-    scheduler like GitHub Actions cron fires it each morning).
-  - /content/posts...      — the review/approve/publish surface for the /admin
-    Content tab (X-Admin-Token).
+    scheduler like GitHub Actions cron fires it each morning), or an owner /
+    content_reviewer pressing "generate now" in the console.
+  - /content/posts..., /content/studio... — the review/approve/publish surface,
+    owner or content_reviewer.
   - POST /content/cards     — personal share cards (logged-in users).
   - GET /content/cards/daily/{nakshatra} + GET /s/{slug} — public virality
     surfaces (Part 2): cacheable daily cards and the OG-tagged landing page.
@@ -41,9 +42,9 @@ from app.modules.content.service import (
 )
 from app.modules.identity.auth import CurrentUser
 from app.modules.identity.service import IdentityService
-from app.platform.admin_auth import AdminGuard, Operator, require_operator
+from app.platform.admin_auth import Operator, require_operator
 from app.platform.config import get_settings
-from app.platform.cron_auth import CronOrAdminGuard
+from app.platform.cron_auth import require_cron_or_operator
 from app.platform.db import get_session
 from app.platform.storage import get_storage
 
@@ -75,6 +76,16 @@ SessionDep = Annotated[AsyncSession, Depends(get_session)]
 FeedEditorDep = Annotated[
     Operator, Depends(require_operator("owner", "content_reviewer"))
 ]
+# The same pairing as a `dependencies=[...]` entry, for the routes that have no
+# use for the Operator object itself.
+#
+# These were `AdminGuard` — "any authenticated operator" — which was accurate
+# when the only credential was the owner's shared token and is not any more. A
+# support account exists to answer devotees' questions; publishing to the
+# product's public channels is not part of that job, and the console's own IA
+# has never claimed it was.
+ReviewerGuard = Depends(require_operator("owner", "content_reviewer"))
+CronOrReviewerGuard = Depends(require_cron_or_operator("owner", "content_reviewer"))
 
 
 # ---- App feed CRUD (console plan Part 8) ----
@@ -192,7 +203,7 @@ def _card_out(card: ShareCard, request: Request) -> ShareCardOut:
 @router.post(
     "/run-daily",
     response_model=RunDailySummary,
-    dependencies=[CronOrAdminGuard],
+    dependencies=[CronOrReviewerGuard],
     summary="Draft today's content pack (scheduled or admin-triggered; idempotent)",
 )
 async def run_daily(
@@ -202,7 +213,7 @@ async def run_daily(
     return await _service.run_daily(session, day)
 
 
-@router.get("/posts", response_model=list[ContentPostOut], dependencies=[AdminGuard])
+@router.get("/posts", response_model=list[ContentPostOut], dependencies=[ReviewerGuard])
 async def list_posts(
     session: SessionDep,
     day: Annotated[date | None, Query(description="Filter to one day")] = None,
@@ -213,7 +224,7 @@ async def list_posts(
 @router.post(
     "/posts/{post_id}/approve",
     response_model=ContentPostOut,
-    dependencies=[AdminGuard],
+    dependencies=[ReviewerGuard],
     summary="Approve a draft (optionally with an inline text edit)",
 )
 async def approve_post(
@@ -230,7 +241,7 @@ async def approve_post(
 @router.post(
     "/posts/{post_id}/publish",
     response_model=ContentPostOut,
-    dependencies=[AdminGuard],
+    dependencies=[ReviewerGuard],
     summary="Publish an approved post to its platform",
 )
 async def publish_post(session: SessionDep, post_id: int) -> ContentPostOut:
@@ -245,7 +256,7 @@ async def publish_post(session: SessionDep, post_id: int) -> ContentPostOut:
 @router.post(
     "/posts/{post_id}/mark-published",
     response_model=ContentPostOut,
-    dependencies=[AdminGuard],
+    dependencies=[ReviewerGuard],
     summary="Mark a daily post published-by-hand (paste the post URL)",
 )
 async def mark_post_published(
@@ -266,7 +277,7 @@ async def mark_post_published(
     "/generate",
     response_model=StudioDraftOut,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[AdminGuard],
+    dependencies=[ReviewerGuard],
     summary="Generate one creative studio draft (reel/weekly/festival/nakshatra/myth)",
 )
 async def generate_studio(session: SessionDep, payload: StudioGeneratePayload) -> StudioDraftOut:
@@ -281,7 +292,7 @@ async def generate_studio(session: SessionDep, payload: StudioGeneratePayload) -
 @router.get(
     "/studio",
     response_model=list[StudioDraftOut],
-    dependencies=[AdminGuard],
+    dependencies=[ReviewerGuard],
     summary="List studio drafts (newest first)",
 )
 async def list_studio(session: SessionDep) -> list[StudioDraftOut]:
@@ -291,7 +302,7 @@ async def list_studio(session: SessionDep) -> list[StudioDraftOut]:
 @router.post(
     "/studio/{draft_id}/approve",
     response_model=StudioDraftOut,
-    dependencies=[AdminGuard],
+    dependencies=[ReviewerGuard],
     summary="Approve a studio draft (optionally with an inline edit)",
 )
 async def approve_studio(
@@ -306,7 +317,7 @@ async def approve_studio(
 @router.post(
     "/studio/{draft_id}/mark-published",
     response_model=StudioDraftOut,
-    dependencies=[AdminGuard],
+    dependencies=[ReviewerGuard],
     summary="Mark a studio draft posted-by-hand (paste the YouTube/Instagram URL)",
 )
 async def mark_studio_published(
@@ -321,7 +332,7 @@ async def mark_studio_published(
 @router.delete(
     "/studio/{draft_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    dependencies=[AdminGuard],
+    dependencies=[ReviewerGuard],
     summary="Delete a studio draft",
 )
 async def delete_studio(session: SessionDep, draft_id: int) -> None:

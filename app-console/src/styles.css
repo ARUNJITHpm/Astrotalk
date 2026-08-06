@@ -220,20 +220,6 @@ body {
   font-weight: 600;
 }
 
-.navitem--stub {
-  color: var(--ink-soft);
-}
-
-.navitem__soon {
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--ink-soft);
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 1px 6px;
-}
-
 .sidebar__foot {
   padding: 12px 18px 16px;
   border-top: 1px solid var(--line);
@@ -261,14 +247,6 @@ body {
 .page__lede {
   margin: 0 0 22px;
   color: var(--ink-soft);
-}
-
-.stub__note {
-  padding: 12px 14px;
-  border: 1px dashed var(--line);
-  border-radius: var(--radius);
-  color: var(--ink-soft);
-  max-width: 60ch;
 }
 
 .banner {
@@ -808,4 +786,302 @@ ul.banner {
   .snippet {
     background: #0f151b;
   }
+}
+
+/* ---- WhatsApp simulator (Part 13) ----
+
+   Ported from app/web/whatsapp.html. It keeps its own palette, hardcoded
+   rather than drawn from the console's variables, and it is the one block here
+   that does NOT follow the dark-mode switch above. That is the point: the whole
+   value of this screen is that it looks like the thing being tested. A WhatsApp
+   bubble is a specific green on a specific wallpaper, and rendering it in the
+   console's greys — or inverted at night — would make it useless for judging
+   what a devotee is actually going to see. */
+
+.wa {
+  --wa-green: #075e54;
+  --wa-teal: #128c7e;
+  --wa-out: #dcf8c6;
+  --wa-in: #ffffff;
+  --wa-bg: #efeae2;
+  --wa-ink: #111b21;
+  --wa-muted: #667781;
+  --wa-tick: #53bdeb;
+
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 460px;
+  height: 620px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--wa-bg);
+  color: var(--wa-ink);
+  font-family: 'Noto Sans Malayalam', system-ui, 'Segoe UI', sans-serif;
+}
+
+.wa__head {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--wa-green);
+  color: #fff;
+}
+
+.wa__avatar {
+  display: flex;
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #25d366;
+  font-size: 19px;
+}
+
+.wa__meta {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  line-height: 1.3;
+}
+
+.wa__name {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.wa__status {
+  overflow: hidden;
+  color: #cfe9e2;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wa__switch {
+  flex-shrink: 0;
+  padding: 5px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 6px;
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+}
+
+.wa__chat {
+  display: flex;
+  overflow-y: auto;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+  padding: 14px 10px 10px;
+}
+
+.wa__day,
+.wa__note {
+  align-self: center;
+  max-width: 92%;
+  margin: 0 0 8px;
+  border-radius: 8px;
+  font-size: 12px;
+  text-align: center;
+}
+
+.wa__day {
+  padding: 5px 12px;
+  background: #fff;
+  color: var(--wa-muted);
+}
+
+.wa__note {
+  padding: 8px 14px;
+  background: #ffeecd;
+  color: #7a6a3a;
+  line-height: 1.5;
+}
+
+.wa__bubble {
+  position: relative;
+  max-width: 82%;
+  margin-bottom: 2px;
+  padding: 6px 9px 8px;
+  border-radius: 8px;
+  box-shadow: 0 1px 0.5px rgba(0, 0, 0, 0.13);
+  font-size: 14.5px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.wa__bubble--in {
+  align-self: flex-start;
+  border-top-left-radius: 2px;
+  background: var(--wa-in);
+}
+
+.wa__bubble--out {
+  align-self: flex-end;
+  border-top-right-radius: 2px;
+  background: var(--wa-out);
+}
+
+.wa__stamp {
+  display: inline-flex;
+  align-items: center;
+  float: right;
+  margin: 6px 0 -2px 8px;
+  color: var(--wa-muted);
+  font-size: 10.5px;
+  gap: 3px;
+}
+
+.wa__tick {
+  color: var(--wa-tick);
+  font-size: 13px;
+  line-height: 1;
+}
+
+.wa__typing {
+  display: inline-flex;
+  padding: 3px 2px;
+  gap: 4px;
+}
+
+.wa__typing span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #9aa6ac;
+  animation: wa-bounce 1.2s infinite ease-in-out;
+}
+
+.wa__typing span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.wa__typing span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes wa-bounce {
+  0%,
+  60%,
+  100% {
+    opacity: 0.5;
+    transform: translateY(0);
+  }
+
+  30% {
+    opacity: 1;
+    transform: translateY(-4px);
+  }
+}
+
+/* Respect a reduced-motion preference: the dots are decoration, and the
+   "typing…" word in the header already carries the meaning. */
+@media (prefers-reduced-motion: reduce) {
+  .wa__typing span {
+    animation: none;
+  }
+}
+
+.wa__composer {
+  display: flex;
+  flex-shrink: 0;
+  align-items: flex-end;
+  padding: 8px 10px;
+  gap: 8px;
+}
+
+.wa__input {
+  flex: 1;
+  max-height: 120px;
+  padding: 10px 14px;
+  border: none;
+  border-radius: 20px;
+  background: #fff;
+  color: var(--wa-ink);
+  font: inherit;
+  font-size: 15px;
+  outline: none;
+  resize: none;
+}
+
+.wa__send {
+  display: flex;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: var(--wa-teal);
+  color: #fff;
+  cursor: pointer;
+  font-size: 19px;
+}
+
+.wa__send:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.wa__gate {
+  position: absolute;
+  z-index: 5;
+  display: grid;
+  padding: 24px;
+  background: rgba(6, 40, 36, 0.92);
+  inset: 0;
+  place-items: center;
+}
+
+.wa__gatecard {
+  width: 100%;
+  max-width: 320px;
+  padding: 24px 22px;
+  border-radius: 14px;
+  background: #fff;
+  color: var(--wa-ink);
+  text-align: center;
+}
+
+.wa__gatecard h2 {
+  margin: 0 0 6px;
+  font-size: 18px;
+}
+
+.wa__gatecard p {
+  margin: 0 0 16px;
+  color: var(--wa-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.wa__gatecard input {
+  width: 100%;
+  margin-bottom: 6px;
+  padding: 11px 12px;
+  border: 1px solid #d5dbdc;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 15px;
+  outline: none;
+}
+
+.wa__gateerr {
+  min-height: 18px;
+  margin: 0 0 10px;
+  color: #d33;
+  font-size: 13px;
 }

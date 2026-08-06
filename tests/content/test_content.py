@@ -143,6 +143,38 @@ async def test_approve_applies_inline_edit_and_publish_lifecycle(session):
 
 
 @pytest.mark.asyncio
+async def test_a_failed_publish_can_be_retried(session, monkeypatch):
+    """A publish that fell over must not strand the piece for good.
+
+    Every route out of ``failed`` used to be shut: approve refused it, publish
+    only takes ``approved``, mark-published only takes ``approved``/``draft``,
+    and ``run_daily`` skips any platform that already has a row for the day
+    whatever its status. So one timed-out channel call permanently lost that
+    morning's WhatsApp piece, with nothing in the console able to touch it.
+    """
+    from app.modules.content import publishers
+
+    service = ContentService()
+    await service.run_daily(session, _DAY)
+    posts = await service.list_posts(session, _DAY)
+    wa = next(p for p in posts if p.platform == "wa_channel")
+    await service.approve(session, wa.id)
+
+    async def _boom(platform: str, body: str) -> str:
+        raise publishers.PublishError("channel timed out")
+
+    monkeypatch.setattr(publishers, "publish", _boom)
+    failed = await service.publish(session, wa.id)
+    assert failed.status == "failed"
+
+    # The way back.
+    monkeypatch.undo()
+    retried = await service.approve(session, wa.id)
+    assert retried.status == "approved"
+    assert (await service.publish(session, wa.id)).status == "published"
+
+
+@pytest.mark.asyncio
 async def test_content_http_surface_gating_and_flow(session, monkeypatch):
     # Admin endpoints demand X-Admin-Token; run-daily takes cron OR admin.
     monkeypatch.setattr(get_settings(), "cron_token", "cron-secret")

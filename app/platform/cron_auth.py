@@ -86,3 +86,45 @@ async def require_cron_or_admin(
 
 
 CronOrAdminGuard = Depends(require_cron_or_admin)
+
+
+def require_cron_or_operator(*roles: str):
+    """Like ``require_cron_or_admin``, but the operator must hold one of ``roles``.
+
+    ``require_cron_or_admin`` accepts *any* authenticated operator, which was the
+    right coarse answer when the only console credential was the owner's shared
+    token. Now that operators sign in with granted roles, "any operator" lets a
+    support account fire a job that drafts content or sends WhatsApp messages.
+
+    The cron branch is unchanged: the scheduler holds a secret, not a role.
+    """
+
+    async def _dep(
+        session: Annotated[AsyncSession, Depends(get_session)],
+        credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)] = None,
+        x_cron_token: Annotated[str | None, Header()] = None,
+        x_admin_token: Annotated[str | None, Header()] = None,
+    ) -> None:
+        from app.platform.admin_auth import resolve_operator
+
+        try:
+            await require_cron(x_cron_token)
+            return
+        except HTTPException:
+            pass
+
+        bearer = credentials.credentials if credentials else ""
+        operator = await resolve_operator(session, bearer, x_admin_token)
+        if operator is None:
+            raise HTTPException(
+                status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or missing cron or admin credentials",
+            )
+        # 403, not 401: we know who they are, and re-authenticating will not help.
+        if roles and not operator.is_owner and not (operator.roles & set(roles)):
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                detail="Your role does not allow this",
+            )
+
+    return _dep

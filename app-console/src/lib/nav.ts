@@ -24,10 +24,6 @@ export interface NavItem {
   label: string
   /** Non-owner roles allowed here. Empty = owner only. */
   roles: Role[]
-  /** Rendered greyed with a "soon" marker; the route still resolves to a stub. */
-  stub?: boolean
-  /** One-line "what is this for", shown in the stub page. */
-  blurb?: string
   /**
    * Routes that belong to this section but are not sidebar entries — a detail
    * page reached from its list, written as a react-router pattern
@@ -108,98 +104,42 @@ export const NAV: NavGroup[] = [
     title: 'Content',
     items: [
       { path: '/content/feed', label: 'App feed', roles: ['content_reviewer'] },
-      {
-        path: '/content/daily',
-        label: 'Daily pack',
-        roles: ['content_reviewer'],
-        stub: true,
-        blurb: 'The scheduled daily content pack. Two implementations exist and need deduping.',
-      },
-      {
-        path: '/content/studio',
-        label: 'Studio',
-        roles: ['content_reviewer'],
-        stub: true,
-        blurb: 'On-demand reel scripts and episodes, posted by hand.',
-      },
-      {
-        path: '/content/cards',
-        label: 'Share cards',
-        roles: ['content_reviewer'],
-        stub: true,
-        blurb: 'Rendered branded images and their /s/ landing pages.',
-      },
+      { path: '/content/daily', label: 'Daily pack', roles: ['content_reviewer'] },
+      { path: '/content/studio', label: 'Studio', roles: ['content_reviewer'] },
+      { path: '/content/cards', label: 'Share cards', roles: ['content_reviewer'] },
     ],
   },
   {
     title: 'Astrology',
     items: [
-      {
-        path: '/astrology/panchangam',
-        label: 'Panchangam',
-        roles: ['support'],
-        stub: true,
-        blurb: 'Date explorer for the panchangam engine.',
-      },
-      {
-        path: '/astrology/suggest',
-        label: 'Temple suggest',
-        roles: ['support'],
-        stub: true,
-        blurb: 'Tester for the concern → temple suggestion path.',
-      },
+      // Testers for engines the whole product depends on. `support` reaches
+      // them because "is the panchangam right today" is the first question
+      // behind half the complaints they field, and neither screen accepts or
+      // returns birth data.
+      { path: '/astrology/panchangam', label: 'Panchangam', roles: ['support'] },
+      { path: '/astrology/suggest', label: 'Temple suggest', roles: ['support'] },
     ],
   },
   {
     title: 'Channels',
     items: [
-      {
-        path: '/channels/whatsapp',
-        label: 'WhatsApp sim',
-        roles: [],
-        stub: true,
-        blurb: 'The existing /whatsapp simulator, carried over.',
-      },
-      {
-        path: '/channels/notifications',
-        label: 'Notifications',
-        roles: [],
-        stub: true,
-        blurb: 'Nakshatram reminders and festival runs.',
-      },
+      // Both owner-only, and both for the same reason rather than by analogy:
+      // the simulator speaks AS any number, and a notification run speaks TO
+      // real ones. See tests/platform/test_carried_over_guards.py.
+      { path: '/channels/whatsapp', label: 'WhatsApp sim', roles: [] },
+      { path: '/channels/notifications', label: 'Notifications', roles: [] },
     ],
   },
   {
     title: 'System',
     items: [
-      {
-        path: '/system/integrations',
-        label: 'Integrations',
-        roles: [],
-        stub: true,
-        blurb: 'Health and live/mock status for every external service.',
-      },
-      {
-        path: '/system/chat',
-        label: 'Chat explorer',
-        roles: ['support'],
-        stub: true,
-        blurb: 'Read-only chat history, for support.',
-      },
-      {
-        path: '/system/tenants',
-        label: 'Org tenants',
-        roles: [],
-        stub: true,
-        blurb: 'White-label organisations.',
-      },
-      {
-        path: '/system/settings',
-        label: 'Settings',
-        roles: [],
-        stub: true,
-        blurb: 'Service fee, admin token and role defaults.',
-      },
+      // Integrations is owner-only because it enumerates which credentials are
+      // configured. Not the values — the endpoint never sends those — but the
+      // shape of the installation is still not a support-level fact.
+      { path: '/system/integrations', label: 'Integrations', roles: [] },
+      { path: '/system/chat', label: 'Chat explorer', roles: ['support'] },
+      { path: '/system/tenants', label: 'Org tenants', roles: [] },
+      { path: '/system/settings', label: 'Settings', roles: [] },
     ],
   },
 ]

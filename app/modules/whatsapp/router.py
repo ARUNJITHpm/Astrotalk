@@ -30,7 +30,7 @@ from app.modules.whatsapp.schemas import (
 )
 from app.modules.whatsapp.service import WhatsappService
 from app.modules.whatsapp.waha_client import WAHAClient, _chat_id_to_phone, _with_disclosure
-from app.platform.admin_auth import AdminGuard
+from app.platform.admin_auth import AdminGuard, require_operator
 from app.platform.config import get_settings
 from app.platform.db import get_session
 from app.platform.logging_config import get_logger
@@ -38,6 +38,12 @@ from app.platform.logging_config import get_logger
 logger = get_logger(__name__)
 
 router = APIRouter(prefix="/whatsapp", tags=["whatsapp"])
+
+# The simulator lets the caller act as ANY phone number and get that person's
+# personalised reading back. `AdminGuard` — any authenticated operator — was
+# therefore a way for a temple_admin or a support account to read a devotee's
+# private conversation by typing their mobile. Owner only.
+OwnerGuard = Depends(require_operator("owner"))
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 
@@ -397,7 +403,7 @@ async def cloud_webhook(request: Request, session: SessionDep) -> dict[str, str]
 # ---- WhatsApp simulator (the /whatsapp demo page) ----
 
 
-@router.post("/simulate", response_model=SimulateResponse, dependencies=[AdminGuard])
+@router.post("/simulate", response_model=SimulateResponse, dependencies=[OwnerGuard])
 async def simulate_message(
     payload: SimulateRequest, session: SessionDep
 ) -> SimulateResponse:
@@ -406,8 +412,8 @@ async def simulate_message(
     sending it via WAHA. Used by the /whatsapp demo page to test the exact flow
     a real WhatsApp user would get.
 
-    Admin-gated (X-Admin-Token): the caller can act as ANY phone number, which
-    would otherwise expose other users' personalised readings.
+    Owner-gated: the caller can act as ANY phone number, which would otherwise
+    expose other users' personalised readings.
     """
     from app.modules.identity.service import normalize_phone
 

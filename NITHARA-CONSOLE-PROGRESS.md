@@ -954,6 +954,137 @@ server refuses. A nav test now pins the whole PEOPLE group as owner-only.
 - **The invite token is shown on screen.** There is no mail transport on this
   deployment, and saying so beats a "check your inbox" that never arrives.
 
+## Part 13 — the carried-over sections — 2026-08-06
+
+CONTENT (app feed, daily pack, studio, share cards), ASTROLOGY (panchangam,
+temple suggest), CHANNELS (WhatsApp simulator, notifications) and SYSTEM
+(integrations, chat explorer, tenants, settings). Twelve screens, so every route
+the IA declares now has a real page behind it. 57 console tests added
+(161 -> 218) and 12 backend (538 -> 550); `ruff check app tests` still 123.
+
+### The finding: `AdminGuard` stopped meaning what it says
+
+Every carried-over endpoint sat behind `AdminGuard`, which resolves to **any
+authenticated operator**. That was an accurate description of the world when the
+only credential was the owner's shared token. Part 4 gave operators real accounts
+with granted roles, and from that moment the same declaration meant something
+quite different:
+
+- a **support** account could approve and publish to the product's public
+  channels;
+- a **temple_admin** could open any devotee's chat transcript;
+- either could type a stranger's mobile into `POST /whatsapp/simulate` and read
+  back that person's personalised reading — the exact hazard the route's own
+  docstring named;
+- either could read the white-label customer list and change what a tenant is
+  billed;
+- either could fire a notification run.
+
+Nothing in the console's IA ever claimed those were allowed. The gap was
+invisible because the sidebar hid the pages, and hiding a nav item is not access
+control. Each is now `require_operator(...)` matching the IA, with a new
+`require_cron_or_operator(*roles)` so the scheduler keeps its own door:
+
+| surface | was | now |
+|---|---|---|
+| `/content/posts`, `/content/studio`, `/content/generate` | any operator | owner or content_reviewer |
+| `POST /content/run-daily` | cron or any operator | cron, owner or content_reviewer |
+| `/notifications/run-*` | cron or any operator | cron or owner |
+| `POST /whatsapp/simulate` | any operator | owner |
+| `/admin/users-chats`, `/admin/user-chat/{phone}` | any operator | owner or support |
+| `GET /orgs`, `POST /orgs`, `POST /orgs/{h}/plan` | any operator | owner |
+
+`tests/platform/test_carried_over_guards.py` (12 tests) pins the negative case
+for each — a 200 for the right role proves the screen works; only a 403 for the
+wrong one proves the door is shut.
+
+### A failed publish stranded the piece for good
+
+Found while writing `postActions`. A publish that fell over — channel timeout,
+expired token — left the row `failed`, and **every** route out was closed:
+`approve` refused it, `publish` only takes `approved`, `mark_post_published`
+only takes `approved`/`draft`, and `run_daily` skips any platform that already
+has a row for the day whatever its status. One transient network error
+permanently lost that morning's piece, with nothing in any console able to touch
+it.
+
+`ContentService.approve` now accepts `failed`, which is the retry path back to
+publish. Backend test `test_a_failed_publish_can_be_retried` fakes the
+`PublishError` and walks the piece home.
+
+### Publish does not publish
+
+Only `wa_channel` has a wired publisher. `fb_post`, `ig_reel` and `yt_short` go
+through adapters that log the body, return an id ending `:mock` — and the row is
+then recorded as **published**, with a timestamp, in the list an operator reads
+to decide what still needs doing. Pressing Publish on a Facebook piece looks
+exactly like it worked.
+
+`publishNote(platform, whatsappLive)` says which button does what *before* it is
+pressed, and the same honesty runs through the section: the notification screen
+narrates every `sent: 12` through the integration state (`sendReality`), because
+"12 sent" is the sentence an operator repeats to a temple; the integrations
+table spells out what each mocked service costs in the operator's terms rather
+than showing a green/grey pill; the panchangam page will not show figures
+without saying the ephemeris is a stand-in.
+
+### `GET /admin/integrations`
+
+The live/mock flag only existed on `/admin/overview`, beside the devotee count,
+the chat volume and the token spend. The daily-pack screen is a
+content_reviewer's, and needs that one boolean to label its Publish button —
+pulling the whole analytics payload to read it would hand a reviewer the size of
+the register as a side effect. The new route returns `{app_env, integrations}`
+to any operator, and deliberately **not** `api_keys_present`, which stays on the
+owner-gated `overview`.
+
+### The WhatsApp simulator is a page now, not a link
+
+Ported `app/web/whatsapp.html` (413 lines) into `ui/channels/WhatsAppSim.tsx`
+with its palette intact — the phone frame, bubbles, ticks, typing dots and the
+Tele-MANAS line. Until the Cloud API send timeout is fixed this simulator *is*
+our WhatsApp surface, and a surface you leave the tool to reach is one nobody
+checks. It looks like WhatsApp on purpose: the thing under test is what a
+devotee sees on a phone, and none of that is visible in a JSON pane.
+
+Two changes from the original. The admin-token box is gone — the operator is
+already signed in, and a second credential typed into a page is a credential in
+`localStorage`. And a banner says what the page does: whatever is typed reaches
+the live conversation state for that number, so sending as a real devotee's
+mobile moves their onboarding along as if they had written in themselves.
+
+`normalizePhone` mirrors `identity/service.py` digit for digit. The phone is the
+identity key across SQL, chat history and WhatsApp sessions, so a console that
+normalised differently would open a *second* conversation for someone who
+already has one — and show an empty history for a devotee who has been writing
+in for months.
+
+### Smaller things
+
+- **The stub machinery is gone.** `ui/Stub.tsx`, `NavItem.stub`/`.blurb`, their
+  CSS and the sidebar's "soon" marker. Two nav tests replace them, pinning both
+  directions: every declared route has a screen, and every screen is declared.
+- **The app feed screen was built too**, though the plan filed it under Part 8.
+  It was the one nav entry with no `stub` marker and no screen — a sidebar item
+  that rendered a placeholder. `feedProblem` mirrors `feed_admin._validate`,
+  including the attribution rule: a card with no `who_en` reads as an anonymous
+  authority making claims about somebody's temple (GUARDRAILS §1).
+- **The chat explorer shows the user's message and the reply, not the prompt.**
+  The stored request carries the persona, retrieved context and prior turns;
+  only the last user message belongs on screen. And there is no reply box — the
+  moment a console can post into somebody's conversation, the transcript stops
+  being evidence.
+- **The settings permission table is generated from `lib/nav.ts`**, the same
+  table the sidebar and the route guard read, so it cannot describe a permission
+  the tool does not enforce. The shared admin token is named and never shown.
+- **The tenants screen offers "leave it as it is" for billing.** The endpoint
+  takes plan and billing together and the list does not report the current
+  billing state, so a plain dropdown would set a status nobody chose the moment
+  somebody opened a row and pressed Save.
+- **Fixed a time bomb in `tests/temples/test_temple_partners.py`**: a festival
+  hardcoded to `2026-08-01`, which the microsite stopped listing on 2026-08-02
+  because it only shows upcoming days. Now `today + 30`.
+
 ## Standing items
 - **Two migrations are unapplied in production**, both additive and both
   reversible: `e1f2a3b4c5d6` (Part 7's booking operator columns — the whole
@@ -970,6 +1101,9 @@ server refuses. A nav test now pins the whole PEOPLE group as owner-only.
   Every row is marked (`NTDEMO…` refs, `+9199000000…` phones, `order_demo_…`,
   `[demo]`, `demo-…`), so `--purge` removes exactly those and nothing else.
   **Remove it before launch.**
+- **`/whatsapp` and the old `/console` are now duplicated by the console.** Part
+  14 deletes `admin.html`, `admin.js`, `console.html` and `whatsapp.html`; until
+  then two implementations of the daily pack and of the simulator are live.
 - Baselines to hold: `ruff check app tests` ≤ 129; full suite green apart from
   the 2 pre-existing `tests/whatsapp/test_whatsapp.py` failures caused by local
   `.env` having `MOCK_WHATSAPP=false`.

@@ -94,6 +94,12 @@ export const apiPost = <T>(path: string, body?: unknown): Promise<T> =>
     body: body === undefined ? undefined : JSON.stringify(body),
   })
 
+export const apiPut = <T>(path: string, body?: unknown): Promise<T> =>
+  api<T>(path, {
+    method: 'PUT',
+    body: body === undefined ? undefined : JSON.stringify(body),
+  })
+
 export const apiPatch = <T>(path: string, body?: unknown): Promise<T> =>
   api<T>(path, {
     method: 'PATCH',

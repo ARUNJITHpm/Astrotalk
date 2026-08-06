@@ -500,7 +500,24 @@ Build the PEOPLE group against Parts 6 and 8.
 - Engagement: check-ins, streaks, milestones.
 ```
 
-## Part 13 — Carried-over sections (incl. the WhatsApp simulator)
+## Part 13 — Carried-over sections (incl. the WhatsApp simulator)  ✅ DONE
+
+> **Not the lowest-risk part it looked like.** The endpoints all existed, and
+> every one of them sat behind `AdminGuard` — *any authenticated operator* —
+> which stopped being an accurate description the moment Part 4 gave operators
+> real roles. Support could publish to the product's channels; a temple_admin
+> could read any devotee's chat or impersonate any mobile in the simulator.
+> Six surfaces re-gated, pinned by `tests/platform/test_carried_over_guards.py`.
+>
+> Two other findings: a **failed publish stranded the piece permanently** (every
+> route out of `failed` was closed), and **Publish does not publish** for three
+> of the four platforms — the row is recorded as published with a timestamp and
+> nothing reached Facebook. Both are now handled rather than hidden.
+>
+> The app-feed screen (filed under Part 8) was built here too: it was the one
+> nav entry with a route, no stub marker and no screen. Every declared route now
+> has a real page, so `ui/Stub.tsx` and the `stub`/`blurb` fields are gone.
+
 ```
 Port the panels that already work today, so /admin and /console can be deleted:
 - CONTENT: daily pack, studio, share cards. NOTE the daily pack is implemented
