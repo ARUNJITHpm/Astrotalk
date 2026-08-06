@@ -95,36 +95,59 @@ check "GET /temples → 53"          53  "$(body '/temples?limit=200' | grep -o 
 check "GET /astrologers → 28"      28  "$(body /astrologers | grep -o '"id":' | wc -l | tr -d ' ')"
 
 echo
-echo "--- the React operator console at /console-app (Part 9) ---"
-check "GET /console-app"              200 "$(code /console-app)"
-check "trailing slash"                200 "$(code /console-app/)"
+echo "--- the React operator console at /console (Parts 9-14) ---"
+check "GET /console"                  200 "$(code /console)"
+check "trailing slash"                200 "$(code /console/)"
 # react-router owns everything under the prefix: a bookmarked section is the
 # normal way an operator returns to work, so a deep link must reach the shell.
-check "deep link /console-app/people/users" 200 "$(code /console-app/people/users)"
-check "deep link /console-app/bookings"     200 "$(code /console-app/bookings)"
+check "deep link /console/people/users" 200 "$(code /console/people/users)"
+check "deep link /console/bookings"     200 "$(code /console/bookings)"
 check "the shell is the console, not the PWA" "yes" \
-  "$(body /console-app | grep -qi 'Nithara Console' && echo yes || echo no)"
+  "$(body /console | grep -qi 'Nithara Console' && echo yes || echo no)"
 check "console and consumer app are different pages" "different" \
-  "$( [ "$(body / | md5sum)" = "$(body /console-app | md5sum)" ] && echo same || echo different )"
-# Exact-matching "/console-app" would leave deep links cacheable — how an
-# operator ends up on yesterday's build after a deploy.
-check "shell is no-store"             "no-store" "$(header /console-app 'cache-control')"
+  "$( [ "$(body / | md5sum)" = "$(body /console | md5sum)" ] && echo same || echo different )"
+# Exact-matching "/console" would leave deep links cacheable — how an operator
+# ends up on yesterday's build after a deploy.
+check "shell is no-store"             "no-store" "$(header /console 'cache-control')"
 check "deep link is no-store too"     "no-store" \
-  "$(header /console-app/bookings/payments 'cache-control')"
+  "$(header /console/bookings/payments 'cache-control')"
 # Vite content-hashes these, and they live under the console's own base — the
 # consumer app's bare /assets/ prefix would miss them entirely.
-CONSOLE_JS=$(body /console-app | grep -oE '/console-app/assets/[^"]+\.js' | head -1)
+CONSOLE_JS=$(body /console | grep -oE '/console/assets/[^"]+\.js' | head -1)
 check "shell references a hashed bundle" "yes" \
   "$( [ -n "$CONSOLE_JS" ] && echo yes || echo no )"
 check "that bundle is served"         200 "$(code "$CONSOLE_JS")"
+# The assets mount is registered BEFORE the catch-all; if that order ever
+# flipped, every bundle would be served the HTML shell with a 200 and the
+# console would boot to a blank page.
 check "and cached immutably"          "yes" \
   "$(header "$CONSOLE_JS" 'cache-control' | grep -q immutable && echo yes || echo no)"
+check "the bundle is JS, not the shell" "yes" \
+  "$(curl -s -D - -o /dev/null "http://localhost:$PORT$CONSOLE_JS" \
+      | grep -qi 'content-type: text/javascript' && echo yes || echo no)"
 # The mount is scoped to a subpath precisely so a catch-all cannot turn a
 # typo'd API call into an HTML 200.
 check "the console did not swallow the API" "no" \
   "$(curl -s -D - -o /dev/null "http://localhost:$PORT/admin/users" \
       | grep -qi 'content-type: text/html' && echo yes || echo no)"
-check "the old /console still works"  200 "$(code /console)"
+
+echo
+echo "--- the retired hand-written pages (Part 14) ---"
+# Bookmarks and the banner older `python main.py` runs printed point at these.
+check "/admin redirects"              308 "$(code /admin)"
+check "  ...to the console"           "/console" "$(header /admin 'location')"
+check "/whatsapp redirects"           308 "$(code /whatsapp)"
+check "  ...to the simulator"         "/console/channels/whatsapp" \
+  "$(header /whatsapp 'location')"
+check "/wa redirects"                 308 "$(code /wa)"
+# The interim address the console stood at between Parts 9 and 14. It is a
+# subpath of nothing now and must 404 rather than quietly still work.
+check "/console-app is gone"          404 "$(code /console-app)"
+# app/web/ still ships shell.js and ui/ — the white-label surface the orgs
+# module serves at /a/{handle}/ui. It is NOT part of the retirement, and the
+# /static mount that carries it must survive.
+check "/static still serves"          200 "$(code /static/shell.js)"
+check "the deleted pages are really gone" 404 "$(code /static/console.html)"
 
 echo
 echo "--- console routes WITH the token ---"
@@ -170,7 +193,7 @@ check "GET /health still fine"     200 "$(code /health)"
 check "GET / still fine"           200 "$(code /)"
 # Locked, not bricked: the console must still LOAD so an operator can read the
 # sign-in error, rather than 404ing and looking like a broken deploy.
-check "the console still loads"    200 "$(code /console-app)"
+check "the console still loads"    200 "$(code /console)"
 check "an empty token authenticates nobody" 401 "$(code /admin/users -H 'X-Admin-Token: ')"
 check "no token → 401"             401 "$(code /admin/users)"
 check "old backdoor → 401"         401 "$(code /admin/users -H 'X-Admin-Token: chargemod')"

@@ -12,6 +12,19 @@
   --warn-bg: #fdf3e7;
   --radius: 8px;
   --sidebar-w: 232px;
+
+  /* The surface a text field sits on. A variable rather than a literal because
+     the dark theme has to move it: an input hardcoded to #fff under a dark
+     theme that only overrides the TEXT colour is white on white, and the value
+     is invisible while remaining perfectly editable. */
+  --input-bg: #ffffff;
+}
+
+/* Let the browser theme what it owns: date pickers, select popups, scrollbars.
+   Without this the calendar button on every date field is a dark glyph on a
+   dark control, and the sidebar gets a light scrollbar down a dark panel. */
+:root {
+  color-scheme: light dark;
 }
 
 * {
@@ -109,7 +122,7 @@ body {
   border: 1px solid var(--line);
   border-radius: var(--radius);
   font: inherit;
-  background: #fff;
+  background: var(--input-bg);
   color: var(--ink);
 }
 
@@ -147,6 +160,18 @@ body {
 .btn--ghost {
   width: 100%;
   background: transparent;
+}
+
+/* The 100% widths above are for the login card, which is a single stacked
+   column. Anywhere a button sits beside something else it should be its own
+   size: a "Run it now" that fires real WhatsApp sends does not want to be the
+   widest target on the screen. */
+.row .btn,
+.formfoot .btn,
+.toolbar .btn,
+.cell__acts .btn {
+  width: auto;
+  margin-top: 0;
 }
 
 /* ---- shell ---- */
@@ -483,6 +508,16 @@ body {
   color: var(--accent);
 }
 
+/* A state that wants attention, as against `--off` further down, which fades
+   and strikes through a thing deliberately withdrawn. The two are opposites and
+   were briefly rendered the same: "mocked" and "failed" are the states an
+   operator most needs to notice, and they were the quietest marks on the page. */
+.badge--warn {
+  border-color: var(--warn);
+  background: var(--warn-bg);
+  color: var(--warn);
+}
+
 .empty {
   padding: 24px;
   color: var(--ink-soft);
@@ -767,9 +802,14 @@ ul.banner {
     --accent: #4f9dd0;
     --warn: #e0a86a;
     --warn-bg: #2c2318;
+    --input-bg: #0f151b;
   }
 
-  .field input,
+  /* Only the primary button. `.field input` used to be here too, setting white
+     text over the white background the base rule still applied — every form in
+     the console was unreadable at night, and no test could see it because jsdom
+     computes no colours. The fix is the variable above; the text colour was
+     never the problem. */
   .btn--primary {
     color: #fff;
   }
@@ -807,6 +847,13 @@ ul.banner {
   --wa-ink: #111b21;
   --wa-muted: #667781;
   --wa-tick: #53bdeb;
+
+  /* Pin the native controls light along with everything else in here. The
+     root sets `color-scheme: light dark` so the console's own date pickers and
+     scrollbars follow the OS, and that would otherwise reach into this block
+     too — painting the composer and the number gate dark inside a white card,
+     on the one screen whose whole point is looking like WhatsApp. */
+  color-scheme: light;
 
   position: relative;
   display: flex;

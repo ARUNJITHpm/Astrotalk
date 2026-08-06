@@ -105,13 +105,16 @@ export function Integrations() {
               </thead>
               <tbody>
                 {integrations.map(([name, live]) => (
-                  <tr key={name} className={live ? undefined : 'row--off'}>
+                  <tr key={name}>
                     <td>
                       <strong>{LABEL[name] ?? name}</strong>
                       <span className="cell__sub">{name}</span>
                     </td>
                     <td>
-                      <span className={live ? 'badge badge--on' : 'badge badge--off'}>
+                      {/* --warn, not --off: "mocked" is the state that wants
+                          attention, and --off fades and strikes through, which
+                          is the mark for something deliberately withdrawn. */}
+                      <span className={live ? 'badge badge--on' : 'badge badge--warn'}>
                         {live ? 'live' : 'mocked'}
                       </span>
                     </td>
@@ -139,7 +142,7 @@ export function Integrations() {
                   <tr key={name}>
                     <td>{name}</td>
                     <td>
-                      <span className={present ? 'badge badge--on' : 'badge badge--off'}>
+                      <span className={present ? 'badge badge--on' : 'badge'}>
                         {present ? 'set' : 'not set'}
                       </span>
                     </td>

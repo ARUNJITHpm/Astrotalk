@@ -35,8 +35,10 @@ import {
 import { Field, Problem } from '../bits'
 
 function StatusBadge({ status }: { status: string }) {
+  // `failed` is a warning, not a withdrawal: it is the one status an operator
+  // has to act on, and `badge--off` would fade it and strike it through.
   const tone =
-    status === 'published' ? ' badge--on' : status === 'failed' ? ' badge--off' : ''
+    status === 'published' ? ' badge--on' : status === 'failed' ? ' badge--warn' : ''
   return <span className={`badge${tone}`}>{status}</span>
 }
 

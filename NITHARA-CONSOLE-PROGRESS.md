@@ -1085,6 +1085,90 @@ in for months.
   hardcoded to `2026-08-01`, which the microsite stopped listing on 2026-08-02
   because it only shows upcoming days. Now `today + 30`.
 
+## Part 14 — the console gets the address, the old pages go — 2026-08-06
+
+The React console moved from the interim `/console-app` to `/console`, and
+`admin.html` (552 ln), `admin.js` (811 ln), `console.html` (684 ln) and
+`whatsapp.html` (413 ln) were deleted along with their routes — 2,460 lines of
+hand-written operator UI that the console had reached parity with in Part 13.
+
+`app/web/` now holds `shell.js` and `ui/` and nothing else. `ui/` is NOT dead
+code: it is the white-label surface the orgs module serves at `/a/{handle}/ui`,
+and `tests/orgs/` covers it.
+
+### The retired addresses redirect rather than 404
+
+`/admin` → `/console`, and `/whatsapp` and `/wa` → `/console/channels/whatsapp`.
+308, so a browser stops asking. Bookmarks point at all three, and so does the
+banner every older `python main.py` run printed.
+
+Two details a plain redirect would have got wrong, both pinned by tests:
+
+- **GET only.** `POST /admin/login` is a real API route. A redirect registered
+  for every method, or on a prefix rather than the exact path, would 308 a login
+  POST — which a client follows as a GET, losing the body and the credentials.
+- **`/console-app` is not redirected.** It existed for six days between Parts 9
+  and 14 and is now a subpath of nothing. Two live addresses for one tool is how
+  half a team ends up bookmarking the one that will break next.
+
+### `shell.js` lost most of itself
+
+It rendered a bottom nav and revealed admin-only links, both driven by a
+`data-nav` key that only `admin.html` and `console.html` ever passed. With those
+gone the one remaining includer (`ui/chat.html`) passes `data-nav="off"` and
+carries its own nav and its own reveal, so the whole mechanism was dead. What is
+left is the back-button wiring. `chat.html`'s two operator links became one:
+`/admin` and `/console` now lead to the same place.
+
+### The service worker check, done properly
+
+`NITHARA-CONSOLE-BUILD-PLAN.md` said to VERIFY IN A BROWSER, because curl cannot
+see a service worker and that is exactly how the `/prototype` bug got missed
+once. Done, and it passes: with the SW active and controlling the page
+(`navigator.serviceWorker.controller` non-null), a deep link to
+`/console/bookings/payments` served the **console's** shell, not the PWA's.
+
+It is now also a test — `app-nithara/src/serviceWorker.test.ts` — which reads
+the navigation allowlist out of the **built** `dist/sw.js` rather than out of
+`vite.config.ts`. The config is an input to a code generator; what governs a
+real browser is the regex array Workbox compiled, and only reading the shipped
+file cannot drift. It checks `/console` and four deep links, plus
+`/a/{handle}/ui` and `/prototype`, and that nothing under `/console/` was
+precached.
+
+This matters more than it did when the allowlist was written. A denylist naming
+the flat pages the console used to be would have caught `/console` and missed
+`/console/bookings` — and the deep link is the one an operator bookmarks.
+
+### Three things only a browser could have found
+
+Opening the console in Chrome for the first time turned up defects that eleven
+Parts and 218 passing tests had not, because jsdom computes no colours.
+
+- **Every form field was white text on a white background in dark mode.** The
+  dark block set `.field input { color: #fff }` to pair with a dark input
+  background that was never written, so the base `background: #fff` stayed.
+  Values were invisible and perfectly editable. Present since Part 9. Fixed with
+  an `--input-bg` variable the theme moves, plus `color-scheme: light dark` on
+  `:root` so date pickers, select popups and scrollbars follow the OS.
+- **"mocked" and "failed" were rendered as withdrawals.** `badge--off` fades to
+  55% and strikes the text through — right for a temple pulled from the
+  directory, exactly wrong for the two states an operator most needs to notice.
+  The most important signal in the console was the quietest mark on the page.
+  New `badge--warn`, and the mocked rows are no longer greyed out either.
+- **Primary buttons stretched across whatever row they sat in.** The `width:
+  100%` on `.btn--primary`/`.btn--ghost` is for the login card's single stacked
+  column; it leaked into every toolbar and card footer, making "Run it now" —
+  which fires real WhatsApp sends — the widest target on the screen.
+
+Fixing the first of these leaked into the WhatsApp simulator, whose whole point
+is looking like WhatsApp: `color-scheme` reached in and painted the composer and
+the number gate dark inside a white card. That block is now pinned
+`color-scheme: light`, which is what its existing comment already claimed.
+
+The badge semantics are pinned by tests. The colours are not — a jsdom test
+cannot see them, and pretending otherwise would be worse than the note here.
+
 ## Standing items
 - **Two migrations are unapplied in production**, both additive and both
   reversible: `e1f2a3b4c5d6` (Part 7's booking operator columns — the whole
@@ -1101,9 +1185,6 @@ in for months.
   Every row is marked (`NTDEMO…` refs, `+9199000000…` phones, `order_demo_…`,
   `[demo]`, `demo-…`), so `--purge` removes exactly those and nothing else.
   **Remove it before launch.**
-- **`/whatsapp` and the old `/console` are now duplicated by the console.** Part
-  14 deletes `admin.html`, `admin.js`, `console.html` and `whatsapp.html`; until
-  then two implementations of the daily pack and of the simulator are live.
 - Baselines to hold: `ruff check app tests` ≤ 129; full suite green apart from
   the 2 pre-existing `tests/whatsapp/test_whatsapp.py` failures caused by local
   `.env` having `MOCK_WHATSAPP=false`.

@@ -23,11 +23,11 @@ const queryClient = new QueryClient({
 })
 
 // basename matches vite.config.ts `base`: FastAPI serves the console under
-// /console-app/, so react-router must strip that prefix or every route 404s.
+// /console/, so react-router must strip that prefix or every route 404s.
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter basename="/console-app">
+      <BrowserRouter basename="/console">
         <AuthProvider>
           <App />
         </AuthProvider>

@@ -5,12 +5,12 @@ import react from '@vitejs/plugin-react'
 // a desktop tool for staff, so there is no service worker to shadow the pages
 // this origin already serves, and no install prompt.
 //
-// `base: '/console-app/'` because the built assets are served from that path,
+// `base: '/console/'` because the built assets are served from that path,
 // not the root — the root belongs to app-nithara. Without it every asset URL in
 // index.html would point at /assets/... and collide with the consumer app's.
 export default defineConfig({
   plugins: [react()],
-  base: '/console-app/',
+  base: '/console/',
   server: {
     port: 5174, // 5173 is app-nithara; both run at once during development
     proxy: {

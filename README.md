@@ -66,12 +66,24 @@ Until then `/` answers 503 and the API is unaffected. For frontend work run
 Vite instead (`npm run dev`, with `VITE_API_BASE` pointing at this server) —
 uvicorn's reloader does not rebuild `dist`.
 
-Three hand-written operator pages also live here, served from `app/web/`:
-`/admin` (analytics), `/console` (content studio, daily pack, temple tools) and
-`/whatsapp` (flow simulator). `app/web/ui/` is the white-label partner surface
-(`/a/{handle}/ui`, `/login`, `/dashboard`). The pre-Nithara consumer UI was
-removed when Nithara took the root; it is preserved on the `legacy-tara-ui`
-branch.
+`/console` serves the operator console — a second React app, source in
+[`app-console/`](./app-console), built the same way and equally gitignored:
+
+```bash
+cd app-console && npm ci && npm run build
+```
+
+It is a desktop tool for staff: no PWA, no service worker, no Malayalam UI. Nine
+sections cover temples, bookings, people, content, astrology, channels and
+system, each gated by the signed-in operator's role. Until it is built `/console`
+answers 503.
+
+The three hand-written operator pages this replaced — `/admin`, the old
+`/console` and `/whatsapp` — were deleted in console plan Part 14. Those
+addresses now redirect into the console. `app/web/` keeps only `shell.js` and
+`ui/`, the white-label partner surface (`/a/{handle}/ui`, `/login`,
+`/dashboard`). The pre-Nithara consumer UI was removed when Nithara took the
+root; it is preserved on the `legacy-tara-ui` branch.
 
 ## Checks
 ```bash

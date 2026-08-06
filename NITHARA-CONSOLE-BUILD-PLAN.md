@@ -542,7 +542,20 @@ Lowest-risk part — these endpoints all exist and are exercised today.
 
 # SHIP
 
-## Part 14 — Serve it, then retire the old pages
+## Part 14 — Serve it, then retire the old pages  ✅ DONE
+
+> The console is at `/console`; `admin.html`, `admin.js`, `console.html` and
+> `whatsapp.html` are deleted and their addresses 308 into the console.
+> `app/web/` keeps `shell.js` and `ui/` — the white-label surface, still live.
+>
+> The service-worker check was done in a browser as this plan insisted, and is
+> now a test that reads the allowlist out of the **built** `dist/sw.js`.
+>
+> Opening the console in a browser for the first time also found three defects
+> no test could see: every form field was white-on-white in dark mode (since
+> Part 9), "mocked" and "failed" were styled as withdrawals rather than
+> warnings, and primary buttons stretched across any row they sat in.
+
 ```
 --- Serving ---
 - Dockerfile: a third stage `FROM node:20-slim AS console`, mirroring the

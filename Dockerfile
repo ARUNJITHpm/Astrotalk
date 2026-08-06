@@ -23,7 +23,7 @@ RUN npm run build
 # ---- Stage 2: build the operator console ----
 # Same shape as the stage above, separate so a console-only change does not
 # invalidate the consumer app's npm layer (and vice versa). Vite's `base` puts
-# the output under /console-app/, which is where app/main.py mounts it.
+# the output under /console/, which is where app/main.py mounts it.
 FROM node:20-slim AS console
 
 WORKDIR /build

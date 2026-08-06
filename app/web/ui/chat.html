@@ -28,7 +28,9 @@
            used to link to (/feed page, /ui, /ui/astrologers) were removed when
            Nithara took the root, so those links are gone rather than dead. -->
       <nav class="side-nav" style="display:flex;flex-direction:column;gap:2px;margin:2px 0 4px">
-        <a href="/admin" class="admin-only admin-hidden" style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:9px;color:var(--muted);text-decoration:none;font-size:14px">📊 &nbsp;അഡ്മിൻ ഡാഷ്‌ബോർഡ്</a>
+        <!-- One operator destination, not two: /admin was the analytics
+             dashboard and Part 14 folded it into the console, so both links
+             now land in the same place. -->
         <a href="/console" class="admin-only admin-hidden" style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:9px;color:var(--muted);text-decoration:none;font-size:14px">🛠️ &nbsp;കൺസോൾ</a>
       </nav>
 
@@ -100,7 +102,6 @@
   <!-- Mobile primary navigation (desktop uses the sidebar links above) -->
   <nav class="tara-bottomnav" aria-label="വിഭാഗങ്ങൾ">
     <a class="active" aria-current="page"><span class="ic" aria-hidden="true">💬</span>ചാറ്റ്</a>
-    <a href="/admin" class="admin-only admin-hidden"><span class="ic" aria-hidden="true">📊</span>അഡ്മിൻ</a>
     <a href="/console" class="admin-only admin-hidden"><span class="ic" aria-hidden="true">🛠️</span>കൺസോൾ</a>
   </nav>
 

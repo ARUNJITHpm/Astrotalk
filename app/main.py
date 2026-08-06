@@ -158,27 +158,30 @@ async def media(key: str) -> Response:
                     headers={"Cache-Control": "public, max-age=86400"})
 
 
-# The SPA shell and the operator pages must never be served stale (a new deploy
-# has to reach an open tab), but Vite content-hashes everything under /assets/,
-# so those filenames change whenever their bytes do and can be cached hard.
+# The SPA shell must never be served stale (a new deploy has to reach an open
+# tab), but Vite content-hashes everything under /assets/, so those filenames
+# change whenever their bytes do and can be cached hard.
 _NO_STORE_PATHS = frozenset((
     "/", "/poojas", "/astro", "/profile",
     "/sw.js", "/registerSW.js", "/manifest.webmanifest",
-    "/admin", "/console", "/wa", "/whatsapp", "/prototype",
+    "/prototype",
 ))
 
 # Content-hashed build output, safe to cache forever. Two entries because the
 # two frontends mount at different roots: Vite writes the console's assets under
-# its `base` (/console-app/assets/), so the consumer app's bare /assets/ prefix
+# its `base` (/console/assets/), so the consumer app's bare /assets/ prefix
 # would miss them and they would end up with no cache header at all.
-_IMMUTABLE_PREFIXES = ("/assets/", "/console-app/assets/")
+_IMMUTABLE_PREFIXES = ("/assets/", "/console/assets/")
 
 # The console is a client-routed SPA under one subpath, so EVERY path beneath it
 # serves the same shell and must never be stale. A prefix, not a member of the
-# set above: exact-matching "/console-app" would leave a deep link like
-# /console-app/bookings cacheable, which is how an operator ends up looking at
+# set above: exact-matching "/console" would leave a deep link like
+# /console/bookings cacheable, which is how an operator ends up looking at
 # yesterday's build after a deploy.
-_NO_STORE_PREFIXES = ("/static", "/console-app")
+#
+# The /console/assets/ rule above is checked FIRST, so the hashed bundles keep
+# their long cache and only the shell is no-store.
+_NO_STORE_PREFIXES = ("/static", "/console")
 
 
 @app.middleware("http")
@@ -193,13 +196,21 @@ async def _web_cache_headers(request, call_next):
 
 
 # ---- Web UI ----
-# Two surfaces share this app:
-#   /                          the Nithara PWA — a React SPA built from
-#                              app-nithara/ into app-nithara/dist (see the
-#                              frontend stage of the Dockerfile).
-#   /admin, /console, /whatsapp   operator pages, still hand-written HTML.
-# The old user-facing UI (chat at /, /auth, /feed, /ui/*) was removed when
-# Nithara took the root; it lives on in the `legacy-tara-ui` branch.
+# Two surfaces share this app, and as of console plan Part 14 both are React:
+#   /            the Nithara PWA — built from app-nithara/ into
+#                app-nithara/dist (the `frontend` stage of the Dockerfile).
+#   /console     the operator console — built from app-console/ into
+#                app-console/dist (the `console` stage).
+#
+# The three hand-written operator pages that used to live here — admin.html,
+# console.html and whatsapp.html — are gone. Each had grown its own copy of the
+# things the console now does once: the daily pack was implemented twice,
+# independently, in admin.js and console.html, and the two had drifted.
+#
+# The old user-facing UI (chat at /, /auth, /feed) was removed when Nithara took
+# the root; it lives on in the `legacy-tara-ui` branch. What remains under
+# app/web/ is `ui/`, which is NOT dead code — it is the white-label surface the
+# orgs module serves at /a/{handle}/ui (tests/orgs/ covers it).
 _WEB_DIR = _HERE / "web"
 _NITHARA_DIR = _ROOT / "app-nithara" / "dist"
 _NITHARA_INDEX = _NITHARA_DIR / "index.html"
@@ -224,58 +235,33 @@ for _spa_route in ("/", "/poojas", "/astro", "/profile"):
     app.get(_spa_route, include_in_schema=False)(_spa_shell)
 
 
-# WhatsApp simulator: same brain as real WhatsApp (POST /whatsapp/simulate →
-# onboarding FSM + chat), admin-token gated. Lets us test the exact flow a real
-# WhatsApp user gets without touching the live WAHA session.
-@app.get("/whatsapp", include_in_schema=False)
-async def whatsapp_ui() -> FileResponse:
-    return FileResponse(_WEB_DIR / "whatsapp.html")
-
-
-# Back-compat: the skin used to live at /wa. Keep old links/bookmarks working.
-@app.get("/wa", include_in_schema=False)
-async def whatsapp_ui_legacy() -> RedirectResponse:
-    return RedirectResponse(url="/whatsapp")
-
-
-# Admin analytics dashboard (project overview: users, charts, chat, tokens).
-# The page is static; every data call it makes hits the token-gated /admin API.
-@app.get("/admin", include_in_schema=False)
-async def admin_page() -> FileResponse:
-    return FileResponse(_WEB_DIR / "admin.html")
-
-
-# Owner Admin Console: one place that surfaces every feature (content studio,
-# daily pack, feed & polls, panchangam, temple tools, WhatsApp simulator) plus
-# the growth-plan roadmap. Login = owner email + password (POST /admin/login);
-# every data call it makes is gated by the X-Admin-Token it stores.
-@app.get("/console", include_in_schema=False)
-async def console_page() -> FileResponse:
-    return FileResponse(_WEB_DIR / "console.html")
-
-
-# The new React operator console (console plan Part 9), built from app-console/.
-# It lives under /console-app/ rather than /console so the hand-written page
-# above keeps working while sections migrate across; /console retires in Part 14.
+# The React operator console, built from app-console/ (console plan Parts 9-13).
+# It stood at /console-app/ while sections migrated across from the hand-written
+# page; Part 14 gave it the real address and deleted the page.
 #
 # Its own client-side routes all serve this shell — unlike the consumer SPA, a
-# catch-all is safe here because the mount is scoped to a subpath that claims no
-# API route. Ordering still matters: this must come BEFORE the root mount below.
+# catch-all is safe here because the subpath claims no API route. `/admin`,
+# `/temples`, `/bookings` and the rest of the operator API live at the ROOT, not
+# under /console, so nothing beneath this prefix belongs to anything else.
+#
+# Ordering matters twice over: the assets mount must precede the catch-all (or
+# every bundle would be served the HTML shell), and both must precede the root
+# mount at the bottom of this file.
 _CONSOLE_DIR = _ROOT / "app-console" / "dist"
 _CONSOLE_INDEX = _CONSOLE_DIR / "index.html"
 
 if _CONSOLE_DIR.is_dir():
-    # Hashed assets under /console-app/assets/*, matching vite's `base`.
+    # Hashed assets under /console/assets/*, matching vite's `base`.
     app.mount(
-        "/console-app/assets",
+        "/console/assets",
         StaticFiles(directory=_CONSOLE_DIR / "assets"),
         name="console_assets",
     )
 
 
-@app.get("/console-app", include_in_schema=False)
-@app.get("/console-app/{_path:path}", include_in_schema=False)
-async def console_app_shell(_path: str = "") -> FileResponse:
+@app.get("/console", include_in_schema=False)
+@app.get("/console/{_path:path}", include_in_schema=False)
+async def console_shell(_path: str = "") -> FileResponse:
     """Serve the console shell for any of its client-side routes.
 
     Unbuilt is a 503 with instructions, not a 404: "not found" sends whoever
@@ -288,6 +274,33 @@ async def console_app_shell(_path: str = "") -> FileResponse:
             detail="Operator console not built — run `npm ci && npm run build` in app-console/.",
         )
     return FileResponse(_CONSOLE_INDEX)
+
+
+# Retired addresses, kept as redirects rather than 404s. Bookmarks and the
+# banner printed by older `python main.py` runs point at these, and an operator
+# who followed one deserves the new tool rather than a dead end.
+#
+# /console-app is deliberately NOT redirected: it was an interim address that
+# existed for six days between Parts 9 and 14, and it is now a subpath of
+# nothing. It falls through to the root mount's 404 like any other typo.
+# 308 rather than 302: these moved permanently, so a browser stops asking. GET
+# only — nothing ever POSTed to them, and `POST /admin/login` is a real API
+# route that must not be swallowed here.
+
+
+@app.get("/admin", include_in_schema=False)
+async def retired_admin_page() -> RedirectResponse:
+    """The analytics dashboard. Its figures are the console's Dashboard and
+    System → Integrations."""
+    return RedirectResponse(url="/console", status_code=308)
+
+
+@app.get("/whatsapp", include_in_schema=False)
+@app.get("/wa", include_in_schema=False)
+async def retired_whatsapp_page() -> RedirectResponse:
+    """The simulator, now Channels → WhatsApp sim. `/wa` was already a redirect
+    to `/whatsapp`, so it has been a redirect-to-a-redirect for a while."""
+    return RedirectResponse(url="/console/channels/whatsapp", status_code=308)
 
 
 # The original design prototype, served as-is for eyeballing the intended UI
@@ -331,8 +344,6 @@ if __name__ == "__main__":
     print(
         f"Nithara running -  app http://localhost:{port}/"
         f"   |   console http://localhost:{port}/console"
-        f"   |   admin http://localhost:{port}/admin"
-        f"   |   WhatsApp sim http://localhost:{port}/whatsapp"
     )
     # The app at / needs app-nithara/dist. For frontend work run Vite instead
     # (`npm run dev` in app-nithara/, VITE_API_BASE pointed at this server) —

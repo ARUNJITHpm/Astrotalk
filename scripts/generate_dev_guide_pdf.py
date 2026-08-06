@@ -922,7 +922,7 @@ def build() -> None:
         "Chat is rate-limited per user (sliding window per hour, configurable; in-process - move to Redis for multi-worker).",
         "Onboarding (POST /identity/users) does register + geocode + first natal chart + auto-login in one round trip.",
         "On login, a stored chart that still looks mock/pending is silently recomputed for real - a self-healing migration.",
-        "The admin dashboard (/admin, app/web/admin.html) has its own auth guard (admin/auth.py), separate from user sessions.",
+        "The operator console (/console, app-console/) authenticates operators separately from devotees: role-scoped accounts (owner, temple_admin, content_reviewer, support) resolved by platform/admin_auth.py.",
     ]:
         pdf.bullet(item)
     pdf.section_title("18. Running it locally")
@@ -983,8 +983,9 @@ def build() -> None:
         "  app/modules/astrologers, orgs/   human-astrologer booking + B2B CRM/billing",
         "  app/modules/whatsapp/            consent ledger + daily pipeline (send = TODO)",
         "",
-        "  app/web/                         index.html, feed.html, console.html, wa skin,",
-        "                                   admin.html + JS/CSS  (all served from / root)",
+        "  app-nithara/                     the consumer PWA served at /",
+        "  app-console/                     the operator console served at /console",
+        "  app/web/ui/                      the white-label surface at /a/{handle}/ui",
         "  evals/                           25-case golden set + automated grading",
         "  NEEDS_ASTROLOGER.md              living punch-list of unreviewed content",
         "  AGENTS.md / GUARDRAILS.md        the ORIGINAL rules - still binding for the",

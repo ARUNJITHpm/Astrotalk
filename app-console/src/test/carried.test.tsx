@@ -183,6 +183,9 @@ describe('the daily pack', () => {
     renderAt('/content/daily', { posts: [post({ status: 'failed' })] })
     expect(await screen.findByRole('button', { name: 'Approve again' })).toBeVisible()
     expect(screen.getByText(/did not go through/i)).toBeVisible()
+    // `failed` is the one status that needs acting on, so it is marked as a
+    // warning rather than faded and struck through like a withdrawal.
+    expect(screen.getByText('failed')).toHaveClass('badge--warn')
   })
 
   it('sends an edited body with the approval, and nothing when untouched', async () => {
@@ -273,6 +276,22 @@ describe('integrations', () => {
       expect(screen.getByText(/Payments complete without any money moving/i)).toBeVisible(),
     )
     expect(screen.getByText(/2 services are mocked/i)).toBeVisible()
+  })
+
+  it('marks a mocked service as a warning, not as a withdrawal', async () => {
+    // Browser review, 2026-08-06. `badge--off` fades to 55% and strikes the
+    // text through — the right mark for a temple that has been withdrawn from
+    // the directory, and the exact opposite of what "mocked" means. It made the
+    // single most important signal in the console the quietest thing on the
+    // page, and no test could see it because the class name was plausible.
+    renderAt('/system/integrations')
+    await waitFor(() => expect(screen.getAllByText('mocked').length).toBeGreaterThan(0))
+    for (const badge of screen.getAllByText('mocked')) {
+      expect(badge).toHaveClass('badge--warn')
+      expect(badge).not.toHaveClass('badge--off')
+      // The row must not be faded either — same mistake, one element up.
+      expect(badge.closest('tr')).not.toHaveClass('row--off')
+    }
   })
 
   it('reports whether a credential is set, never what it is', async () => {

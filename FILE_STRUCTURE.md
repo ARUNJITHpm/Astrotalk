@@ -37,7 +37,18 @@ tara/
 │   │   ├── notifications/         Cross-module notification delivery (GROWTH_PLAN Part 3)
 │   │   └── admin/                 Ops analytics dashboard service + routes
 │   │       (each module also has: models.py, schemas.py, router.py — internal/DTO/HTTP layers)
-│   └── web/                       Server-rendered UI: chat (`/`, `/wa`), admin, auth, astrologer + org dashboards
+│   └── web/                       The white-label partner surface only (`ui/` → `/a/{handle}/ui`) + shell.js.
+│                                  The hand-written operator pages went in console plan Part 14.
+│
+├── app-nithara/                   The consumer PWA served at `/` — React + Vite + Capacitor, Malayalam-first.
+│   └── dist/                      Build output (gitignored). Docker builds it in the `frontend` stage.
+│
+├── app-console/                   The operator console served at `/console` — React + Vite, desktop only.
+│   │                              No PWA, no Capacitor, no i18n: staff work in it for hours, in English.
+│   ├── src/api/                   One typed module per section, over a shared fetch wrapper
+│   ├── src/lib/                   The pure rules — nav/roles, money, booking + content state machines
+│   ├── src/ui/                    One folder per sidebar group (temples, bookings, people, content, …)
+│   └── dist/                      Build output (gitignored). Docker builds it in the `console` stage.
 │
 ├── tests/                         pytest suite, one subfolder per `app/modules/*` domain (+ `platform/`)
 │   ├── admin/  astrologers/  astrology_engine/  chat/  commerce/  community/
