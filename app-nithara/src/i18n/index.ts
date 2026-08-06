@@ -32,6 +32,16 @@ const EXTRA_EN = {
   payFailed: 'The payment didn’t go through. Your booking is saved — you can pay from Poojas.',
   payUnavailable: 'Couldn’t open payment just now. Your booking is saved — you can pay from Poojas.',
   dateTbc: 'To be confirmed',
+  // Says what is true and what still works. "No connection" alone would read as
+  // a failure; the app is usable, it just cannot fetch anything new.
+  offlineNote: 'You’re offline — showing what was already loaded',
+  // The check-in button used to say this whether or not anything was recorded.
+  darshanAlready: 'Already checked in here today',
+  darshanFailed: 'Couldn’t record that — please try again.',
+  dirFailed: 'Couldn’t open directions for this temple.',
+  // Interpolated, because the console can set any lead time and the old label
+  // said "3 days" for every value above one.
+  needsDays: 'Needs {{count}} days’ notice',
   // Location and scanning (Part 9). The chip must never say "near you" unless a
   // real fix arrived — the distances on screen depend on it.
   locNearYou: 'Near you',
@@ -100,6 +110,11 @@ const EXTRA_ML = {
   payFailed: 'പണമടയ്ക്കൽ നടന്നില്ല. ബുക്കിംഗ് സേവ് ചെയ്തിട്ടുണ്ട് — പൂജകൾ എന്നതിൽ നിന്ന് അടയ്ക്കാം.',
   payUnavailable: 'പേയ്‌മെന്റ് തുറക്കാനായില്ല. ബുക്കിംഗ് സേവ് ചെയ്തിട്ടുണ്ട് — പൂജകൾ എന്നതിൽ നിന്ന് അടയ്ക്കാം.',
   dateTbc: 'തീയതി സ്ഥിരീകരിക്കാനുണ്ട്',
+  offlineNote: 'ഇന്റർനെറ്റ് ഇല്ല — നേരത്തെ ലോഡ് ചെയ്തത് കാണിക്കുന്നു',
+  darshanAlready: 'ഇന്ന് ഇവിടെ ചെക്ക്-ഇൻ ചെയ്തിട്ടുണ്ട്',
+  darshanFailed: 'രേഖപ്പെടുത്താനായില്ല — വീണ്ടും ശ്രമിക്കൂ.',
+  dirFailed: 'ഈ ക്ഷേത്രത്തിലേക്കുള്ള വഴി തുറക്കാനായില്ല.',
+  needsDays: '{{count}} ദിവസം മുൻപ് ബുക്ക് ചെയ്യണം',
   locNearYou: 'നിങ്ങൾക്കടുത്ത്',
   locDefault: 'തൃശൂർ അടിസ്ഥാനമാക്കി',
   obNearby: 'എനിക്കടുത്ത്',

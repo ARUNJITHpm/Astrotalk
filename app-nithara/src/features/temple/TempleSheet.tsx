@@ -1,13 +1,41 @@
 import { useEffect, useState } from 'react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Sheet } from '../../components/Sheet'
 import { Doors } from '../../components/Doors'
 import { Icon } from '../../components/Icon'
 import { toast } from '../../components/Toast'
+import { apiPost } from '../../api/client'
 import { useTemple } from '../../api/hooks'
+import { openDirections } from '../../lib/directions'
 import { useT } from '../../i18n'
-import type { PoojaCatalogueItem, TempleDetail } from '../../api/types'
+import type { CheckinResult, PoojaCatalogueItem, TempleDetail } from '../../api/types'
 
 const money = (n: number) => '₹' + n.toLocaleString('en-IN')
+
+/**
+ * Record a darshan.
+ *
+ * This button raised a toast saying "darshan recorded" and recorded nothing.
+ * POST /temples/{id}/checkin has existed since Part 2 and the entire
+ * streak/badges/temples-visited system is fed by it, so every one of those
+ * figures has been counting an event the app never created.
+ *
+ * The server is idempotent per day, and `fresh` says which happened — so a
+ * second visit on the same day is acknowledged honestly rather than claiming a
+ * new one.
+ */
+function useCheckin(templeId: string, T: (k: string) => string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => apiPost<CheckinResult>(`/temples/${templeId}/checkin`, {}),
+    onSuccess: (result) => {
+      toast(result.fresh ? T('darshanRecorded') : T('darshanAlready'))
+      qc.invalidateQueries({ queryKey: ['stats'] })
+      qc.invalidateQueries({ queryKey: ['milestones'] })
+    },
+    onError: () => toast(T('darshanFailed')),
+  })
+}
 
 type Tab = 'about' | 'timings' | 'poojas'
 
@@ -73,6 +101,7 @@ function TempleBody({
 }) {
   const name = lang === 'ml' ? t.ml : t.en
   const name2 = lang === 'ml' ? t.en : t.ml
+  const checkin = useCheckin(t.id, T)
   const place = t.mplace && lang === 'ml' ? t.mplace : t.place
   const story = lang === 'ml' && t.story_ml ? t.story_ml : t.story
   const fmt = (k: number | null) => (k == null ? '' : k < 1 ? `${Math.round(k * 1000)} m` : `${k.toFixed(1)} km`)
@@ -178,10 +207,20 @@ function TempleBody({
 
       <div style={{ height: 22 }} />
       <div className="dcta">
-        <button className="btn btn-pri" onClick={() => toast(T('darshanRecorded'))}>
+        <button
+          className="btn btn-pri"
+          disabled={checkin.isPending}
+          onClick={() => checkin.mutate()}
+        >
           {T('checkinDarshan')}
         </button>
-        <button className="btn btn-nav" onClick={() => toast(`${T('openingDir')} ${name}`)}>
+        <button
+          className="btn btn-nav"
+          aria-label={T('directions')}
+          onClick={() => {
+            if (!openDirections({ lat: t.lat, lng: t.lng, name })) toast(T('dirFailed'))
+          }}
+        >
           <Icon name="i-navigate" cls="ic sm" />
         </button>
       </div>

@@ -1,6 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
 import { apiGet, qs } from './client'
+import { useEffect } from 'react'
+
 import { currentPosition } from '../lib/native'
+import { recallTemple, rememberTemple } from '../lib/lastTemple'
 import type {
   Booking,
   FeedItem,
@@ -70,11 +73,23 @@ export function useNearbyTemples(limit = 200, from?: { lat: number; lng: number 
 }
 
 export function useTemple(id: string | undefined | null) {
-  return useQuery({
+  const query = useQuery({
     queryKey: ['temple', id],
     queryFn: () => apiGet<TempleDetail>(`/temples/${id}`),
     enabled: !!id,
+    // Seeds the first render from the last temple kept across launches, so the
+    // app opened offline shows the timings instead of an empty hero. The
+    // network answer replaces it as soon as one arrives — this is a cache, not
+    // a source of truth, and stale timings shown as current would be worse than
+    // a spinner.
+    placeholderData: () => recallTemple(id) ?? undefined,
   })
+
+  useEffect(() => {
+    if (query.data && !query.isPlaceholderData) rememberTemple(query.data)
+  }, [query.data, query.isPlaceholderData])
+
+  return query
 }
 
 export function useTemplePoojas(id: string | undefined | null, nak?: number) {

@@ -1,6 +1,8 @@
 import { useEffect } from 'react'
 import type { ReactNode } from 'react'
+import { Icon } from './Icon'
 import { useT } from '../i18n'
+import { useOnline } from '../lib/online'
 
 // The fixed 432px device frame from the prototype (.stage centres .phone). On a
 // real phone it fills the screen; on desktop it sits centred on the grey stage.
@@ -11,13 +13,25 @@ import { useT } from '../i18n'
 // prototype's applyLang() which sets $('#phone').dataset.lang. We also keep
 // <html lang> in sync for a11y.
 export function PhoneFrame({ children }: { children: ReactNode }) {
-  const { lang } = useT()
+  const { t: T, lang } = useT()
+  const online = useOnline()
   useEffect(() => {
     document.documentElement.lang = lang
   }, [lang])
   return (
     <div className="stage">
       <div className="phone" id="phone" data-lang={lang}>
+        {/* The service worker precaches the shell, so the app opens with no
+            network — and then every screen sits on a failed query. Without
+            this it looks broken rather than disconnected. A strip, not a
+            toast: the state persists, and a notice that fades leaves the
+            empty screens after it unexplained. */}
+        {!online && (
+          <div className="offbar" role="status">
+            <Icon name="i-globe" cls="ic sm" />
+            {T('offlineNote')}
+          </div>
+        )}
         {children}
       </div>
     </div>

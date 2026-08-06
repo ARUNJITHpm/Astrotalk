@@ -6,7 +6,7 @@
 // claiming something it does not know.
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, waitFor } from '@testing-library/react'
+import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -24,6 +24,11 @@ const TARGET: BookTarget = {
 
 const MEMBERS: Member[] = [
   { id: 1, name: 'Ananya', rel: 'rSelf', nak: 21, self: true },
+]
+
+const FAMILY: Member[] = [
+  ...MEMBERS,
+  { id: 2, name: 'Amma', rel: 'rMother', nak: 10, self: false },
 ]
 
 function catalogue(feePaise: number): PoojaCatalogue {
@@ -62,6 +67,7 @@ let posts: { url: string; body: unknown }[] = []
 let created: Booking = booking()
 let listed: Booking[] = []
 let feePaise = 1500
+let members: Member[] = MEMBERS
 
 function json(body: unknown) {
   return { ok: true, status: 200, json: async () => body, text: async () => JSON.stringify(body) } as Response
@@ -72,6 +78,7 @@ beforeEach(() => {
   created = booking()
   listed = []
   feePaise = 1500
+  members = MEMBERS
   vi.stubGlobal(
     'fetch',
     vi.fn(async (url: string, init: RequestInit = {}) => {
@@ -82,7 +89,7 @@ beforeEach(() => {
         return json({ status: 'paid' })
       }
       if (path.includes('/poojas')) return json(catalogue(feePaise))
-      if (path.includes('/members')) return json(MEMBERS)
+      if (path.includes('/members')) return json(members)
       if (path.includes('/bookings')) return json(listed)
       return json([])
     }),
@@ -90,24 +97,30 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  cleanup()
   // Restore unconditionally: a test that fails before its own cleanup would
   // otherwise leak fake timers into every test after it.
   vi.useRealTimers()
   vi.restoreAllMocks()
   delete window.Razorpay
-  document.getElementById('phone')?.remove()
+  document.querySelectorAll('#phone').forEach((el) => el.remove())
 })
 
-function renderSheet() {
+function renderSheet(opts: { members?: Member[]; target?: BookTarget } = {}) {
+  if (opts.members) members = opts.members
   // Sheet portals into #phone (the fixed device frame) and renders nothing
   // without it, so the harness has to supply the host the real app provides.
+  // Clear any host a previous test left behind: Sheet portals into the FIRST
+  // #phone it finds, and a stale one means the sheet renders into a detached
+  // node and every query comes back empty.
+  document.querySelectorAll('#phone').forEach((el) => el.remove())
   const host = document.createElement('div')
   host.id = 'phone'
   document.body.appendChild(host)
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={client}>
-      <BookingSheet target={TARGET} onClose={() => {}} onAddMember={() => {}} />
+      <BookingSheet target={opts.target ?? TARGET} onClose={() => {}} onAddMember={() => {}} />
     </QueryClientProvider>,
   )
 }
@@ -224,5 +237,47 @@ describe('mock mode', () => {
 
     await waitFor(() => expect(screen.getByText('All set')).toBeInTheDocument())
     expect(posts.some((p) => p.url.includes('/mock-pay'))).toBe(false)
+  })
+})
+
+describe('who the booking is for', () => {
+  it('records the member chosen, not the account holder', async () => {
+    // Booking "for Amma's star" under the account holder's name is the mistake
+    // this screen exists to prevent — the temple reads the member name off the
+    // worklist and calls it out.
+    const user = userEvent.setup()
+    renderSheet({ members: FAMILY })
+    await screen.findByRole('button', { name: /₹115/ })
+
+    await user.click(screen.getByRole('button', { name: /Amma/ }))
+    await user.click(screen.getByRole('button', { name: /₹115/ }))
+
+    await waitFor(() => expect(posts.some((p) => p.url.endsWith('/bookings'))).toBe(true))
+    const body = posts.find((p) => p.url.endsWith('/bookings'))!.body as Record<string, unknown>
+    expect(body.member_id).toBe(2)
+    expect(body.member_name).toBe('Amma')
+    expect(body.member_nak).toBe(10)
+  })
+
+  it('defaults to the member the CTA named', async () => {
+    // A "book for Amma's star" button must not silently land on the account
+    // holder just because nobody tapped a chip.
+    const user = userEvent.setup()
+    renderSheet({ members: FAMILY, target: { ...TARGET, memberId: 2 } })
+    await user.click(await screen.findByRole('button', { name: /₹115/ }))
+
+    await waitFor(() => expect(posts.some((p) => p.url.endsWith('/bookings'))).toBe(true))
+    const body = posts.find((p) => p.url.endsWith('/bookings'))!.body as Record<string, unknown>
+    expect(body.member_id).toBe(2)
+  })
+
+  it('falls back to the account holder when the CTA named nobody', async () => {
+    const user = userEvent.setup()
+    renderSheet({ members: FAMILY })
+    await user.click(await screen.findByRole('button', { name: /₹115/ }))
+
+    await waitFor(() => expect(posts.some((p) => p.url.endsWith('/bookings'))).toBe(true))
+    const body = posts.find((p) => p.url.endsWith('/bookings'))!.body as Record<string, unknown>
+    expect(body.member_id).toBe(1)
   })
 })

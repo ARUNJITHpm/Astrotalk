@@ -12,6 +12,7 @@ import {
   useTemplePoojas,
 } from '../api/hooks'
 import { BookingSheet, type BookTarget } from '../features/booking/BookingSheet'
+import { leadLabel } from '../lib/poojaLock'
 import { MemberSheet } from '../features/member/MemberSheet'
 import type { Member } from '../api/types'
 
@@ -136,13 +137,10 @@ export default function Poojas() {
               <span className="pm" style={{ flex: 1 }}>
                 <b>{lang === 'ml' ? p.name_ml : p.name}</b>
                 <span className={p.locked ? 'warn' : ''}>
-                  {p.locked
-                    ? T('windowClosed')
-                    : p.lead_days === 0
-                      ? T('sameDay')
-                      : p.lead_days === 1
-                        ? T('needs1')
-                        : T('needs3')}
+                  {(() => {
+                    const label = leadLabel(p)
+                    return label.count != null ? T(label.key, { count: label.count }) : T(label.key)
+                  })()}
                 </span>
               </span>
               <span className="rt" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
