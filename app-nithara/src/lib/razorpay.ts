@@ -119,6 +119,15 @@ export interface CheckoutRequest {
  * about the booking they just made.
  */
 export async function openCheckout(req: CheckoutRequest): Promise<CheckoutOutcome> {
+  // On a device the web checkout still works — it renders in the Capacitor
+  // WebView like any other page — so the native SDK is NOT wired here.
+  //
+  // That is a deliberate scope call rather than an oversight. The native SDK
+  // buys a nicer sheet and UPI-intent handoff to GPay/PhonePe, which matters in
+  // India; it also needs the Android and iOS platforms added, a Razorpay
+  // account, and a real device to test on, none of which exist yet. Shipping an
+  // untestable payment path would be worse than shipping the one that works.
+  // Part 9b picks this up alongside the store builds.
   try {
     await loadScript()
   } catch {

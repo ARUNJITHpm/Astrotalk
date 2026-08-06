@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { apiGet, qs } from './client'
+import { currentPosition } from '../lib/native'
 import type {
   Booking,
   FeedItem,
@@ -37,9 +38,35 @@ export function useTemples(params: TempleQuery = {}) {
   })
 }
 
-/** Nearby temples, nearest first (the home + map default). */
-export function useNearbyTemples(limit = 200) {
-  return useTemples({ lat: DEFAULT_LOC.lat, lng: DEFAULT_LOC.lng, sort: 'near', limit })
+/**
+ * The device's position, asked for ONLY when `enabled`.
+ *
+ * Never on app open. A permission dialog that appears before the person has
+ * asked for anything is the prompt everybody denies, and a denial is sticky —
+ * so the ask is attached to an action that means "near me" (the location chip,
+ * the onboarding nearby list) where the reason is obvious.
+ */
+export function useDeviceLocation(enabled: boolean) {
+  return useQuery({
+    queryKey: ['device-location'],
+    enabled,
+    // A refusal is an answer, not a failure to retry into.
+    retry: false,
+    staleTime: 10 * 60 * 1000,
+    queryFn: currentPosition,
+  })
+}
+
+/**
+ * Nearby temples, nearest first (the home + map default).
+ *
+ * Falls back to a fixed point in Thrissur when there is no device position —
+ * which is most of the time, and deliberately so. The list is curated either
+ * way; what changes is whether "nearest" means nearest to you.
+ */
+export function useNearbyTemples(limit = 200, from?: { lat: number; lng: number } | null) {
+  const origin = from ?? DEFAULT_LOC
+  return useTemples({ lat: origin.lat, lng: origin.lng, sort: 'near', limit })
 }
 
 export function useTemple(id: string | undefined | null) {

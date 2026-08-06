@@ -32,6 +32,14 @@ const EXTRA_EN = {
   payFailed: 'The payment didn’t go through. Your booking is saved — you can pay from Poojas.',
   payUnavailable: 'Couldn’t open payment just now. Your booking is saved — you can pay from Poojas.',
   dateTbc: 'To be confirmed',
+  // Location and scanning (Part 9). The chip must never say "near you" unless a
+  // real fix arrived — the distances on screen depend on it.
+  locNearYou: 'Near you',
+  locDefault: 'Using Thrissur',
+  obNearby: 'Near me',
+  obScan: 'Scan a poster',
+  scanNothing: 'Nothing scanned. Try again, or search below.',
+  scanUnknown: 'That code isn’t one of ours — search for the temple below.',
   loadFailed: 'Couldn’t load that — pull to retry.',
   // The prototype's copy named a star the user never gave ("…suits Rohini").
   nitharaBlurb:
@@ -92,6 +100,12 @@ const EXTRA_ML = {
   payFailed: 'പണമടയ്ക്കൽ നടന്നില്ല. ബുക്കിംഗ് സേവ് ചെയ്തിട്ടുണ്ട് — പൂജകൾ എന്നതിൽ നിന്ന് അടയ്ക്കാം.',
   payUnavailable: 'പേയ്‌മെന്റ് തുറക്കാനായില്ല. ബുക്കിംഗ് സേവ് ചെയ്തിട്ടുണ്ട് — പൂജകൾ എന്നതിൽ നിന്ന് അടയ്ക്കാം.',
   dateTbc: 'തീയതി സ്ഥിരീകരിക്കാനുണ്ട്',
+  locNearYou: 'നിങ്ങൾക്കടുത്ത്',
+  locDefault: 'തൃശൂർ അടിസ്ഥാനമാക്കി',
+  obNearby: 'എനിക്കടുത്ത്',
+  obScan: 'പോസ്റ്റർ സ്കാൻ ചെയ്യൂ',
+  scanNothing: 'ഒന്നും സ്കാൻ ചെയ്തില്ല. വീണ്ടും ശ്രമിക്കൂ, അല്ലെങ്കിൽ താഴെ തിരയൂ.',
+  scanUnknown: 'ഈ കോഡ് ഞങ്ങളുടേതല്ല — താഴെ ക്ഷേത്രം തിരയൂ.',
   loadFailed: 'ലോഡ് ചെയ്യാനായില്ല — വീണ്ടും ശ്രമിക്കൂ.',
   nitharaBlurb:
     'നിങ്ങളുടെ മലയാളം ജ്യോതിഷ കൂട്ടുകാരി. ഇന്നത്തെ പഞ്ചാംഗം, തിഥിയുടെ അർത്ഥം, നിങ്ങളുടെ നക്ഷത്രത്തിന് ചേരുന്ന ക്ഷേത്രം — എന്തും ചോദിക്കാം.',

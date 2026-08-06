@@ -5,6 +5,7 @@ import { toast } from '../components/Toast'
 import { toggleLang, useT } from '../i18n'
 import { clearHomeTempleCache, useHomeTempleId } from '../lib/homeTemple'
 import {
+  useDeviceLocation,
   useFeed,
   useMembers,
   useNakshatramNext,
@@ -49,7 +50,14 @@ function HomeInner({ homeId }: { homeId: string }) {
     if (templeQuery.isError) clearHomeTempleCache()
   }, [templeQuery.isError])
   const poojas = useTemplePoojas(homeId).data?.poojas ?? []
-  const nearby = (useNearbyTemples().data ?? []).filter((t) => t.id !== homeId).slice(0, 3)
+  // The location chip is the ask. Tapping it means "near me", which is the one
+  // moment a permission dialog explains itself — asking on app open is the
+  // prompt everybody denies, and a denial is sticky.
+  const [wantLocation, setWantLocation] = useState(false)
+  const device = useDeviceLocation(wantLocation)
+  const nearby = (useNearbyTemples(200, device.data).data ?? [])
+    .filter((t) => t.id !== homeId)
+    .slice(0, 3)
   const feed = useFeed().data ?? []
   const panchangam = usePanchangam().data
   const members = useMembers().data ?? []
@@ -73,6 +81,15 @@ function HomeInner({ homeId }: { homeId: string }) {
         break
     }
   }
+
+  // What the chip says, and it must not overstate. Only "near you" once a real
+  // fix arrived; "using Thrissur" when the ask was refused or timed out, so the
+  // distances on screen are explained rather than quietly wrong.
+  const placeLabel = device.data
+    ? T('locNearYou')
+    : wantLocation && !device.isFetching
+      ? T('locDefault')
+      : 'Thrissur, Kerala'
 
   const book = (key: string, amt: number) => toast(`${T('book')} · ${money(amt)}`)
   const today = new Date().toLocaleDateString(lang === 'ml' ? 'ml-IN' : 'en-IN', {
@@ -98,9 +115,15 @@ function HomeInner({ homeId }: { homeId: string }) {
           </button>
         </div>
         <div className="placerow">
-          <button className="placechip" onClick={() => toast(T('locToast'))}>
+          <button
+            className="placechip"
+            onClick={() => {
+              if (device.data) return
+              setWantLocation(true)
+            }}
+          >
             <Icon name="i-pin" />
-            <span className="nm">Thrissur, Kerala</span>
+            <span className="nm">{placeLabel}</span>
             <Icon name="i-navigate" cls="cv" />
           </button>
           <span className="datechip">{today}</span>
