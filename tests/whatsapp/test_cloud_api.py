@@ -1,10 +1,14 @@
-"""Tests for the official Meta WhatsApp Cloud API transport.
+"""Tests for the Meta WhatsApp Cloud API transport — the only one, since Part 15.
 
-Covers the pieces that make "cloud" a drop-in replacement for WAHA:
   - CloudAPIClient: recipient formatting, mock send, AI-disclosure footer.
-  - _make_transport: config selects cloud vs waha.
   - Cloud webhook: GET verification handshake, X-Hub-Signature-256 verification,
-    and POST routing an inbound text through the SAME brain as WAHA.
+    and POST routing an inbound text through the brain.
+
+The disclosure assertions matter more than they look. The string they check used
+to live inside ``waha_client.py``, which Part 15 deleted — the Cloud client
+imported it from there, so a careless removal would have taken GUARDRAILS §3's
+AI disclosure off every outbound message with nothing failing. It now lives in
+``whatsapp/disclosure.py``, which belongs to no transport.
 """
 
 import hashlib
@@ -20,10 +24,10 @@ from sqlalchemy.pool import StaticPool
 
 from app.modules.whatsapp import onboarding as ob
 from app.modules.whatsapp.cloud_api_client import CloudAPIClient, _phone_to_wa_id
+from app.modules.whatsapp.disclosure import AI_DISCLOSURE, OPT_OUT, with_footer
 from app.modules.whatsapp.router import _verify_meta_signature
 from app.modules.whatsapp.service import _make_transport
-from app.modules.whatsapp.waha_client import WAHAClient, _AI_DISCLOSURE
-from app.platform.config import get_settings
+from app.platform.config import get_settings, warn_about_removed_settings
 from app.platform.db import Base
 
 _PHONE = "919400621156"
@@ -56,13 +60,13 @@ async def test_cloud_send_text_is_mocked_and_carries_disclosure(monkeypatch):
 
     monkeypatch.setattr(client, "_send", _capture)
     await client.send_text(_PHONE, "നമസ്കാരം")
-    assert _AI_DISCLOSURE in captured["text"]
+    assert AI_DISCLOSURE in captured["text"]
     assert captured["text"].startswith("നമസ്കാരം")
 
     # send_text_raw must NOT append it.
     captured.clear()
     await client.send_text_raw(_PHONE, "STOP confirmed")
-    assert _AI_DISCLOSURE not in captured["text"]
+    assert AI_DISCLOSURE not in captured["text"]
 
 
 async def test_cloud_send_mock_returns_placeholder_without_network(monkeypatch):
@@ -72,17 +76,40 @@ async def test_cloud_send_mock_returns_placeholder_without_network(monkeypatch):
     assert result == {"mock": True, "to": _PHONE}
 
 
+# ---- the compliance footers ----
+
+
+def test_a_proactive_message_carries_the_disclosure_and_the_way_out():
+    """GUARDRAILS §3. A message somebody did not ask for right now must say it
+    is AI-assisted AND how to stop the next one; a reply only needs the first."""
+    body = with_footer("നാളെ ഉത്സവം")
+    assert body.startswith("നാളെ ഉത്സവം")
+    assert AI_DISCLOSURE in body
+    assert OPT_OUT in body
+
+
 # ---- transport selection ----
 
 
-def test_make_transport_selects_cloud(monkeypatch):
-    monkeypatch.setattr(get_settings(), "whatsapp_transport", "cloud")
+def test_there_is_one_transport_and_it_is_the_cloud_api():
+    # Part 15 removed the self-hosted WAHA stack. The selector is gone with it;
+    # what remains is a seam, so the next swap is a one-file change again.
     assert isinstance(_make_transport(), CloudAPIClient)
 
 
-def test_make_transport_defaults_to_waha(monkeypatch):
+def test_a_stale_waha_setting_warns_instead_of_being_ignored(monkeypatch):
+    """A Space whose env still says WHATSAPP_TRANSPORT=waha keeps working — its
+    messages go out over the Cloud API — but quietly doing something other than
+    what was configured is how an operator comes to believe a channel is wired
+    the way they set it up. It boots, and it complains."""
     monkeypatch.setattr(get_settings(), "whatsapp_transport", "waha")
-    assert isinstance(_make_transport(), WAHAClient)
+    problems = warn_about_removed_settings()
+    assert len(problems) == 1
+    assert "waha" in problems[0].lower()
+    assert "cloud" in problems[0].lower()
+
+    monkeypatch.setattr(get_settings(), "whatsapp_transport", "cloud")
+    assert warn_about_removed_settings() == []
 
 
 # ---- signature verification ----
@@ -230,3 +257,29 @@ async def test_cloud_webhook_ignores_delivery_statuses(api):
     resp = await api.post("/whatsapp/cloud-webhook", json=body)
     assert resp.status_code == 200
     assert resp.json() == {"status": "ok", "handled": "0"}
+
+
+# ---- the transport health probe ----
+
+
+async def test_status_reports_mock_mode_without_touching_the_network(monkeypatch):
+    monkeypatch.setattr(get_settings(), "mock_whatsapp", True)
+    result = await CloudAPIClient().is_healthy()
+    assert result == {"healthy": True, "mock": True, "transport": "cloud"}
+
+
+async def test_status_names_the_missing_credential(monkeypatch):
+    """"Live" on the console's Integrations page only means "not mocked". An
+    expired token or a wrong phone-number id looks identical from there until a
+    devotee's reply fails to arrive, which is why this probe exists at all."""
+    monkeypatch.setattr(get_settings(), "mock_whatsapp", False)
+    monkeypatch.setattr(get_settings(), "meta_access_token", "")
+    monkeypatch.setattr(get_settings(), "meta_phone_number_id", "")
+    result = await CloudAPIClient().is_healthy()
+    assert result["healthy"] is False
+    assert "meta_access_token" in result["error"]
+
+
+async def test_status_is_owner_only(api):
+    # It returns the sending number's display name and Meta quality rating.
+    assert (await api.get("/whatsapp/status")).status_code == 401

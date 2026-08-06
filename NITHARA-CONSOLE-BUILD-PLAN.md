@@ -579,7 +579,22 @@ Lowest-risk part — these endpoints all exist and are exercised today.
 - whatsapp.html stays until Part 13 ports it.
 ```
 
-## Part 15 — Retire the WAHA transport
+## Part 15 — Retire the WAHA transport  ✅ DONE
+
+> Owner confirmed 2026-08-06. Everything below is deleted, plus the `waha`
+> sidecar in docker-compose. `whatsapp_transport` defaults to `"cloud"` and a
+> stale `"waha"` value warns at startup instead of being silently ignored.
+>
+> **The trap this part contained:** `_with_disclosure` lived inside
+> `waha_client.py` and `cloud_api_client.py` imported it from there, so a
+> straight deletion would have removed GUARDRAILS §3's AI disclosure from every
+> outbound Cloud API message with nothing failing — the tests that checked it
+> imported the constant from the same doomed file. It now lives in
+> `whatsapp/disclosure.py`, which belongs to no transport.
+>
+> `GET /whatsapp/status` replaces `/waha-status`, keeping the credential probe
+> that removing the routes would otherwise have orphaned.
+
 ```
 Decision (2026-07-27): drop the self-hosted WAHA path entirely. It is an
 unofficial bridge that links a real phone account, needs an external always-on

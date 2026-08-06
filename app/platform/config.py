@@ -112,14 +112,17 @@ class Settings(BaseSettings):
     whatsapp_bsp_api_key: str = ""
     whatsapp_channel_id: str = ""
 
-    # ---- WhatsApp transport selector: which stack sends/receives 1:1 chat ----
-    # "waha"  = self-hosted WAHA (GOWS/whatsmeow) — unofficial, links a real
-    #           device by QR/pairing code; fragile (Meta unlinks/bans it).
-    # "cloud" = official Meta WhatsApp Cloud API (graph.facebook.com) — durable,
-    #           no device linking, no unlink/ban risk. Needs a Meta app + token.
-    # Only the OUTBOUND adapter + which inbound webhook is authoritative change;
-    # the conversation brain is identical. Default stays "waha" for back-compat.
-    whatsapp_transport: str = "waha"
+    # ---- WhatsApp transport ----
+    # "cloud" = the official Meta WhatsApp Cloud API (graph.facebook.com), and
+    # since console plan Part 15 the only one. The self-hosted "waha" stack was
+    # removed: it linked a real device by QR, Meta could unlink or ban it at
+    # will, and it needed an always-on external host with its own keepalive and
+    # auto-recover machinery to survive that host sleeping.
+    #
+    # A deployment whose env still says "waha" keeps booting and is warned at
+    # startup (see `warn_about_removed_settings`). Refusing to start would take
+    # the whole API down over one channel's stale variable.
+    whatsapp_transport: str = "cloud"
 
     # ---- Meta WhatsApp Cloud API (used when whatsapp_transport == "cloud") ----
     # From the Meta app dashboard → WhatsApp → API Setup. The access token is a
@@ -139,33 +142,6 @@ class Settings(BaseSettings):
     # webhook POSTs are verified against the X-Hub-Signature-256 HMAC so a
     # forged caller can't inject messages. Empty = signature check skipped.
     meta_app_secret: str = ""
-
-    # ---- WAHA (WhatsApp HTTP API) — real two-way WhatsApp chat ----
-    # Base URL of the WAHA container's REST API (default: sidecar on port 3010).
-    waha_api_url: str = "http://localhost:3010/api"
-    # Session name configured in WAHA (matches the session started via the WAHA UI).
-    waha_session: str = "default"
-    # API key for WAHA (if WAHA is started with WAHA_API_KEY env var).
-    waha_api_key: str = ""
-    # Shared secret for verifying inbound webhook payloads (optional extra layer).
-    waha_webhook_secret: str = ""
-    # ---- Keep-alive: stop a scale-to-zero WAHA host (e.g. Render free tier)
-    # from sleeping. Render spins the container down after ~15 min with no
-    # inbound HTTP traffic; WhatsApp messages arrive over Meta's websocket (not
-    # HTTP) so they don't wake it. When enabled (and not mocked), a background
-    # task pings the WAHA host on an interval so it keeps seeing HTTP traffic.
-    # NOTE: this only works while Tara itself is awake — if Tara is also on a
-    # scale-to-zero host, pair it with an external pinger hitting Tara's /health.
-    waha_keepalive_enabled: bool = False
-    waha_keepalive_interval_seconds: int = 600  # 10 minutes
-    # Explicit URL to ping. Empty = derive "<waha host>/ping" from waha_api_url.
-    waha_keepalive_url: str = ""
-    # Auto-recover a dropped WhatsApp session: each keepalive cycle, if the WAHA
-    # session is FAILED/STOPPED (a transient connection drop), restart it so it
-    # reconnects from the persisted creds — no human re-pair needed. Sessions in
-    # SCAN_QR_CODE (a real logout needing a new QR/code) are left alone. Only
-    # runs while the keepalive task is running (waha_keepalive_enabled + live).
-    waha_autorecover_enabled: bool = True
 
     # ---- Payments (Razorpay) ----
     razorpay_key_id: str = ""
@@ -221,6 +197,31 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
+
+
+def warn_about_removed_settings() -> list[str]:
+    """Complain, at boot, about env that names something no longer here.
+
+    Console plan Part 15 deleted the self-hosted WAHA transport. A deployment
+    that still says ``WHATSAPP_TRANSPORT=waha`` keeps working — its messages go
+    out through the Cloud API — but it is asking for a stack that does not
+    exist, and silently doing something else is how an operator comes to believe
+    a channel is wired the way they configured it.
+
+    A warning rather than a refusal: taking the whole API down over one
+    channel's stale variable is out of proportion to the mistake. Returns the
+    messages so a test can assert on them without reading the log.
+    """
+    problems: list[str] = []
+    transport = get_settings().whatsapp_transport.strip().lower()
+    if transport and transport != "cloud":
+        problems.append(
+            f"WHATSAPP_TRANSPORT={transport!r} is not a transport this build has. "
+            "The self-hosted WAHA stack was removed; WhatsApp now goes through "
+            "the official Meta Cloud API. Set it to 'cloud' or unset it, and "
+            "make sure META_ACCESS_TOKEN and META_PHONE_NUMBER_ID are configured."
+        )
+    return problems
 
 
 def is_admin_phone(phone: str | None) -> bool:

@@ -1,4 +1,4 @@
-"""Public service for the whatsapp module — Channel broadcast + 1:1 cap + WAHA chat.
+"""Public service for the whatsapp module — Channel broadcast, 1:1 cap, chat.
 
 This is the ONLY surface other modules may depend on (AGENTS.md).
 
@@ -8,9 +8,9 @@ HARD GUARDRAILS (GUARDRAILS.md §3 — enforced here, never weakened):
   - Business-initiated 1:1 sends are capped at MAX_WA_MESSAGES_PER_DAY per phone
     per 24h, enforced by a counter (see consent.WAMessageLog), not by hand.
   - Opt-in is required before any PROACTIVE send (see consent.is_opted_in).
-  - User-initiated WhatsApp chat (WAHA integration): full two-way AI chat is
-    allowed per owner approval (2026-07-09). Every reply carries the AI
-    disclosure. The daily cap does NOT apply to user-initiated messages.
+  - User-initiated WhatsApp chat: full two-way AI chat is allowed per owner
+    approval (2026-07-09). Every reply carries the AI disclosure. The daily cap
+    does NOT apply to user-initiated messages.
   - NO function joins or adds a bot to a WhatsApp group. Prohibited.
 """
 
@@ -22,7 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.whatsapp import consent
 from app.modules.whatsapp import onboarding as ob
 from app.modules.whatsapp.cloud_api_client import CloudAPIClient
-from app.modules.whatsapp.waha_client import WAHAClient
+from app.modules.whatsapp.disclosure import with_footer as _with_footer
 from app.platform.config import get_settings
 from app.platform.logging_config import get_logger
 
@@ -30,11 +30,6 @@ logger = get_logger(__name__)
 
 # GUARDRAILS.md §3 hard cap; default 3, overridable per environment.
 MAX_WA_MESSAGES_PER_DAY = int(os.getenv("MAX_WA_MESSAGES_PER_DAY", "3"))
-
-# Appended to EVERY proactive message. AI disclosure + friction-free opt-out.
-_AI_DISCLOSURE = "🤖 ഈ സന്ദേശം AI സഹായത്തോടെ തയ്യാറാക്കിയതാണ്."
-_OPT_OUT = "ഈ സന്ദേശങ്ങൾ വേണ്ടെങ്കിൽ 'STOP' എന്ന് മറുപടി അയക്കൂ."
-_FOOTER = f"\n\n{_AI_DISCLOSURE}\n{_OPT_OUT}"
 
 # Max messages to keep in the rolling chat context for multi-turn WhatsApp chat.
 _MAX_CONTEXT_TURNS = 10  # 10 messages = 5 user + 5 assistant turns
@@ -44,25 +39,20 @@ _STOP_KEYWORDS = {"stop", "unsubscribe", "quit", "നിർത്തൂ"}
 _START_KEYWORDS = {"start", "subscribe", "hi", "hello", "ഹായ്", "നമസ്കാരം"}
 
 
-def _with_footer(message: str) -> str:
-    return f"{message}{_FOOTER}"
+def _make_transport() -> CloudAPIClient:
+    """The outbound WhatsApp client.
 
-
-def _make_transport():
-    """Pick the outbound WhatsApp client by config.
-
-    "cloud" → official Meta Cloud API (durable); anything else → WAHA (default,
-    back-compat). Both expose the same send_text / send_text_raw / is_healthy
-    surface, so the rest of the service is transport-agnostic.
+    One transport since Part 15 retired WAHA. Kept as a function rather than
+    inlined so the seam survives: every send in this module goes through the
+    object it returns, which is what made swapping the transport a one-file
+    change the last time and will again.
     """
-    if get_settings().whatsapp_transport.strip().lower() == "cloud":
-        return CloudAPIClient()
-    return WAHAClient()
+    return CloudAPIClient()
 
 
 class WhatsappService:
     def __init__(self) -> None:
-        self._waha = _make_transport()
+        self._transport = _make_transport()
 
     # ---- Channel broadcast (existing, unchanged) ----
 
@@ -120,7 +110,7 @@ class WhatsappService:
             "(AGENTS.md / GUARDRAILS.md §3)."
         )
 
-    # ---- WAHA inbound message handler (new) ----
+    # ---- inbound message handler ----
 
     # Legacy FSM state names → the new conversation model, applied on read so old
     # wa_sessions rows keep working without a data migration.
@@ -149,7 +139,7 @@ class WhatsappService:
              anything else is answered conversationally with no chart.
 
         The daily cap does NOT apply here — these are user-initiated messages.
-        The AI disclosure is appended by WAHAClient.send_text(), not here.
+        The AI disclosure is appended by the transport's send_text(), not here.
         """
         text = (text or "").strip()
         lower = text.lower()
@@ -466,23 +456,31 @@ class WhatsappService:
                 "ദയവായി വീണ്ടും ശ്രമിക്കൂ."
             )
 
-    # ---- WAHA status (for admin/health) ----
+    # ---- transport health ----
 
-    async def waha_status(self) -> dict:
-        """Check the WAHA connection status."""
-        return await self._waha.is_healthy()
+    async def transport_status(self) -> dict:
+        """Whether the configured credentials actually reach WhatsApp.
+
+        The console's Integrations page can say the WhatsApp integration is
+        "live", which only means it is not mocked — an expired token or a wrong
+        phone-number id looks identical from there until a devotee's reply fails
+        to arrive. ``/waha-status`` used to answer this for the old transport;
+        this is its replacement, and it is the same question.
+        """
+        return await self._transport.is_healthy()
+
+    # ---- outbound ----
 
     async def send_reply(self, phone: str, text: str) -> dict:
-        """Send a reply to a WhatsApp user via WAHA.
+        """Reply to a WhatsApp user, disclosure appended by the transport.
 
-        Public convenience method so the router doesn't need to instantiate
-        WAHAClient directly.
+        Public convenience method so the router never touches the client.
         """
-        return await self._waha.send_text(phone, text)
+        return await self._transport.send_text(phone, text)
 
     async def send_reply_raw(self, phone: str, text: str) -> dict:
         """Send a raw reply (no AI disclosure) — for system messages only."""
-        return await self._waha.send_text_raw(phone, text)
+        return await self._transport.send_text_raw(phone, text)
 
 
 # Module-level convenience surface.

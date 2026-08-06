@@ -174,10 +174,17 @@ the same module at once.
   screen's loading / empty / error states.
 - Never put client-controlled text into `users.phone` — it is the identity key
   across Postgres and Mongo.
-- **WAHA is being retired** (console plan Part 14). Do not build anything new on
-  `waha_client.py` or `keepalive.py`. Until the official Cloud API's send
-  timeout is fixed, the WhatsApp surface is the console's simulator, which
-  drives the real brain through `POST /whatsapp/simulate`.
+- **WAHA is gone** (console plan Part 15, 2026-08-06). `waha_client.py`,
+  `keepalive.py` and the three `/waha-*` routes were deleted; WhatsApp goes
+  through the official Meta Cloud API only. Until that transport's send-timeout
+  problem is fixed, the WhatsApp surface people actually use is the console's
+  simulator at Channels → WhatsApp sim, which drives the real brain through
+  `POST /whatsapp/simulate`.
+- **The AI disclosure lives in `whatsapp/disclosure.py`**, not in a transport.
+  It used to sit inside `waha_client.py` with the Cloud client importing it from
+  there, which meant deleting a transport could have silently removed a
+  GUARDRAILS §3 requirement from every outbound message. Any new sender appends
+  it from that module.
 
 ## Working baselines (do not regress)
 - `pytest` — **321 pass**. Two failures in `tests/whatsapp/test_whatsapp.py` are

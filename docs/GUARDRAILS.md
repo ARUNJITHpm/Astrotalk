@@ -29,7 +29,7 @@ Operational rules that must be **enforced in code**, not just followed by conven
 - **Opt-in required** before any PROACTIVE send; track in `wa_consent` keyed by phone number.
 - Every proactive message includes a visible **opt-out** instruction and discloses it's from an **AI-assisted** service.
 - **Hard cap: 3 business-initiated messages per user per 24 hours.** Enforce with a counter, not a manual process.
-- **Two-way AI chat** is available on WhatsApp via WAHA (approved 2026-07-09). User-initiated messages receive full Tara responses (same brain as the website). Every outbound reply carries the AI disclosure. The daily cap does NOT apply to user-initiated messages.
+- **Two-way AI chat** is available on WhatsApp via the Meta Cloud API (approved 2026-07-09). User-initiated messages receive full Tara responses (same brain as the website). Every outbound reply carries the AI disclosure. The daily cap does NOT apply to user-initiated messages.
 - Users who send **STOP** are opted out immediately; sending **START** re-subscribes them.
 - Never programmatically join or add a bot to a WhatsApp group the business does not own. Temple/community distribution happens via shared Channel links, by invitation.
 

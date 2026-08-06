@@ -1,16 +1,17 @@
 """HTTP adapter for the official Meta WhatsApp Cloud API.
 
-The durable alternative to WAHA. Same public surface as ``WAHAClient``
-(``send_text`` / ``send_text_raw`` / ``is_healthy``) so ``WhatsappService`` can
-hold either one interchangeably — the transport is chosen by
-``settings.whatsapp_transport`` ("waha" | "cloud").
+The only outbound WhatsApp client since console plan Part 15, which removed the
+self-hosted WAHA stack. That stack linked a real device by QR or pairing code,
+which Meta's anti-abuse repeatedly unlinked or banned, and it needed an
+always-on external host with keepalive and auto-recover machinery to survive
+that host sleeping. This is the official channel: no device linking, nothing to
+keep awake.
 
-Why this exists: the WAHA/GOWS/whatsmeow stack links a real device via QR/pairing
-code, which Meta's anti-abuse repeatedly unlinks or bans. The Cloud API is the
-official channel — no device linking, no unlink/ban risk. Migrating is contained
-to this file + the inbound webhook (Cloud API's payload shape differs from WAHA's).
+The surface (``send_text`` / ``send_text_raw`` / ``is_healthy``) is deliberately
+narrow, so ``WhatsappService`` never learns which client it holds and swapping
+transports stays a one-file change.
 
-GUARDRAILS.md §3 (enforced here, identical to WAHAClient):
+GUARDRAILS.md §3 (enforced here):
   - Every outbound message carries the AI disclosure.
   - ``mock_whatsapp`` mode logs instead of calling Meta (zero network in dev).
 
@@ -29,7 +30,7 @@ import asyncio
 
 import httpx
 
-from app.modules.whatsapp.waha_client import _with_disclosure
+from app.modules.whatsapp.disclosure import with_disclosure
 from app.platform.config import get_settings
 from app.platform.logging_config import get_logger
 
@@ -83,7 +84,7 @@ def _phone_to_wa_id(phone: str) -> str:
 class CloudAPIClient:
     """Thin HTTP adapter over Meta's WhatsApp Cloud API.
 
-    Mirrors ``WAHAClient``'s method surface so the two are drop-in swappable.
+    The whole surface ``WhatsappService`` depends on — see the module docstring.
     Respects ``mock_whatsapp``: True = log only (dev default, no network),
     False = call the live Graph API.
     """
@@ -111,7 +112,7 @@ class CloudAPIClient:
     async def send_text(self, phone: str, text: str) -> dict:
         """Send a text message with the AI disclosure footer appended (in code,
         so it cannot be skipped). The standard send for chat replies / prompts."""
-        return await self._send(phone, _with_disclosure(text))
+        return await self._send(phone, with_disclosure(text))
 
     async def send_text_raw(self, phone: str, text: str) -> dict:
         """Send a text message WITHOUT the AI disclosure footer. Reserved for

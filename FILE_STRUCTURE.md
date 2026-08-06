@@ -28,7 +28,7 @@ tara/
 │   │   ├── tone_safety/          Tara's persona prompt, crisis/self-harm screen, output guardrail on replies
 │   │   ├── chat/                 The AI astrologer orchestrator: history, memory, recurrence, curiosity chips
 │   │   ├── content/               Daily content pipeline: drafts → share cards → publishers (Meta/YT)
-│   │   ├── whatsapp/              WhatsApp channel: Cloud API + WAHA transports, onboarding, consent ledger
+│   │   ├── whatsapp/              WhatsApp channel: Meta Cloud API transport, onboarding, consent ledger
 │   │   ├── community/             Audio-room style community features (ENGAGEMENT_PLAN Part A)
 │   │   ├── commerce/              Subscriptions, premium PDF reports, billing (GROWTH_PLAN Part 5)
 │   │   ├── orgs/                  Multi-tenancy core: white-label orgs, booking, astrologer CRM, SaaS billing

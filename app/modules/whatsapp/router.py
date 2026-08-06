@@ -1,11 +1,15 @@
-"""HTTP routes for the whatsapp module — BSP webhooks, consent ledger, WAHA webhook.
+"""HTTP routes for the whatsapp module — the Cloud API webhook, consent, simulator.
 
 Opt-in is required before any PROACTIVE send (GUARDRAILS.md §3). The first live
 send needs human approval (AGENTS.md).
 
-Two-way AI chat via WAHA is enabled per owner approval (2026-07-09). Inbound
+Two-way AI chat is enabled per owner approval (2026-07-09). Inbound
 user-initiated messages are processed by ``WhatsappService.handle_inbound_message``
-and replied to via the ``WAHAClient`` adapter.
+and replied to through the Cloud API client.
+
+Console plan Part 15 removed the self-hosted WAHA transport and its three
+routes. ``/cloud-webhook`` is the only inbound path now; a WAHA container still
+POSTing to the old ``/waha-webhook`` gets a 404, which is the correct answer.
 """
 
 import asyncio
@@ -18,6 +22,7 @@ from fastapi.responses import PlainTextResponse, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.whatsapp import consent
+from app.modules.whatsapp.disclosure import with_disclosure
 from app.modules.whatsapp.models import (
     WASession,  # noqa: F401 — ensures init_db creates wa_sessions
 )
@@ -26,11 +31,9 @@ from app.modules.whatsapp.schemas import (
     ConsentResponse,
     SimulateRequest,
     SimulateResponse,
-    WAHAWebhookEvent,
 )
 from app.modules.whatsapp.service import WhatsappService
-from app.modules.whatsapp.waha_client import WAHAClient, _chat_id_to_phone, _with_disclosure
-from app.platform.admin_auth import AdminGuard, require_operator
+from app.platform.admin_auth import require_operator
 from app.platform.config import get_settings
 from app.platform.db import get_session
 from app.platform.logging_config import get_logger
@@ -48,17 +51,16 @@ OwnerGuard = Depends(require_operator("owner"))
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 
 _service = WhatsappService()
-_waha = WAHAClient()
 
 
 import time as _time
 
-# Recently-processed webhook event ids → monotonic timestamp. WAHA occasionally
-# delivers the same message event twice (e.g. multiple linked-device sessions on
-# the number); we reply only to the first. In-memory is fine — the HF Space is a
-# single process, and a missed dedup after a restart is harmless (at worst one
-# duplicate reply). Check+insert is synchronous so concurrent duplicate requests
-# can't both pass (asyncio won't interleave a function with no await).
+# Recently-processed webhook message ids → monotonic timestamp. Meta redelivers
+# a message when our 200 is slow or lost, so without this a delayed reply earns
+# a second one. In-memory is fine — the HF Space is a single process, and a
+# missed dedup after a restart is harmless (at worst one duplicate reply).
+# Check+insert is synchronous so concurrent duplicate requests can't both pass
+# (asyncio won't interleave a function with no await).
 _SEEN_EVENTS: dict[str, float] = {}
 _SEEN_TTL = 300.0  # seconds
 
@@ -119,29 +121,6 @@ def _schedule_send(label: str, send) -> None:
     task.add_done_callback(_BG_SENDS.discard)
 
 
-def _reply_chat_id(payload: dict, from_field: str) -> str:
-    """The chat id to reply to, resolving WhatsApp's LID addressing.
-
-    GOWS delivers some messages with ``from="<lid>@lid"`` — a privacy alias, not
-    a phone number. Replying to a LID is slow/unreliable (and identity lookup on
-    it never matches a real user), but the sender's REAL phone is carried in
-    ``_data.Info.SenderAlt`` as ``"<phone>@s.whatsapp.net"``. Prefer it so the
-    reply routes to a normal ``"<phone>@c.us"`` chat and the phone key matches
-    the web-registered user. Normal ``@c.us`` senders pass straight through.
-    """
-    if from_field.endswith("@lid"):
-        info = (payload.get("_data") or {}).get("Info") or {}
-        alt = info.get("SenderAlt") or ""
-        if alt.endswith("@s.whatsapp.net"):
-            digits = alt.split("@", 1)[0].split(":", 1)[0]  # drop device suffix
-            if digits.isdigit():
-                return f"{digits}@c.us"
-    return from_field
-
-
-# ---- Existing BSP webhook (unchanged) ----
-
-
 @router.post("/webhook")
 async def webhook() -> dict[str, str]:
     # Opt-in only; first live send needs human approval (AGENTS.md / GUARDRAILS.md).
@@ -164,107 +143,6 @@ async def opt_out(payload: ConsentRequest, session: SessionDep) -> ConsentRespon
     record = await consent.opt_out(session, payload.phone)
     await session.commit()
     return ConsentResponse(phone=record.phone, opted_in=record.opted_in)
-
-
-# ---- WAHA webhook (new: real WhatsApp integration) ----
-
-
-@router.post("/waha-webhook")
-async def waha_webhook(request: Request, session: SessionDep) -> dict[str, str]:
-    """Receive inbound WhatsApp messages from the WAHA container.
-
-    WAHA posts JSON events here for every incoming message. We:
-      1. Parse the event envelope (WAHAWebhookEvent).
-      2. Ignore non-message events (acks, status changes, etc.).
-      3. Ignore group messages (GUARDRAILS.md §3: no bots in groups).
-      4. Extract sender phone + message text.
-      5. Route through WhatsappService.handle_inbound_message().
-      6. Send the reply back via WAHAClient.
-
-    The endpoint always returns 200 to WAHA (even on internal errors) so WAHA
-    doesn't retry and flood us. Errors are logged, not surfaced.
-    """
-    try:
-        body = await request.json()
-    except Exception:
-        logger.warning("waha-webhook: invalid JSON body")
-        return {"status": "ignored", "reason": "invalid json"}
-
-    # Optional webhook secret verification.
-    secret = get_settings().waha_webhook_secret
-    if secret:
-        header_secret = request.headers.get("X-Webhook-Secret", "")
-        if header_secret != secret:
-            logger.warning("waha-webhook: invalid webhook secret")
-            return {"status": "ignored", "reason": "invalid secret"}
-
-    try:
-        event = WAHAWebhookEvent(**body)
-    except Exception as exc:
-        logger.warning("waha-webhook: payload parse error (%s)", exc)
-        return {"status": "ignored", "reason": "parse error"}
-
-    # Only process "message" events.
-    if event.event != "message":
-        return {"status": "ignored", "reason": f"event type: {event.event}"}
-
-    # Extract the message fields from the payload.
-    payload = event.payload
-    # WAHA payload structure: payload.from (sender), payload.body (text).
-    # The "from" field is a chat ID like "919876543210@c.us".
-    from_field = payload.get("from", "")
-    body_text = payload.get("body", "")
-
-    # Ignore messages from ourselves (the bot number).
-    if payload.get("fromMe", False):
-        return {"status": "ignored", "reason": "own message"}
-
-    # Ignore group messages (GUARDRAILS.md §3).
-    if "@g.us" in from_field:
-        return {"status": "ignored", "reason": "group message"}
-
-    if not from_field or not body_text:
-        return {"status": "ignored", "reason": "empty message"}
-
-    # Drop duplicate deliveries of the same event so we don't reply twice.
-    if _already_processed(event.id, str(payload.get("id", ""))):
-        logger.info("waha-webhook: duplicate event %s ignored", event.id or payload.get("id"))
-        return {"status": "ignored", "reason": "duplicate"}
-
-    # Resolve LID-addressed senders to their real "<phone>@c.us" chat id, then
-    # derive the phone key from THAT (not the raw LID) so identity matches the
-    # web-registered user and the reply routes to a real phone.
-    from app.modules.identity.service import normalize_phone
-
-    reply_chat = _reply_chat_id(payload, from_field)
-    phone = normalize_phone(_chat_id_to_phone(reply_chat))
-
-    logger.info("waha-webhook: inbound from phone ending ••%s", phone[-2:])
-
-    try:
-        # Route through the service orchestrator.
-        reply = await _service.handle_inbound_message(session, phone, body_text)
-        await session.commit()
-
-        # Send the reply back to the resolved chat id.
-        await _service.send_reply(reply_chat, reply)
-
-        return {"status": "ok"}
-
-    except Exception as exc:
-        logger.error("waha-webhook: processing failed (%s)", exc)
-        # Best-effort error reply to the user.
-        try:
-            await _service.send_reply(
-                reply_chat,
-                "❌ ക്ഷമിക്കണം, ഒരു പിശക് സംഭവിച്ചു. ദയവായി വീണ്ടും ശ്രമിക്കൂ.",
-            )
-        except Exception:
-            pass
-        return {"status": "error"}
-
-
-# ---- Meta WhatsApp Cloud API webhook (the durable, official transport) ----
 
 
 def _verify_meta_signature(raw_body: bytes, header: str, app_secret: str) -> bool:
@@ -309,13 +187,14 @@ async def cloud_webhook_verify(request: Request) -> Response:
 async def cloud_webhook(request: Request, session: SessionDep) -> dict[str, str]:
     """Receive inbound WhatsApp messages from the Meta Cloud API.
 
-    Payload shape (differs from WAHA — nested):
+    Payload shape (nested):
       entry[].changes[].value.messages[]  → inbound messages
       entry[].changes[].value.statuses[]  → delivery/read receipts (ignored)
 
     A message carries ``from`` (bare international digits, e.g. ``919400621156``)
     and, for text, ``text.body``. We route each text message through the SAME
-    brain as WAHA (``handle_inbound_message``) and reply via the Cloud API client.
+    same brain as the simulator (``handle_inbound_message``) and reply via the
+    Cloud API client.
 
     Always returns 200 so Meta doesn't retry-flood us; errors are logged.
     """
@@ -409,7 +288,7 @@ async def simulate_message(
 ) -> SimulateResponse:
     """Route a message through the SAME brain as real WhatsApp — onboarding FSM,
     registration, chat — for an arbitrary phone, and return the reply instead of
-    sending it via WAHA. Used by the /whatsapp demo page to test the exact flow
+    sending it. Used by the console's Channels → WhatsApp sim to test the flow
     a real WhatsApp user would get.
 
     Owner-gated: the caller can act as ANY phone number, which would otherwise
@@ -423,24 +302,23 @@ async def simulate_message(
 
     reply = await _service.handle_inbound_message(session, phone, payload.text)
     await session.commit()
-    # Mirror the real path: WAHAClient.send_text appends the AI disclosure.
-    return SimulateResponse(reply=_with_disclosure(reply))
+    # Mirror the real path: the transport's send_text appends the AI disclosure.
+    return SimulateResponse(reply=with_disclosure(reply))
 
 
-# ---- WAHA admin endpoints (new) ----
-# Both are admin-gated: /waha-qr returns the pairing QR and session details for
-# the WhatsApp account, which is enough for a stranger to attach their own
-# device to it. /waha-status leaks the connected number and session state. They
-# were unguarded until now despite saying "for admin" on the tin.
+# ---- transport health ----
 
 
-@router.get("/waha-status", dependencies=[AdminGuard])
-async def waha_status() -> dict:
-    """Check WAHA connection status (for admin dashboard / health probes)."""
-    return await _service.waha_status()
+@router.get("/status", dependencies=[OwnerGuard])
+async def transport_status() -> dict:
+    """Is the WhatsApp transport actually usable?
 
+    Replaces ``/waha-status``, which Part 15 removed with the transport it
+    probed. Owner-gated: the reply carries the sending number's display name and
+    Meta quality rating, and a failure carries whichever credential is missing.
 
-@router.get("/waha-qr", dependencies=[AdminGuard])
-async def waha_qr() -> dict:
-    """Get the WAHA QR code / session info (for admin pairing setup)."""
-    return await _waha.get_qr()
+    "Live" on the console's Integrations page only means "not mocked". An
+    expired token or a wrong phone-number id looks exactly the same from there
+    until a devotee's reply does not arrive.
+    """
+    return await _service.transport_status()

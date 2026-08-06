@@ -439,7 +439,9 @@ def build():
 
     pdf.callout(
         "Reminder for the current test setup: rotate the permanent token you already "
-        "generated (it was shared in chat) and shut down the unused Render WAHA instance. "
+        "generated (it was shared in chat), and shut down the Render WAHA instance and "
+        "its host - the code path was deleted on 2026-08-06, so nothing calls it and "
+        "nothing keeps it awake any more. "
         "Separately, sending from the HF free Space has shown unreliable connectivity to "
         "graph.facebook.com; consider a Cloudflare Worker proxy or a sturdier host before "
         "real users rely on it.",

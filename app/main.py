@@ -51,8 +51,8 @@ from app.modules.orgs.router import whitelabel_router as orgs_whitelabel_router
 from app.modules.temples.router import router as temples_router
 from app.modules.temples.router import site_router as temples_site_router
 from app.modules.tone_safety.router import router as tone_safety_router
-from app.modules.whatsapp.keepalive import start_keepalive
 from app.modules.whatsapp.router import router as whatsapp_router
+from app.platform.config import warn_about_removed_settings
 from app.platform.db import init_db
 from app.platform.logging_config import configure_logging, get_logger
 from app.platform.mongo import close_mongo
@@ -95,12 +95,12 @@ async def lifespan(app: FastAPI):
     # Base.metadata is complete by the time we create missing tables here.
     await init_db()
     await _load_directories()
-    # Keep a scale-to-zero WAHA host (Render free tier) awake by pinging it on
-    # an interval. No-op unless waha_keepalive_enabled is set in production.
-    keepalive_task = start_keepalive()
+    # Say so when the environment names something this build no longer has —
+    # the alternative is a channel quietly working differently from how it was
+    # configured, which nobody discovers until a message does not arrive.
+    for problem in warn_about_removed_settings():
+        get_logger(__name__).warning("config: %s", problem)
     yield
-    if keepalive_task is not None:
-        keepalive_task.cancel()
     await close_mongo()
 
 

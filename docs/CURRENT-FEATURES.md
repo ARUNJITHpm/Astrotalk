@@ -37,7 +37,7 @@ Legend: 🟢 real/live · 🟡 real logic, mocked transport/key by default · �
 
 ## WhatsApp 🟢
 - Real two-way conversational onboarding over WhatsApp (collects name/DOB/time/place in Malayalam, then answers the original question) — same brain as web chat.
-- Dual transport: **WAHA** (self-hosted/unofficial, default) or **Meta Cloud API** (official, HMAC-verified webhook).
+- Transport: the official **Meta Cloud API** (HMAC-verified webhook). The self-hosted WAHA stack was removed on 2026-08-06.
 - Consent ledger, opt-in/opt-out keywords, AI-disclosure + opt-out footer on every proactive message (enforced in code), 3-messages/day cap on business-initiated sends.
 - 🟡 `MOCK_WHATSAPP` default **on** — logs instead of sending.
 

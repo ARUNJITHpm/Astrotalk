@@ -1169,6 +1169,75 @@ the number gate dark inside a white card. That block is now pinned
 The badge semantics are pinned by tests. The colours are not — a jsdom test
 cannot see them, and pretending otherwise would be worse than the note here.
 
+## Part 15 — the WAHA transport is gone — 2026-08-06
+
+Owner confirmed ("no need waha at all"), which was the sign-off this part was
+waiting on. `waha_client.py` (166 ln), `keepalive.py` (110 ln), the three
+`/waha-*` routes, the two WAHA webhook schemas, nine `waha_*` settings and the
+`waha` sidecar in docker-compose are all deleted. WhatsApp goes through the
+official Meta Cloud API and nothing else.
+
+Why it went: the stack linked a real device by QR or pairing code, which Meta's
+anti-abuse could unlink or ban at will, and it needed an always-on external host
+— which then needed its own keepalive pinger and session auto-recover machinery
+to survive that host scaling to zero. Two files of infrastructure existed solely
+to keep a third-party container awake.
+
+### The one that would have been quiet
+
+**`_with_disclosure` lived inside `waha_client.py`, and `cloud_api_client.py`
+imported it from there.** Deleting the transport would have taken GUARDRAILS §3's
+AI disclosure off every outbound Cloud API message, and nothing would have
+failed: the Cloud client's own tests imported the constant from the same doomed
+file, so they would have vanished with it.
+
+`whatsapp/disclosure.py` now owns the compliance strings — and both of them,
+because `service.py` had been carrying its own second copy of the same Malayalam
+sentence for proactive messages. Two footers, because they answer different
+questions: a reply needs the disclosure, a message somebody did not ask for
+needs the disclosure **and** the way out.
+
+### A stale setting warns rather than being ignored
+
+`whatsapp_transport` stays, defaulting to `"cloud"`. Deleting it outright would
+have been tidier and worse: pydantic reads settings with `extra="ignore"`, so a
+Space whose env still says `WHATSAPP_TRANSPORT=waha` would boot, use the Cloud
+API, and say nothing — an operator would go on believing the channel is wired
+the way they configured it.
+
+So `warn_about_removed_settings()` runs at startup and logs what is wrong and
+what to do about it. A warning, not a refusal: taking the whole API down over
+one channel's stale variable is out of proportion to the mistake.
+
+### `GET /whatsapp/status` replaces `/waha-status`
+
+Removing the WAHA routes orphaned `CloudAPIClient.is_healthy` — a working probe
+that validates the token and phone-number id against Meta and returns the
+number's quality rating. Rather than delete it and rewrite it later, it got the
+door the removed route used to have. Owner-gated, because the reply carries the
+sending number's display name.
+
+This is a like-for-like replacement, not new scope. It matters because "live" on
+the console's Integrations page only means "not mocked": an expired token looks
+identical from there until a devotee's reply fails to arrive.
+
+### Explicitly not in scope
+
+The Cloud API's send-timeout problem — `graph.facebook.com` is periodically
+unreachable from the HF Space — is untouched, as the plan required. The
+egress-window retry in `_resilient_send` is exactly as it was.
+
+### Going live still needs the owner
+
+Nothing here makes WhatsApp work; it removes the alternative. The Space needs
+`META_ACCESS_TOKEN` and `META_PHONE_NUMBER_ID`, and GUARDRAILS §3 still makes
+the first live send a human-approval gate. Until then the WhatsApp surface is
+the console's simulator, which drives the same brain.
+
+556 backend tests (three WAHA guard tests deleted; six new ones covering the
+footers, the stale-setting warning and the health probe); `ruff check app tests`
+down to 122 from 123.
+
 ## Standing items
 - **Two migrations are unapplied in production**, both additive and both
   reversible: `e1f2a3b4c5d6` (Part 7's booking operator columns — the whole
@@ -1177,9 +1246,10 @@ cannot see them, and pretending otherwise would be worse than the note here.
 - **`ADMIN_TOKEN` is not set on the live Space.** `"chargemod"` was removed in
   Part 4, so pushing to `hf` before the owner adds that secret leaves only the
   `admin_phones` session as a way in.
-- Part 14 (retire WAHA) must move `whatsapp_transport`'s default off `"waha"`
-  (`config.py:122`) in the same commit, or a Space with no explicit setting
-  falls through to a transport that no longer exists.
+- **WhatsApp needs its Cloud API credentials on the Space.** Part 15 removed
+  the WAHA fallback, so `META_ACCESS_TOKEN` and `META_PHONE_NUMBER_ID` are now
+  the only way a message leaves the building. A Space whose env still says
+  `WHATSAPP_TRANSPORT=waha` boots and warns; it does not fail.
 - **Demo data is live on production** (`scripts/seed_demo_data.py`, 2026-07-27):
   6 users, 24 pooja bookings, 22 payments, 6 consults, 1 partner, 3 festivals.
   Every row is marked (`NTDEMO…` refs, `+9199000000…` phones, `order_demo_…`,
