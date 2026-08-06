@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Icon } from '../components/Icon'
 import { toast } from '../components/Toast'
 import { toggleLang, useT } from '../i18n'
+import { ApiError } from '../api/client'
 import { clearHomeTempleCache, useHomeTempleId } from '../lib/homeTemple'
 import {
   useDeviceLocation,
@@ -39,16 +40,21 @@ function HomeInner({ homeId }: { homeId: string }) {
   const [searchOpen, setSearchOpen] = useState(false)
   const [mapOpen, setMapOpen] = useState(false)
 
-  const templeQuery = useTemple(homeId)
+  const templeQuery = useTemple(homeId, true)
   const temple = templeQuery.data
-  // If the saved home temple no longer resolves (data changed / migrated),
-  // drop the local copy so onboarding runs again instead of showing an empty
-  // hero. The account keeps its id: a temple pulled from the directory this
-  // morning may be back this afternoon, and erasing somebody's choice over our
-  // own data problem is worse than asking them once.
+  // Only a 404 means the temple is really gone. Any error used to clear the
+  // cache, which swept up ordinary network failures — captive-portal wifi, a
+  // 500, a cold start on the Space — and dropped the devotee into onboarding on
+  // their next launch over a blip. Worse since the offline cache landed: on
+  // error the hero still renders from the cached copy, so the app showed the
+  // temple and deleted the choice in the same pass.
+  //
+  // The account keeps its id either way: a temple pulled from the directory
+  // this morning may be back this afternoon.
   useEffect(() => {
-    if (templeQuery.isError) clearHomeTempleCache()
-  }, [templeQuery.isError])
+    const err = templeQuery.error
+    if (err instanceof ApiError && err.status === 404) clearHomeTempleCache()
+  }, [templeQuery.error])
   const poojas = useTemplePoojas(homeId).data?.poojas ?? []
   // The location chip is the ask. Tapping it means "near me", which is the one
   // moment a permission dialog explains itself — asking on app open is the

@@ -72,7 +72,15 @@ export function useNearbyTemples(limit = 200, from?: { lat: number; lng: number 
   return useTemples({ lat: origin.lat, lng: origin.lng, sort: 'near', limit })
 }
 
-export function useTemple(id: string | undefined | null) {
+/**
+ * One temple's detail.
+ *
+ * `remember` opts into the across-launches cache and only Home passes it. The
+ * cache is a single slot, and writing on every fetch meant tapping one nearby
+ * temple from the home rail evicted the home temple — defeating the one case it
+ * exists for, which is opening the app outside your own temple with no signal.
+ */
+export function useTemple(id: string | undefined | null, remember = false) {
   const query = useQuery({
     queryKey: ['temple', id],
     queryFn: () => apiGet<TempleDetail>(`/temples/${id}`),
@@ -82,12 +90,12 @@ export function useTemple(id: string | undefined | null) {
     // network answer replaces it as soon as one arrives — this is a cache, not
     // a source of truth, and stale timings shown as current would be worse than
     // a spinner.
-    placeholderData: () => recallTemple(id) ?? undefined,
+    placeholderData: () => (remember ? (recallTemple(id) ?? undefined) : undefined),
   })
 
   useEffect(() => {
-    if (query.data && !query.isPlaceholderData) rememberTemple(query.data)
-  }, [query.data, query.isPlaceholderData])
+    if (remember && query.data && !query.isPlaceholderData) rememberTemple(query.data)
+  }, [remember, query.data, query.isPlaceholderData])
 
   return query
 }

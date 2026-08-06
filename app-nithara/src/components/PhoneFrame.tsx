@@ -20,12 +20,16 @@ export function PhoneFrame({ children }: { children: ReactNode }) {
   }, [lang])
   return (
     <div className="stage">
-      <div className="phone" id="phone" data-lang={lang}>
+      <div className="phone" id="phone" data-lang={lang} data-offline={!online || undefined}>
         {/* The service worker precaches the shell, so the app opens with no
             network — and then every screen sits on a failed query. Without
             this it looks broken rather than disconnected. A strip, not a
             toast: the state persists, and a notice that fades leaves the
-            empty screens after it unexplained. */}
+            empty screens after it unexplained.
+
+            `data-offline` on the frame is what makes room for it — screens and
+            sheets are absolutely positioned, so the strip would otherwise sit
+            on top of their first 35px rather than above them. */}
         {!online && (
           <div className="offbar" role="status">
             <Icon name="i-globe" cls="ic sm" />

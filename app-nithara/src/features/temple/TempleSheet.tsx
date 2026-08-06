@@ -27,6 +27,12 @@ const money = (n: number) => '₹' + n.toLocaleString('en-IN')
 function useCheckin(templeId: string, T: (k: string) => string) {
   const qc = useQueryClient()
   return useMutation({
+    // React Query v5 PAUSES a mutation while the browser reports itself
+    // offline, leaving it `pending` forever — so the button greyed out with no
+    // toast and no way back, in exactly the situation this screen is for:
+    // standing at the temple with no signal. 'always' lets the request fail
+    // fast so `onError` can say so.
+    networkMode: 'always',
     mutationFn: () => apiPost<CheckinResult>(`/temples/${templeId}/checkin`, {}),
     onSuccess: (result) => {
       toast(result.fresh ? T('darshanRecorded') : T('darshanAlready'))

@@ -12,26 +12,39 @@ export interface Destination {
 /**
  * A maps URL for the destination.
  *
- * Coordinates first, name second. A search by name finds the wrong
- * Mahadeva temple — there are dozens in Kerala — and the directory's
- * coordinates were verified against Places, so they are the trustworthy half.
- * The name rides along only as the label on the pin.
+ * Coordinates only. A search by name finds the wrong Mahadeva temple — there
+ * are dozens in Kerala — and the directory's coordinates were verified against
+ * Places, so they are the trustworthy half.
+ *
+ * The name is deliberately NOT in the URL. An earlier version appended it as a
+ * fragment and claimed it labelled the pin; Google's Maps URLs API does not
+ * read the fragment, so it did nothing. A comment promising behaviour the code
+ * does not have is worse than no comment.
  *
  * Google Maps rather than a `geo:` URI: `geo:` is Android-only, and this one
  * URL is handled by the Maps app on Android and iOS and by the web on desktop.
  */
 export function directionsUrl(to: Destination): string | null {
   if (!Number.isFinite(to.lat) || !Number.isFinite(to.lng)) return null
-  const destination = `${to.lat},${to.lng}`
-  const label = encodeURIComponent(to.name || 'Temple')
-  return `https://www.google.com/maps/dir/?api=1&destination=${destination}&destination_place_id=&travelmode=driving#${label}`
+  return `https://www.google.com/maps/dir/?api=1&destination=${to.lat},${to.lng}&travelmode=driving`
 }
 
-/** Open directions in whatever handles maps here. Returns false if we could
- *  not — a temple with no coordinates, or a blocked popup. */
+/**
+ * Open directions in whatever handles maps here.
+ *
+ * Returns false ONLY when there is nothing to open — a temple with no
+ * coordinates. It deliberately does not treat `window.open`'s return value as
+ * the success signal: passing `noopener` in the feature string makes the spec
+ * return `null` even when the tab opened perfectly, so the previous version
+ * reported failure on every single tap and showed "Couldn't open directions"
+ * immediately after Maps had opened.
+ *
+ * The opener is severed afterwards instead, which buys the same protection.
+ */
 export function openDirections(to: Destination): boolean {
   const url = directionsUrl(to)
   if (!url) return false
-  const opened = window.open(url, '_blank', 'noopener,noreferrer')
-  return !!opened
+  const opened = window.open(url, '_blank')
+  if (opened) opened.opener = null
+  return true
 }

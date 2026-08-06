@@ -128,6 +128,24 @@ describe('data states', () => {
     )
   })
 
+  it('keeps the temple through a server error, which is not the same as gone', async () => {
+    // Any error used to clear the choice, which swept up captive-portal wifi,
+    // a 500 and a cold start on the Space — dropping the devotee into
+    // onboarding over a blip. Only a 404 means the temple is really gone.
+    templeStatus = 500
+    renderHome()
+    // Wait until the temple request has actually been made and failed, so the
+    // assertion is about the error path rather than about racing it.
+    await waitFor(() =>
+      expect(
+        (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.some((c) =>
+          /\/temples\/tsr-guruvayur$/.test(String(c[0])),
+        ),
+      ).toBe(true),
+    )
+    await waitFor(() => expect(localStorage.getItem('nithara.home_temple')).toBe('tsr-guruvayur'))
+  })
+
   it('offers onboarding when no temple has been chosen', async () => {
     localStorage.clear()
     vi.stubGlobal(
