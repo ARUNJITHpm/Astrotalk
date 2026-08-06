@@ -4,7 +4,18 @@ import { Icon } from '../components/Icon'
 import { toast } from '../components/Toast'
 import { toggleLang, useT } from '../i18n'
 import { clearHomeTempleCache, useHomeTempleId } from '../lib/homeTemple'
-import { useFeed, useNearbyTemples, usePanchangam, useTemple, useTemplePoojas } from '../api/hooks'
+import {
+  useFeed,
+  useMembers,
+  useNakshatramNext,
+  useNearbyTemples,
+  usePanchangam,
+  useTemple,
+  useTemplePoojas,
+} from '../api/hooks'
+import { nakName } from '../lib/nakshatrams'
+import { buildPromos, type Promo } from '../lib/promos'
+import { PromoRail } from '../features/home/PromoRail'
 import { TempleSheet } from '../features/temple/TempleSheet'
 import { SearchSheet } from '../features/temple/SearchSheet'
 import { MapCard, MapSheet } from '../features/temple/Map'
@@ -41,6 +52,27 @@ function HomeInner({ homeId }: { homeId: string }) {
   const nearby = (useNearbyTemples().data ?? []).filter((t) => t.id !== homeId).slice(0, 3)
   const feed = useFeed().data ?? []
   const panchangam = usePanchangam().data
+  const members = useMembers().data ?? []
+  // One star-day lookup covering every member's nakshatram. The endpoint takes
+  // the index repeatably, so this is a single request however large the family.
+  const starDays =
+    useNakshatramNext(members.map((m) => m.nak).filter((n): n is number => n != null)).data ?? []
+
+  const promos = buildPromos({ panchangam, members, starDays, feed, t: T, lang, nakName: (i) => nakName(i, lang) })
+
+  function actOnPromo(promo: Promo) {
+    switch (promo.action.kind) {
+      case 'poojas':
+        navigate('/poojas')
+        break
+      case 'chat':
+        navigate('/astro')
+        break
+      case 'temple':
+        setOpenId(promo.action.templeId)
+        break
+    }
+  }
 
   const book = (key: string, amt: number) => toast(`${T('book')} · ${money(amt)}`)
   const today = new Date().toLocaleDateString(lang === 'ml' ? 'ml-IN' : 'en-IN', {
@@ -74,6 +106,8 @@ function HomeInner({ homeId }: { homeId: string }) {
           <span className="datechip">{today}</span>
         </div>
       </header>
+
+      <PromoRail promos={promos} onAct={actOnPromo} />
 
       {panchangam && (
         <button className="panch" onClick={() => navigate('/astro')}>
