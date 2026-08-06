@@ -53,6 +53,13 @@ class User(Base):
     # to read their chat transcripts. Off by default; only the customer can
     # flip it (POST /identity/transcript-consent).
     transcript_consent: Mapped[bool] = mapped_column(default=False)
+    # The temple this devotee chose during onboarding. A plain string, NOT a
+    # foreign key to temples.id: identity and temples are separate modules and
+    # compose through services, never each other's tables (AGENTS.md). The
+    # route validates the id against TemplesService before storing it, and a
+    # temple later retired from the directory simply stops resolving — which the
+    # app already handles by offering onboarding again.
+    home_temple_id: Mapped[str | None] = mapped_column(nullable=True, default=None)
     created_at: Mapped[datetime] = mapped_column(default=_utcnow)
 
     # Right-to-delete (GUARDRAILS.md §4): deleting a user cascades to charts.

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Icon } from '../components/Icon'
 import { toast } from '../components/Toast'
 import { toggleLang, useT } from '../i18n'
-import { clearHomeTempleId, useHomeTempleId } from '../lib/homeTemple'
+import { clearHomeTempleCache, useHomeTempleId } from '../lib/homeTemple'
 import { useFeed, useNearbyTemples, usePanchangam, useTemple, useTemplePoojas } from '../api/hooks'
 import { TempleSheet } from '../features/temple/TempleSheet'
 import { SearchSheet } from '../features/temple/SearchSheet'
@@ -30,9 +30,12 @@ function HomeInner({ homeId }: { homeId: string }) {
   const templeQuery = useTemple(homeId)
   const temple = templeQuery.data
   // If the saved home temple no longer resolves (data changed / migrated),
-  // forget it so onboarding runs again instead of showing an empty hero.
+  // drop the local copy so onboarding runs again instead of showing an empty
+  // hero. The account keeps its id: a temple pulled from the directory this
+  // morning may be back this afternoon, and erasing somebody's choice over our
+  // own data problem is worse than asking them once.
   useEffect(() => {
-    if (templeQuery.isError) clearHomeTempleId()
+    if (templeQuery.isError) clearHomeTempleCache()
   }, [templeQuery.isError])
   const poojas = useTemplePoojas(homeId).data?.poojas ?? []
   const nearby = (useNearbyTemples().data ?? []).filter((t) => t.id !== homeId).slice(0, 3)

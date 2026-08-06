@@ -128,6 +128,22 @@ class BirthDetailsOut(BaseModel):
     birth_place: str = ""
 
 
+class HomeTempleIn(BaseModel):
+    """The temple a devotee picks during onboarding."""
+
+    temple_id: str
+
+
+class HomeTempleOut(BaseModel):
+    """The chosen temple, or null for an account that has not chosen one.
+
+    Null is a normal answer, not an error: onboarding is skippable and the app
+    offers it again whenever this is empty.
+    """
+
+    temple_id: str | None = None
+
+
 class ReferralSummary(BaseModel):
     """The logged-in user's referral panel (GROWTH_PLAN.md Part 2)."""
 

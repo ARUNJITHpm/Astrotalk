@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { Icon } from '../components/Icon'
 import { useT } from '../i18n'
 import { setHomeTempleId, useHomeTempleId } from '../lib/homeTemple'
@@ -38,6 +39,7 @@ export default function Profile() {
   const { data: members = [] } = useMembers()
   const { data: stats } = useStats()
   const { data: milestones = [] } = useMilestones()
+  const qc = useQueryClient()
   const { data: chart } = useChart()
   const [editingBirth, setEditingBirth] = useState(false)
   const [sharing, setSharing] = useState(false)
@@ -254,8 +256,8 @@ export default function Profile() {
         open={searchOpen}
         onClose={() => setSearchOpen(false)}
         onPick={(id) => {
-          setHomeTempleId(id)
           setSearchOpen(false)
+          void setHomeTempleId(id, qc)
         }}
       />
       <ChatSheet open={chatOpen} onClose={() => setChatOpen(false)} />

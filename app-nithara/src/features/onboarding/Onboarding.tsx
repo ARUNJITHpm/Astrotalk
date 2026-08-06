@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react'
 import { Icon } from '../../components/Icon'
 import { useNearbyTemples } from '../../api/hooks'
+import { useQueryClient } from '@tanstack/react-query'
+
 import { setHomeTempleId } from '../../lib/homeTemple'
 import { useT } from '../../i18n'
 
@@ -20,10 +22,21 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
     return data.filter((t) => `${t.en} ${t.ml} ${t.place}`.toLowerCase().includes(needle))
   }, [data, q])
 
-  function finish() {
+  const qc = useQueryClient()
+
+  async function finish() {
     if (!picked) return
-    setHomeTempleId(picked)
+    // Close the sheet first: the choice is cached locally straight away, so the
+    // home screen is already right, and a slow network must not leave somebody
+    // staring at onboarding they have finished with.
     onDone()
+    try {
+      await setHomeTempleId(picked, qc)
+    } catch {
+      // The account write failed. The local cache still holds the choice, and
+      // the next successful read reconciles — so the devotee is not asked again
+      // over a dropped request.
+    }
   }
 
   return (

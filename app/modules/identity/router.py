@@ -21,6 +21,8 @@ from app.modules.identity.schemas import (
     BirthDetailsIn,
     BirthDetailsOut,
     ChartOut,
+    HomeTempleIn,
+    HomeTempleOut,
     LoginRequest,
     MemberCreate,
     MemberOut,
@@ -331,6 +333,37 @@ async def my_referral(user: CurrentUser, session: SessionDep) -> ReferralSummary
         share_link=f"{base}/ui/login?ref={summary['code']}",
         **summary,
     )
+
+
+@router.get("/me/home-temple", response_model=HomeTempleOut)
+async def my_home_temple(user: CurrentUser) -> HomeTempleOut:
+    """The temple this account chose during onboarding, or null."""
+    return HomeTempleOut(temple_id=user.home_temple_id)
+
+
+@router.put("/me/home-temple", response_model=HomeTempleOut)
+async def set_my_home_temple(
+    payload: HomeTempleIn, user: CurrentUser, session: SessionDep
+) -> HomeTempleOut:
+    """Record the chosen temple against the account.
+
+    It lived in `localStorage`, so clearing site data or opening the app on a
+    second phone threw away the one thing onboarding asks for — while the
+    account itself survived, because it is keyed by a server-minted anon id.
+
+    The id is validated here rather than constrained in the database: identity
+    and temples are separate modules that compose through services (AGENTS.md),
+    and a foreign key would also make retiring a temple fail against every
+    account that had chosen it.
+    """
+    from app.modules.temples.service import TemplesService
+
+    temple_id = payload.temple_id.strip()
+    if TemplesService().get_temple(temple_id) is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Temple not found")
+    user.home_temple_id = temple_id
+    await session.commit()
+    return HomeTempleOut(temple_id=temple_id)
 
 
 @router.get("/me/chart", response_model=ChartOut)
