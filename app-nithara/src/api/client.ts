@@ -67,6 +67,12 @@ export const apiPost = <T>(path: string, body?: unknown): Promise<T> =>
     body: body === undefined ? undefined : JSON.stringify(body),
   })
 
+export const apiPut = <T>(path: string, body?: unknown): Promise<T> =>
+  api<T>(path, {
+    method: 'PUT',
+    body: body === undefined ? undefined : JSON.stringify(body),
+  })
+
 /** Build a query string from defined params only. */
 export function qs(params: Record<string, string | number | undefined | null>): string {
   const parts = Object.entries(params)

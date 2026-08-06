@@ -3,11 +3,23 @@ import { Icon } from '../components/Icon'
 import { useT } from '../i18n'
 import { setHomeTempleId, useHomeTempleId } from '../lib/homeTemple'
 import { nakName } from '../lib/nakshatrams'
-import { useBookings, useMembers, useMilestones, useStats, useTemple } from '../api/hooks'
+import {
+  useBirthDetails,
+  useBookings,
+  useChart,
+  useMembers,
+  useMilestones,
+  useStats,
+  useTemple,
+} from '../api/hooks'
+import { apiPost } from '../api/client'
 import { MemberSheet } from '../features/member/MemberSheet'
 import { SearchSheet } from '../features/temple/SearchSheet'
 import { ChatSheet } from '../features/chat/ChatSheet'
-import type { Member } from '../api/types'
+import { BirthDetailsSheet } from '../features/profile/BirthDetailsSheet'
+import { ChartCard } from '../features/profile/ChartCard'
+import type { Member, ShareCard } from '../api/types'
+import type { NatalChart } from '../lib/chart'
 
 // Badge icon + i18n label key per milestone key returned by /me/milestones.
 // Without the label map the UI would render raw snake_case in both languages.
@@ -26,6 +38,12 @@ export default function Profile() {
   const { data: members = [] } = useMembers()
   const { data: stats } = useStats()
   const { data: milestones = [] } = useMilestones()
+  const { data: chart } = useChart()
+  const [editingBirth, setEditingBirth] = useState(false)
+  const [sharing, setSharing] = useState(false)
+  // Only fetched while the sheet is open — birth data should not sit in a query
+  // cache on a screen that does not need it.
+  const { data: birth } = useBirthDetails(editingBirth)
   const bookings = useBookings().data ?? []
 
   const [editing, setEditing] = useState<Member | 'new' | null>(null)
@@ -34,6 +52,43 @@ export default function Profile() {
 
   const self = members.find((m) => m.self)
   const templeName = temple ? (lang === 'ml' ? temple.ml : temple.en) : ''
+
+  /**
+   * Share the reading, not the birth data.
+   *
+   * The card lands on a PUBLIC /s/ page, so what goes on it is deliberately the
+   * two facts a person volunteers about themselves — janma nakshatram and rasi
+   * — and never the date, time or place of birth. Those three are what a chart
+   * is recomputed from; putting them on a shareable image would hand anyone who
+   * saw it the whole jathakam.
+   */
+  async function shareChart() {
+    const natal = chart?.natal_json as NatalChart | undefined
+    if (!natal) return
+    setSharing(true)
+    try {
+      const parts = [
+        natal.nakshatram ? `${T('yourStar')}: ${natal.nakshatram}` : '',
+        natal.rasi ? `${T('rasiWord')}: ${natal.rasi}` : '',
+      ].filter(Boolean)
+      const card = await apiPost<ShareCard>('/content/cards', {
+        title: T('myJathakam'),
+        body: parts.join('\n'),
+        template: 'story',
+      })
+      if (navigator.share) {
+        await navigator.share({ title: T('myJathakam'), url: card.share_url })
+      } else {
+        await navigator.clipboard?.writeText(card.share_url)
+      }
+    } catch {
+      // Sharing is an extra, never a step in anything. A failure here leaves the
+      // chart exactly as it was, so there is nothing to roll back and nothing
+      // the person needs to do differently.
+    } finally {
+      setSharing(false)
+    }
+  }
 
   return (
     <section className="screen" data-active id="s-profile">
@@ -87,31 +142,35 @@ export default function Profile() {
         </div>
       </div>
 
-      {/* Birth chart. This build is anonymous-only and the chat brain has no
-          chart-creation path (it only READS a chart), so we must not promise
-          "three questions and Nithara builds your jathakam" — that CTA would be
-          a dead end. We state the position plainly and offer what does work:
-          setting your nakshatram, which really does personalise the app. */}
-      <div className="pcard">
-        <h2>{T('birthChart')}</h2>
-        <div className="setup">
-          <div className="si">
-            <Icon name="i-sparkle" />
+      {/* Birth chart. The CTA used to offer only "set your nakshatram", because
+          an anonymous account had no way to create a chart — the signup form was
+          the only writer of birth details and an anon account never sees it.
+          PUT /identity/me/birth closed that, so the offer is now the real one. */}
+      {chart ? (
+        <ChartCard
+          chart={chart.natal_json as NatalChart}
+          onEdit={() => setEditingBirth(true)}
+          onShare={shareChart}
+          sharing={sharing}
+        />
+      ) : (
+        <div className="pcard">
+          <h2>{T('birthChart')}</h2>
+          <div className="setup">
+            <div className="si">
+              <Icon name="i-sparkle" />
+            </div>
+            <div className="st">
+              <b>{T('chartNotSet')}</b>
+              <span>{T('chartSetupBlurb')}</span>
+            </div>
           </div>
-          <div className="st">
-            <b>{T('chartNotSet')}</b>
-            <span>{T('chartComingSoon')}</span>
-          </div>
+          <button className="btn btn-pri btn-block" onClick={() => setEditingBirth(true)}>
+            <Icon name="i-star" cls="ic sm" />
+            {T('computeChart')}
+          </button>
         </div>
-        <button
-          className="btn btn-pri btn-block"
-          disabled={!self}
-          onClick={() => setEditing(self ?? 'new')}
-        >
-          <Icon name="i-star" cls="ic sm" />
-          {T('setYourStar')}
-        </button>
-      </div>
+      )}
 
       {/* Family board */}
       <div className="pcard">
@@ -175,6 +234,20 @@ export default function Profile() {
           </div>
         </div>
       )}
+
+      <BirthDetailsSheet
+        open={editingBirth}
+        initial={
+          birth
+            ? {
+                dob: birth.dob ?? '',
+                birth_time: birth.birth_time?.slice(0, 5) ?? '',
+                birth_place: birth.birth_place ?? '',
+              }
+            : undefined
+        }
+        onClose={() => setEditingBirth(false)}
+      />
 
       <MemberSheet editing={editing} onClose={() => setEditing(null)} />
       <SearchSheet

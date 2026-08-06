@@ -7,6 +7,8 @@ import type {
   Milestone,
   NakshatramDay,
   Panchangam,
+  BirthDetails,
+  Chart,
   PoojaCatalogue,
   Stats,
   Temple,
@@ -82,6 +84,37 @@ export function useNakshatramNext(naks: number[]) {
 }
 
 // ---- authed (anon or account) surfaces ----
+
+/**
+ * The signed-in account's natal chart, or null when it has none.
+ *
+ * A 404 is the ordinary state, not an error: Nithara accounts start anonymous
+ * and birth details are optional, so most accounts have no chart and the
+ * profile offers to make one. Token-scoped — no account id in the URL.
+ */
+export function useChart() {
+  return useQuery({
+    queryKey: ['chart'],
+    queryFn: async () => {
+      try {
+        return await apiGet<Chart>('/identity/me/chart')
+      } catch (err) {
+        if ((err as { status?: number })?.status === 404) return null
+        throw err
+      }
+    },
+  })
+}
+
+/** The three fields behind the chart, read back so a typo in one does not mean
+ *  retyping all three. Fetched only when the edit sheet opens. */
+export function useBirthDetails(enabled: boolean) {
+  return useQuery({
+    queryKey: ['birth'],
+    enabled,
+    queryFn: () => apiGet<BirthDetails>('/identity/me/birth'),
+  })
+}
 
 export function useMembers() {
   return useQuery({ queryKey: ['members'], queryFn: () => apiGet<Member[]>('/identity/me/members') })

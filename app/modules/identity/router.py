@@ -18,6 +18,8 @@ from app.modules.identity.schemas import (
     AnonRequest,
     AnonResponse,
     AuthResponse,
+    BirthDetailsIn,
+    BirthDetailsOut,
     ChartOut,
     LoginRequest,
     MemberCreate,
@@ -329,6 +331,72 @@ async def my_referral(user: CurrentUser, session: SessionDep) -> ReferralSummary
         share_link=f"{base}/ui/login?ref={summary['code']}",
         **summary,
     )
+
+
+@router.get("/me/chart", response_model=ChartOut)
+async def my_chart(user: CurrentUser, session: SessionDep):
+    """This account's stored natal chart, or 404 when it has none.
+
+    Token-scoped, like /me/members and /me/stats. The alternative —
+    ``/users/{id}/chart`` — obliges the client to know and send its own user id,
+    which puts an account identifier in a URL for no gain: the session already
+    says who is asking, and it cannot be spoofed.
+
+    404 is the ordinary case, not an error. Nithara accounts start anonymous and
+    birth details are optional, so most accounts have no chart and the profile
+    screen offers to make one.
+    """
+    chart = await _service.get_chart(session, user.id)
+    if chart is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="No chart yet")
+    return chart
+
+
+@router.get("/me/birth", response_model=BirthDetailsOut)
+async def my_birth_details(user: CurrentUser):
+    """The three fields behind this account's chart, for correcting them.
+
+    Its own account, over its own session — which is the one place birth data
+    legitimately goes. GUARDRAILS §4 is about URLs, query strings, logs and list
+    responses; a person reading back what they themselves entered is none of
+    those, and the alternative is making them retype all three to fix a typo in
+    one.
+    """
+    return BirthDetailsOut(
+        dob=user.dob,
+        birth_time=user.birth_time,
+        birth_place=user.birth_place,
+    )
+
+
+@router.put("/me/birth", response_model=ChartOut)
+async def set_birth_details(
+    payload: BirthDetailsIn, user: CurrentUser, session: SessionDep
+):
+    """Record the logged-in account's birth details and compute its chart.
+
+    The missing half of the chart flow. ``recompute-chart`` recomputes from
+    details already on the row, and the only writer of those details was the
+    signup form — which an anonymous account never sees. So an app account could
+    READ a chart it had no way to create, and the profile screen said "coming
+    soon" because there was genuinely nothing to show.
+
+    The account comes from the session token, so one user can never write
+    another's birth data — the same rule ``/users/{id}`` enforces for reads.
+
+    Geocodes the place before computing: the lagna is location-sensitive, and a
+    chart drawn on the placeholder coordinates is wrong in the one way a devotee
+    would notice.
+    """
+    user.dob = payload.dob
+    user.birth_time = payload.birth_time
+    user.birth_place = payload.birth_place.strip()
+    user = await _service.regeocode_user(session, user)
+    natal_json = await _compute_natal_chart(user)
+    chart = await _service.save_chart(session, user.id, natal_json)
+    await session.commit()
+    await session.refresh(chart)
+    return chart
 
 
 @router.post("/recompute-chart", response_model=ChartOut)

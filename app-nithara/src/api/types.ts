@@ -54,6 +54,43 @@ export interface PoojaCatalogue {
   service_fee_paise: number
 }
 
+/** A stored natal chart. `natal_json` is read through lib/chart.ts, which is
+ *  where its shape is described — the backend serves it whole and the app
+ *  derives the rasi grid and dasha bar from it (build plan Part 3C). */
+export interface Chart {
+  id: number
+  user_id: number
+  natal_json: Record<string, unknown>
+  computed_at: string
+}
+
+/** A stored natal chart. `natal_json`'s shape is described in lib/chart.ts,
+ *  which is where the rasi grid and dasha bar are derived from it — the backend
+ *  serves it whole and does not reshape it (build plan Part 3C). */
+export interface Chart {
+  id: number
+  user_id: number
+  natal_json: Record<string, unknown>
+  computed_at: string
+}
+
+/** What this account entered — the three fields and nothing derived. */
+export interface BirthDetails {
+  dob: string | null
+  birth_time: string | null
+  birth_place: string
+}
+
+/** A rendered share card and the public page a shared link lands on. */
+export interface ShareCard {
+  slug: string
+  kind: string
+  title: string
+  media_url: string
+  share_url: string
+  hits: number
+}
+
 export interface CheckinResult {
   fresh: boolean
   temple_id: string

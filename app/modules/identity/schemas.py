@@ -92,6 +92,42 @@ class UserCreate(BaseModel):
     org: str | None = None
 
 
+class BirthDetailsIn(BaseModel):
+    """The three facts a natal chart needs, set after the account exists.
+
+    Nithara's accounts start anonymous (`POST /identity/anon`), so birth details
+    arrive later — or never. Until this existed the only way to record them was
+    the signup form, which an anonymous account never sees: the app could read a
+    chart and had no way to create one.
+
+    A body, never a query string. GUARDRAILS §4 puts dob, birth time and birth
+    place in the same class as the chart they produce, and a URL is written to
+    every access log between here and the browser.
+
+    ``birth_time`` is optional and stays optional. A great many people know the
+    day and not the hour, and the engine says so — ``birth_time_known`` rides on
+    the chart, the lagna is computed from noon, and the reading is narrowed
+    rather than invented. Demanding a time would make people guess one, which is
+    worse than not knowing: a guessed hour produces a confidently wrong lagna.
+    """
+
+    dob: date
+    birth_time: time | None = None
+    birth_place: str
+
+
+class BirthDetailsOut(BaseModel):
+    """What this account previously entered, read back to itself.
+
+    Deliberately the same three fields and nothing derived — no coordinates, no
+    timezone, no chart. Enough to correct a typo, and no more.
+    """
+
+    dob: date | None = None
+    birth_time: time | None = None
+    birth_place: str = ""
+
+
 class ReferralSummary(BaseModel):
     """The logged-in user's referral panel (GROWTH_PLAN.md Part 2)."""
 
